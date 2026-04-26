@@ -99,7 +99,7 @@ export default async function CheckoutPage(props: { params: Promise<{ productSlu
               <CheckoutClient productId={product.id} price={product.price} />
               
               <p className="text-center text-xs text-muted-foreground mt-4 leading-relaxed">
-                هذه بوابة دفع تجريبية مخصصة للبيئة المحلية (تجاوز الدفع بضغطة زر). الكود مهيأ لربط Stripe/Tap مستقبلاً.
+                ستتمكن من الدفع يدوياً عبر التحويل البنكي أو STC Pay. سيتم تزويدك بالبيانات بعد إتمام الطلب لتأكيد الدفع.
               </p>
            </div>
         </div>

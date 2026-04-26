@@ -128,7 +128,19 @@ model Order {
   id          String       @id @default(cuid())
   userId      String
   totalAmount Float
-  status      String       @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  status      String       @default("PENDING_PAYMENT") // PENDING_PAYMENT, PENDING_REVIEW, PAID, REJECTED, CANCELED, REFUNDED
+  
+  // Manual Payment Tracking
+  paymentReference String?
+  paymentNote      String?
+  paymentProofUrl  String?
+  paidAt           DateTime?
+
+  // Review System
+  reviewedAt       DateTime?
+  reviewedById     String?
+  rejectedReason   String?
+
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   items       OrderItem[]
   createdAt   DateTime     @default(now())

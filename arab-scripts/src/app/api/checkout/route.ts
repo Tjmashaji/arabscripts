@@ -33,12 +33,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "المنتج غير موجود" }, { status: 404 });
     }
 
-    // Create Order
+    // Create Order with PENDING_PAYMENT
     const order = await prisma.order.create({
       data: {
         userId: session.user.id,
         totalAmount: product.price,
-        status: "PAID", // Auto paid for local testing
+        status: "PENDING_PAYMENT", 
         items: {
           create: {
             productId: product.id,
@@ -49,19 +49,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // Create License
-    const licenseKey = generateLicenseKey();
-    const license = await prisma.license.create({
-      data: {
-        key: licenseKey,
-        productId: product.id,
-        userId: session.user.id,
-        status: "ACTIVE",
-        maxUses: 1,
-      }
-    });
-
-    return NextResponse.json({ success: true, order, license });
+    return NextResponse.json({ success: true, order, redirect: `/checkout/manual-payment/${order.id}` });
 
   } catch (error) {
     console.error("Checkout Error:", error);

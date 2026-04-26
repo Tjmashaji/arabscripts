@@ -97,8 +97,13 @@ export default async function CustomerDashboardPage() {
               <Card key={order.id} className="bg-card/30 border-border/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex justify-between items-center text-muted-foreground font-normal">
-                    <span>طلب رقم: {order.id.slice(-6).toUpperCase()}</span>
-                    <span>{new Date(order.createdAt).toLocaleDateString('ar-SA')}</span>
+                    <span>طلب رقم: <span className="font-mono text-xs">{order.id}</span></span>
+                    
+                    {order.status === 'PENDING_PAYMENT' && <Badge variant="destructive">بانتظار الدفع</Badge>}
+                    {order.status === 'PENDING_REVIEW' && <Badge variant="secondary" className="text-yellow-500">بانتظار مراجعة الإدارة</Badge>}
+                    {order.status === 'PAID' && <Badge variant="default" className="bg-green-500">مدفوع ومكتمل</Badge>}
+                    {order.status === 'REJECTED' && <Badge variant="destructive">تم رفض الدفع</Badge>}
+                    {order.status === 'CANCELED' && <Badge variant="outline">تم الإلغاء</Badge>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 flex flex-col gap-3">
@@ -112,6 +117,18 @@ export default async function CustomerDashboardPage() {
                      <span className="font-bold">الإجمالي</span>
                      <span className="font-black text-xl">{order.totalAmount} ريال</span>
                   </div>
+                  {order.status === 'PENDING_PAYMENT' && (
+                    <div className="mt-4">
+                       <Link href={`/checkout/manual-payment/${order.id}`}>
+                         <Button className="w-full font-bold shadow-lg shadow-primary/20">تأكيد الدفع الآن</Button>
+                       </Link>
+                    </div>
+                  )}
+                  {order.status === 'REJECTED' && (
+                    <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg text-sm font-bold text-center">
+                       تم رفض عملية الدفع: {order.rejectedReason || "البيانات غير صحيحة"}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
