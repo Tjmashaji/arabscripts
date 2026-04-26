@@ -35,9 +35,9 @@ export function HeaderAuth() {
   }
 
   return (
-    <Button variant="secondary" className="hidden sm:flex gap-2" onClick={() => signIn()}>
+    <Button variant="secondary" className="flex gap-2 hover:scale-105 transition-transform" onClick={() => signIn()}>
       <User className="h-4 w-4" />
-      <span>تسجيل الدخول</span>
+      <span className="hidden sm:inline">تسجيل الدخول</span>
     </Button>
   );
 }

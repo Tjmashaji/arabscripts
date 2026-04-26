@@ -19,25 +19,25 @@ export default async function Home() {
   return (
     <div className="flex flex-col items-center w-full">
       {/* HERO SECTION */}
-      <section className="relative w-full max-w-7xl mx-auto px-4 py-24 sm:py-32 flex flex-col items-center text-center overflow-hidden">
+      <section className="relative w-full max-w-7xl mx-auto px-4 py-20 sm:py-32 flex flex-col items-center text-center overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background -z-10" />
         
-        <Badge variant="outline" className="mb-6 px-4 py-1.5 border-primary/50 text-primary bg-primary/10 backdrop-blur-sm shadow-lg">
+        <Badge variant="outline" className="mb-8 px-4 py-2 border-primary/50 text-primary bg-primary/10 backdrop-blur-sm shadow-[0_0_20px_-5px_rgba(var(--primary),0.5)] transition-all hover:scale-105 cursor-default">
           🚀 الوجهة المفضلة لأصحاب سيرفرات الرول بلاي
         </Badge>
         
-        <h1 className="text-4xl md:text-6xl font-black tracking-tight mb-6 max-w-4xl leading-tight">
-          سكربتات <span className="text-gradient">حصرية واحترافية</span> <br />
-          جاهزة لسيرفرك
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tight mb-8 max-w-5xl leading-[1.2] md:leading-[1.1]">
+          سكربتات <span className="text-gradient">حصرية واحترافية</span> <br className="hidden sm:block" />
+          جاهزة لرفع مستوى سيرفرك
         </h1>
         
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed font-medium">
+        <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed font-medium px-2 md:px-0">
           أضف لمسة الإبداع لسيرفرك مع أقوى السكربتات المبرمجة بذكاء. توافق تام مع أحدث إصدارات ESX و QBCore وتجربة مستخدم مبهرة.
         </p>
         
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          <Link href="/products">
-            <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 font-bold shadow-[0_0_40px_-5px_rgba(var(--primary),0.6)]">
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto px-4 sm:px-0">
+          <Link href="/products" className="w-full sm:w-auto">
+            <Button size="lg" className="w-full sm:w-auto text-lg h-14 md:h-16 px-8 md:px-12 font-bold shadow-[0_0_40px_-5px_rgba(var(--primary),0.6)] hover:scale-105 transition-transform rounded-2xl">
               <ShoppingCart className="w-5 h-5 ml-2" /> تصفح المتجر بالكامل
             </Button>
           </Link>
@@ -132,12 +132,12 @@ export default async function Home() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
   return (
-    <Card className="glass-card hover:border-primary/50 transition-colors duration-300">
-      <CardContent className="p-6 flex flex-col items-start gap-4">
-        <div className="p-3 rounded-2xl bg-primary/10">
+    <Card className="glass-card transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_10px_40px_-15px_rgba(var(--primary),0.5)] group cursor-default">
+      <CardContent className="p-8 flex flex-col items-start gap-4">
+        <div className="p-4 rounded-2xl bg-primary/10 group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-500 shadow-inner">
           {icon}
         </div>
-        <h3 className="text-xl font-bold">{title}</h3>
+        <h3 className="text-xl font-bold group-hover:text-primary transition-colors">{title}</h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
           {description}
         </p>

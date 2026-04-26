@@ -122,10 +122,10 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-x-hidden;
   }
   html {
-    @apply font-sans;
+    @apply font-sans scroll-smooth;
   }
   .font-arabic {
     font-family: var(--font-cairo), var(--font-inter), sans-serif;
@@ -134,15 +134,15 @@
 
 @layer utilities {
   .glass {
-    @apply bg-background/60 backdrop-blur-md border border-border/50 shadow-sm;
+    @apply bg-background/60 backdrop-blur-md border border-border/50 shadow-sm transition-all duration-300;
   }
   .glass-card {
-    @apply bg-card/40 backdrop-blur-xl border border-border/30 shadow-lg;
+    @apply bg-card/40 backdrop-blur-xl border border-border/30 shadow-lg transition-all duration-300 hover:shadow-primary/5 hover:border-primary/20;
   }
   .glass-panel {
-    @apply bg-black/40 backdrop-blur-2xl border border-white/10 shadow-2xl;
+    @apply bg-black/40 backdrop-blur-2xl border border-white/10 shadow-2xl transition-all duration-300;
   }
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60 drop-shadow-sm;
   }
 }
