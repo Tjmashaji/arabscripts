@@ -21,10 +21,7 @@ export function Header() {
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-bold">
             <Link href="/products" className="transition-all hover:text-primary hover:-translate-y-1">
-              المنتجات
-            </Link>
-            <Link href="/categories" className="transition-all hover:text-primary hover:-translate-y-1">
-              التصنيفات
+              المنتجات والتصنيفات
             </Link>
             <Link href="/dashboard" className="transition-all hover:text-primary hover:-translate-y-1">
               الحساب و التراخيص
@@ -69,8 +66,7 @@ export function Header() {
       {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
         <div className="md:hidden absolute top-20 left-0 w-full bg-background/95 backdrop-blur-xl border-b border-border/50 shadow-2xl flex flex-col items-center py-6 gap-6 animate-in slide-in-from-top-4">
-          <Link onClick={() => setIsMobileMenuOpen(false)} href="/products" className="text-lg font-bold hover:text-primary">المنتجات</Link>
-          <Link onClick={() => setIsMobileMenuOpen(false)} href="/categories" className="text-lg font-bold hover:text-primary">التصنيفات</Link>
+          <Link onClick={() => setIsMobileMenuOpen(false)} href="/products" className="text-lg font-bold hover:text-primary">المنتجات والتصنيفات</Link>
           <Link onClick={() => setIsMobileMenuOpen(false)} href="/dashboard" className="text-lg font-bold hover:text-primary">حسابي وتراخيصي</Link>
           <Link onClick={() => setIsMobileMenuOpen(false)} href="/support" className="text-lg font-bold hover:text-primary">الدعم الفني</Link>
           

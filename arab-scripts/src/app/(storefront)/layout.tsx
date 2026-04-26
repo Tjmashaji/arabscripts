@@ -26,8 +26,8 @@ export default function StorefrontLayout({
             <h4 className="font-bold mb-4 text-foreground">روابط سريعة</h4>
             <ul className="space-y-2 text-muted-foreground">
               <li><a href="/products" className="hover:text-primary transition-colors">تصفح المتجر</a></li>
-              <li><a href="/dashboard/purchases" className="hover:text-primary transition-colors">مشترياتي</a></li>
-              <li><a href="/dashboard/licenses" className="hover:text-primary transition-colors">إدارة التراخيص الخاصة بي</a></li>
+              <li><a href="/dashboard" className="hover:text-primary transition-colors">مشترياتي</a></li>
+              <li><a href="/dashboard" className="hover:text-primary transition-colors">إدارة التراخيص الخاصة بي</a></li>
               <li><a href="/support" className="hover:text-primary transition-colors">الدعم الفني وفتح تذكرة</a></li>
             </ul>
           </div>
