@@ -26,16 +26,22 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-20">
-      <div className="flex justify-between items-center mb-8">
-         <h1 className="text-4xl font-bold">لوحة تحكم الإدارة</h1>
-         <div className="flex gap-3">
-            <Link href="/admin/products" className="bg-background border border-border px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors text-sm font-bold flex items-center gap-2">
-               <Package className="w-4 h-4" /> المنتجات
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+         <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">لوحة تحكم الإدارة</h1>
+         <div className="flex flex-wrap gap-3">
+            <Link href="/admin/products" className="bg-card border border-border px-4 py-2 rounded-xl hover:bg-primary/20 hover:border-primary/50 transition-all text-sm font-bold flex items-center gap-2 shadow-sm">
+               <Package className="w-4 h-4 text-blue-500" /> المنتجات
             </Link>
-            <Link href="/admin/licenses" className="bg-background border border-border px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors text-sm font-bold flex items-center gap-2">
-               <KeyRound className="w-4 h-4" /> التراخيص
+            <Link href="/admin/licenses" className="bg-card border border-border px-4 py-2 rounded-xl hover:bg-primary/20 hover:border-primary/50 transition-all text-sm font-bold flex items-center gap-2 shadow-sm">
+               <KeyRound className="w-4 h-4 text-yellow-500" /> التراخيص
             </Link>
-            <Link href="/admin/products/new" className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:opacity-90 transition-opacity text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20">
+            <Link href="/admin/orders" className="bg-card border border-border px-4 py-2 rounded-xl hover:bg-primary/20 hover:border-primary/50 transition-all text-sm font-bold flex items-center gap-2 shadow-sm">
+               <ShoppingBag className="w-4 h-4 text-green-500" /> الطلبات
+            </Link>
+            <Link href="/admin/customers" className="bg-card border border-border px-4 py-2 rounded-xl hover:bg-primary/20 hover:border-primary/50 transition-all text-sm font-bold flex items-center gap-2 shadow-sm">
+               <Users className="w-4 h-4 text-purple-500" /> العملاء
+            </Link>
+            <Link href="/admin/products/new" className="bg-primary text-primary-foreground px-5 py-2 rounded-xl hover:scale-105 transition-transform text-sm font-bold flex items-center gap-2 shadow-[0_0_20px_-5px_rgba(var(--primary),0.6)] ml-2">
                + إضافة منتج
             </Link>
          </div>
