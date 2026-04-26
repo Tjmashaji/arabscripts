@@ -1,0 +1,220 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// USER & AUTHENTICATION (NextAuth)
+// -----------------------------------------------------------------------------
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("USER") // USER, ADMIN, VENDOR
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]
+  licenses      License[]
+  downloadLogs  DownloadLog[]
+  reviews       Review[]
+  supportTickets SupportTicket[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// PRODUCTS & STORE
+// -----------------------------------------------------------------------------
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id              String         @id @default(cuid())
+  name            String
+  slug            String         @unique
+  shortDesc       String
+  longDesc        String
+  price           Float
+  compareAtPrice  Float?
+  type            String         @default("SCRIPT") // SCRIPT, UI, MLO, BUNDLE, SERVICE
+  compatibility   String?        // ESX, QBCORE, STANDALONE
+  version         String?
+  features        String?
+  faq             String?
+  status          String         @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  isFeatured      Boolean        @default(false)
+  categoryId      String
+  
+  category        Category       @relation(fields: [categoryId], references: [id])
+  images          ProductImage[]
+  files           ProductFile[]
+  orderItems      OrderItem[]
+  licenses        License[]
+  reviews         Review[]
+  downloadLogs    DownloadLog[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  url       String
+  isPrimary Boolean  @default(false)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model ProductFile {
+  id        String   @id @default(cuid())
+  productId String
+  fileName  String
+  fileUrl   String
+  version   String?
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// ORDERS & SALES
+// -----------------------------------------------------------------------------
+model Order {
+  id          String       @id @default(cuid())
+  userId      String
+  totalAmount Float
+  status      String       @default("PENDING") // PENDING, PAID, FAILED, REFUNDED
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  price     Float
+  quantity  Int      @default(1)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// LICENSING & DOWNLOADS
+// -----------------------------------------------------------------------------
+model License {
+  id         String        @id @default(cuid())
+  key        String        @unique
+  productId  String
+  userId     String
+  status     String        @default("ACTIVE") // ACTIVE, SUSPENDED, REVOKED
+  maxUses    Int           @default(1)
+  currentUses Int          @default(0)
+  ipBindings String?       // JSON string
+
+  // New Tracking fields
+  activatedServerId String?
+  resourceName      String?
+  ipAddress         String?
+  lastCheckAt       DateTime?
+  
+  product    Product       @relation(fields: [productId], references: [id])
+  user       User          @relation(fields: [userId], references: [id])
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+model DownloadLog {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  ipAddress String?
+  user      User     @relation(fields: [userId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// -----------------------------------------------------------------------------
+// FEEDBACK & SUPPORT
+// -----------------------------------------------------------------------------
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String?
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id          String       @id @default(cuid())
+  userId      String
+  subject     String
+  message     String
+  status      String       @default("OPEN") // OPEN, IN_PROGRESS, CLOSED
+  
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// DYNAMIC SETTINGS
+// -----------------------------------------------------------------------------
+model SiteSetting {
+  id    String @id
+  key   String @unique
+  value String
+}
