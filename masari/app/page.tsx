@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Activity, AlertTriangle, BarChart3, Bell, BusFront, CalendarDays,
   Check, ChevronLeft, CircleDollarSign, Clock3, FileClock, GraduationCap,
@@ -10,6 +10,7 @@ import {
 import { SchoolOps } from "./school-ops";
 import { PendingAccount, AdminSchools } from "./onboarding";
 import { LiveControl } from "./live-control";
+import { ForgotPassword, ResetPasswordPage, isRecoveryLink } from "./account";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -938,11 +939,14 @@ function LoginDialog({ onClose, onAuthenticated }: { onClose:()=>void; onAuthent
       await supabase.auth.signOut({ scope: "local" });
     } finally { setBusy(false); }
   };
-  return <div className="login-backdrop"><div className="login-card"><button className="close-login" onClick={onClose}><X/></button><div className="brand-mark large"><BusFront/></div><p className="eyebrow">مرحبًا بك</p><h2>تسجيل الدخول إلى مساري</h2><p>استخدم الحساب المسجل لدى المدرسة أو شركة النقل.</p><label>البريد الإلكتروني<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label><label>كلمة المرور<input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>{message&&<p className="login-message">{message}</p>}<Button className="wide-action" onClick={login} disabled={busy||!email||!password}>{busy?"جارٍ الدخول…":"تسجيل الدخول"}</Button><button className="text-link">نسيت كلمة المرور؟</button></div></div>;
+  const [forgot,setForgot]=useState(false);
+  if(forgot) return <div className="login-backdrop"><div className="login-card"><button className="close-login" onClick={onClose}><X/></button><ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/></div></div>;
+  return <div className="login-backdrop"><div className="login-card"><button className="close-login" onClick={onClose}><X/></button><div className="brand-mark large"><BusFront/></div><p className="eyebrow">مرحبًا بك</p><h2>تسجيل الدخول إلى مساري</h2><p>استخدم الحساب المسجل لدى المدرسة أو شركة النقل.</p><label>البريد الإلكتروني<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label><label>كلمة المرور<input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>{message&&<p className="login-message">{message}</p>}<Button className="wide-action" onClick={login} disabled={busy||!email||!password}>{busy?"جارٍ الدخول…":"تسجيل الدخول"}</Button><button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button></div></div>;
 }
 function AuthPage({ onEnter, onAuthenticated }: { onEnter: (role: Role) => void; onAuthenticated: (session: Session) => Promise<void> }) {
   const [selectedRole, setSelectedRole] = useState<Role>("parent");
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [forgot, setForgot] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -980,20 +984,23 @@ function AuthPage({ onEnter, onAuthenticated }: { onEnter: (role: Role) => void;
     <section className="auth-shell">
       <div className="auth-tabs"><button className={mode==="login"?"active":""} onClick={()=>setMode("login")}>تسجيل الدخول</button><button className={mode==="signup"?"active":""} onClick={()=>setMode("signup")}>تسجيل جديد</button></div>
       <div className="role-cards">{roleOptions.map((item)=><button key={item.role} className={selectedRole===item.role?"active":""} onClick={()=>setSelectedRole(item.role)}><item.icon/><strong>{item.title}</strong><span>{item.desc}</span></button>)}</div>
-      <div className="auth-form-card"><div className="auth-form-head"><SelectedIcon/><div><p className="eyebrow">{mode==="login"?"دخول":"إنشاء حساب"}</p><h2>{roleNames[selectedRole]}</h2></div></div>
+      <div className="auth-form-card">{forgot ? <ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/> : <><div className="auth-form-head"><SelectedIcon/><div><p className="eyebrow">{mode==="login"?"دخول":"إنشاء حساب"}</p><h2>{roleNames[selectedRole]}</h2></div></div>
         <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label>
         <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>
         {mode==="signup"&&<label>اسم الجهة / المستخدم<input value={name} onChange={(e)=>setName(e.target.value)} placeholder={selectedRole==="school"?"اسم المدرسة":"الاسم الكامل"}/></label>}
         {message&&<p className="auth-message">{message}</p>}
-        <Button className="wide-action" onClick={submitAuth} disabled={busy || !email.trim() || password.length < 6}>{busy ? "جارٍ التحقق…" : mode==="login" ? "تسجيل دخول حقيقي" : "إنشاء حساب"}</Button>
+        <Button className="wide-action" onClick={submitAuth} disabled={busy || !email.trim() || password.length < (mode==="signup" ? 8 : 6)}>{busy ? "جارٍ التحقق…" : mode==="login" ? "تسجيل دخول حقيقي" : "إنشاء حساب"}</Button>
+        {mode==="login" ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}
         <button className="demo-button" onClick={()=>onEnter(selectedRole)}>دخول تجريبي مؤقت</button>
         <p className="auth-note">الدخول الحقيقي يستخدم Supabase Auth. الدخول التجريبي مخصص للعرض السريع فقط.</p>
-      </div>
+      </>}</div>
     </section>
   </main>;
 }
+// رابط الاستعادة يُقرأ من العنوان في المتصفح فقط (لا يتعارض مع العرض على الخادم).
+const noopSubscribe = () => () => {};
 export default function Home() {
-  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [login,setLogin]=useState(false); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(seededData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [extraDrivers,setExtraDrivers]=useState<DriverRow[]>(defaultExtraDrivers); const [studentRows,setStudentRows]=useState<StudentRow[]>(defaultStudentRows); const [routeRows,setRouteRows]=useState<RouteRow[]>(defaultRouteRows); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>(defaultFeedbackRows); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const [platformAdmin,setPlatformAdmin]=useState(false);
+  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [login,setLogin]=useState(false); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(seededData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [extraDrivers,setExtraDrivers]=useState<DriverRow[]>(defaultExtraDrivers); const [studentRows,setStudentRows]=useState<StudentRow[]>(defaultStudentRows); const [routeRows,setRouteRows]=useState<RouteRow[]>(defaultRouteRows); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>(defaultFeedbackRows); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false);
   const gpsWatchRef = useRef<number | null>(null);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
@@ -1002,7 +1009,7 @@ export default function Home() {
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
   const eventsChannelRef = useRef<RealtimeChannel | null>(null);
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
-  useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>refresh());return()=>{alive=false;subscription.unsubscribe()}},[]);
+  useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{if(event==="PASSWORD_RECOVERY"){setRecoveryClosed(false);setRecoveryEvent(true)}void refresh()});return()=>{alive=false;subscription.unsubscribe()}},[]);
   useEffect(()=>{let alive=true;loadDriverRows(authMode !== "authenticated").then((rows)=>{if(alive)setExtraDrivers(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
   useEffect(()=>{let alive=true;loadStudentRows(authMode !== "authenticated").then((rows)=>{if(alive)setStudentRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
   useEffect(()=>{let alive=true;loadRouteRows(authMode !== "authenticated").then((rows)=>{if(alive)setRouteRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
@@ -1382,6 +1389,9 @@ export default function Home() {
   };
   const leavePending=async()=>{await supabase.auth.signOut({ scope: "local" });setPendingAccount(null)};
   const recheckPending=async()=>{const {data:sessionData}=await supabase.auth.getSession();if(!sessionData.session)return;await enterAuthenticated(sessionData.session);await reloadData().catch(()=>{})};
+  const finishRecovery=async()=>{setRecoveryClosed(true);setRecoveryEvent(false);const {data:sessionData}=await supabase.auth.getSession();if(sessionData.session)await enterAuthenticated(sessionData.session)};
+  const cancelRecovery=async()=>{await supabase.auth.signOut({ scope: "local" });if(typeof window!=="undefined")window.history.replaceState(null,"",window.location.pathname);setRecoveryClosed(true);setRecoveryEvent(false)};
+  if(recovering) return <ResetPasswordPage onDone={()=>void finishRecovery()} onCancel={()=>void cancelRecovery()}/>;
   if(pendingAccount) return <PendingAccount email={pendingAccount.email} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
   if(!entered) return <AuthPage onEnter={enterAs} onAuthenticated={enterAuthenticated}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
