@@ -1,0 +1,326 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Check, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/lib/supabase";
+
+// التشغيل اليومي للمدرسة: كل ما يلزم قبل أن يبدأ السائق رحلته.
+// الصلاحيات تفرضها سياسات RLS ودوال الخادم؛ الواجهة تعرض النتيجة فقط.
+
+type Tab = "requests" | "fleet" | "routes" | "students" | "trips";
+type StudentRequest = { id: string; student_name: string; grade: string | null; parent_name: string | null; parent_phone: string | null; parent_email: string | null; status: string };
+type DriverRequest = { id: string; driver_name: string; phone: string | null; email: string | null; vehicle_plate: string | null };
+type Driver = { id: string; full_name: string; status: string; user_id: string | null };
+type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null };
+type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null };
+type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; is_active: boolean; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
+type Assignment = { id: string; route_id: string; stop_id: string | null };
+type Student = { id: string; full_name: string; grade: string | null; service_status: string; student_route_assignments: Assignment[] };
+type Trip = { id: string; route_id: string; status: string };
+
+const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
+const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : "إلى المدرسة";
+const tripStatusLabel: Record<string, string> = { scheduled: "مجدولة", ready: "جاهزة", in_progress: "جارية", paused: "متوقفة", completed: "انتهت", cancelled: "ملغاة", emergency: "طارئ" };
+const errorText = (error: { message?: string; code?: string } | null) => {
+  const m = error?.message ?? "";
+  if (m.includes("DUPLICATE_STUDENT")) return "الطالب مسجل مسبقًا.";
+  if (m.includes("DUPLICATE_DRIVER")) return "السائق مسجل مسبقًا.";
+  if (m.includes("ALREADY_REVIEWED")) return "تمت مراجعة هذا الطلب مسبقًا.";
+  if (m.includes("REASON_REQUIRED")) return "سبب الرفض مطلوب.";
+  if (m.includes("trips_driver_day")) return "للسائق رحلة أخرى اليوم بنفس الاتجاه.";
+  if (m.includes("trips_bus_day")) return "للباص رحلة أخرى اليوم بنفس الاتجاه.";
+  if (error?.code === "23505") return "يوجد سجل بنفس البيانات.";
+  if (error?.code === "42501") return "ليست لديك صلاحية لهذا الإجراء.";
+  return "تعذر الحفظ. حاول مرة أخرى.";
+};
+// يقبل الإحداثيات كما تُنسخ من خرائط Google: "24.7501, 46.8001"
+const parseLatLng = (text: string): { lat: number; lng: number } | null => {
+  const parts = text.split(/[,،\s]+/).filter(Boolean).map(Number);
+  if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n))) return null;
+  const [lat, lng] = parts;
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat, lng } : null;
+};
+const formatLatLng = (stop: Pick<Stop, "latitude" | "longitude">) => stop.latitude != null && stop.longitude != null ? `${stop.latitude}, ${stop.longitude}` : "";
+
+export function SchoolOps({ schoolId }: { schoolId: string }) {
+  const [schoolPoint, setSchoolPoint] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
+  const [tab, setTab] = useState<Tab>("requests");
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [studentRequests, setStudentRequests] = useState<StudentRequest[]>([]);
+  const [driverRequests, setDriverRequests] = useState<DriverRequest[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [buses, setBuses] = useState<Bus[]>([]);
+  const [routes, setRoutes] = useState<RouteRow[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
+
+  const load = useCallback(async () => {
+    const [sc, sr, dr, dv, bs, rt, st, tr] = await Promise.all([
+      supabase.from("schools").select("latitude,longitude").eq("id", schoolId).single(),
+      supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
+      supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
+      supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
+      supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
+      supabase.from("routes").select("id,name,direction,scheduled_time,is_active,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
+      supabase.from("students").select("id,full_name,grade,service_status,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
+      supabase.from("trips").select("id,route_id,status").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
+    ]);
+    setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null });
+    setStudentRequests(sr.data ?? []);
+    setDriverRequests(dr.data ?? []);
+    setDrivers(dv.data ?? []);
+    setBuses(bs.data ?? []);
+    setRoutes((rt.data ?? []).map((r) => ({ ...r, route_stops: [...(r.route_stops ?? [])].sort((a, b) => a.stop_order - b.stop_order) })));
+    setStudents(st.data ?? []);
+    setTrips(tr.data ?? []);
+  }, [schoolId]);
+
+  useEffect(() => {
+    let alive = true;
+    const run = async () => { if (alive) await load().catch(() => {}); };
+    void run();
+    return () => { alive = false; };
+  }, [load]);
+
+  // كل عملية: تنفيذ ثم إعادة تحميل ثم رسالة واضحة.
+  const act = async (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>, ok: string) => {
+    setBusy(true); setMessage(null);
+    try {
+      const { error } = await fn();
+      if (error) { setMessage({ text: errorText(error), ok: false }); return false; }
+      await load();
+      setMessage({ text: ok, ok: true });
+      return true;
+    } finally { setBusy(false); }
+  };
+
+  const pendingCount = studentRequests.length + driverRequests.length;
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "requests", label: pendingCount ? `الطلبات (${pendingCount})` : "الطلبات" },
+    { id: "fleet", label: "الباصات" },
+    { id: "routes", label: "المسارات" },
+    { id: "students", label: "إسناد الطلاب" },
+    { id: "trips", label: "رحلات اليوم" },
+  ];
+
+  return <>
+    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>التشغيل اليومي</h1><p>اعتماد الطلبات، الباصات، المسارات، إسناد الطلاب، ورحلات اليوم.</p></div></div>
+    <div className="child-switcher" role="tablist">{tabs.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? "active" : ""} onClick={() => { setTab(t.id); setMessage(null); }}>{t.label}</button>)}</div>
+    {message && <p className={`save-strip ops-message ${message.ok ? "" : "ops-error"}`}>{message.ok ? <Check /> : <X />}<span>{message.text}</span></p>}
+    {tab === "requests" && <RequestsTab studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
+    {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
+    {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} busy={busy} act={act} />}
+    {tab === "students" && <StudentsTab students={students} routes={routes} busy={busy} act={act} />}
+    {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
+  </>;
+}
+
+type Act = (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>, ok: string) => Promise<boolean>;
+
+function RequestsTab({ studentRequests, driverRequests, busy, act }: { studentRequests: StudentRequest[]; driverRequests: DriverRequest[]; busy: boolean; act: Act }) {
+  const reject = (kind: "student" | "driver", id: string) => {
+    const note = window.prompt("سبب الرفض:");
+    if (!note?.trim()) return;
+    void act(() => supabase.rpc(kind === "student" ? "review_student_request" : "review_driver_request", { p_request: id, p_approve: false, p_note: note.trim() }), "تم رفض الطلب.");
+  };
+  return <>
+    <article className="panel ops-panel">
+      <div className="panel-head"><div><p className="eyebrow">بانتظار الاعتماد</p><h2>طلبات الطلاب</h2></div></div>
+      {studentRequests.length === 0 && <p className="muted-label">لا توجد طلبات طلاب جديدة.</p>}
+      {studentRequests.map((r) => <div className="ops-row" key={r.id}>
+        <div><strong>{r.student_name}</strong><p>{[r.grade, r.parent_name && `ولي الأمر: ${r.parent_name}`, r.parent_phone, r.parent_email].filter(Boolean).join(" · ")}</p></div>
+        <div className="ops-actions">
+          <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("review_student_request", { p_request: r.id, p_approve: true }), `تم اعتماد ${r.student_name}. سيُربط حساب ولي الأمر تلقائيًا عند تسجيله بنفس البريد.`)}>اعتماد</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => reject("student", r.id)}>رفض</Button>
+        </div>
+      </div>)}
+    </article>
+    <article className="panel ops-panel">
+      <div className="panel-head"><div><p className="eyebrow">بانتظار الاعتماد</p><h2>طلبات السائقين</h2></div></div>
+      {driverRequests.length === 0 && <p className="muted-label">لا توجد طلبات سائقين جديدة.</p>}
+      {driverRequests.map((r) => <div className="ops-row" key={r.id}>
+        <div><strong>{r.driver_name}</strong><p>{[r.phone, r.email, r.vehicle_plate && `لوحة: ${r.vehicle_plate}`].filter(Boolean).join(" · ")}</p></div>
+        <div className="ops-actions">
+          <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("review_driver_request", { p_request: r.id, p_approve: true }), `تم اعتماد ${r.driver_name}. سيُربط حسابه تلقائيًا عند تسجيله بنفس البريد.`)}>اعتماد</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => reject("driver", r.id)}>رفض</Button>
+        </div>
+      </div>)}
+    </article>
+  </>;
+}
+
+function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act }) {
+  const [form, setForm] = useState({ number: "", plate: "", capacity: "20" });
+  const capacity = Number(form.capacity);
+  const canAdd = form.number.trim() && form.plate.trim() && Number.isInteger(capacity) && capacity > 0;
+  const add = async () => {
+    const ok = await act(() => supabase.from("buses").insert({ school_id: schoolId, bus_number: form.number.trim(), plate_number: form.plate.trim(), capacity }), "تمت إضافة الباص.");
+    if (ok) setForm({ number: "", plate: "", capacity: "20" });
+  };
+  const activeDrivers = drivers.filter((d) => d.status === "active");
+  return <>
+    <article className="panel ops-panel">
+      <div className="panel-head"><div><p className="eyebrow">الأسطول</p><h2>الباصات وسائقوها</h2></div></div>
+      {buses.length === 0 && <p className="muted-label">لا توجد باصات بعد.</p>}
+      {buses.map((bus) => <div className="ops-row" key={bus.id}>
+        <div><strong>باص {bus.bus_number}</strong><p>{bus.plate_number} · {bus.capacity} مقعدًا</p></div>
+        <label className="ops-select">السائق<select value={bus.driver_id ?? ""} disabled={busy} onChange={(e) => void act(() => supabase.from("buses").update({ driver_id: e.target.value || null }).eq("id", bus.id), "تم تحديث سائق الباص.")}>
+          <option value="">— بلا سائق —</option>{activeDrivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+        </select></label>
+      </div>)}
+    </article>
+    <article className="panel ops-panel">
+      <div className="panel-head"><div><p className="eyebrow">الأسطول</p><h2>إضافة باص</h2></div></div>
+      <div className="driver-form">
+        <label>رقم الباص<input value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} placeholder="مثال: 3" /></label>
+        <label>رقم اللوحة<input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value })} placeholder="أ ب ج 1234" /></label>
+        <label>عدد المقاعد<input value={form.capacity} inputMode="numeric" onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></label>
+      </div>
+      <Button className="wide-action" disabled={!canAdd || busy} onClick={() => void add()}><Plus /> إضافة الباص</Button>
+    </article>
+    <article className="panel ops-panel">
+      <div className="panel-head"><div><p className="eyebrow">السائقون</p><h2>سائقو المدرسة</h2></div></div>
+      {drivers.length === 0 && <p className="muted-label">لا يوجد سائقون بعد. أضف سائقًا من «الأسطول والسائقون» ثم اعتمده من «الطلبات».</p>}
+      {drivers.map((d) => <div className="ops-row" key={d.id}><div><strong>{d.full_name}</strong><p>{d.user_id ? "الحساب مربوط" : "بانتظار تسجيل السائق بنفس البريد"}</p></div><Badge className="status-badge tone-2">{d.status === "active" ? "معتمد" : d.status === "pending" ? "قيد المراجعة" : "موقوف"}</Badge></div>)}
+    </article>
+  </>;
+}
+
+function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, busy, act }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act }) {
+  const activeDrivers = drivers.filter((d) => d.status === "active");
+  return <>
+    {routes.length === 0 && <article className="panel ops-panel"><p className="muted-label">لا توجد مسارات بعد. أنشئ أول مسار من النموذج أدناه.</p></article>}
+    {routes.map((route) => <article className="panel ops-panel" key={route.id}>
+      <div className="panel-head"><div><p className="eyebrow">{directionLabel(route.direction)} · {route.scheduled_time?.slice(0, 5) ?? "—"}</p><h2>{route.name}</h2></div>{!route.is_active && <Badge className="status-badge tone-1">متوقف</Badge>}</div>
+      <div className="driver-form">
+        <label>الباص<select value={route.bus_id ?? ""} disabled={busy} onChange={(e) => {
+          const bus = buses.find((b) => b.id === e.target.value);
+          // اختيار الباص يقترح سائقه تلقائيًا إن لم يكن للمسار سائق
+          const patch = { bus_id: e.target.value || null, ...(bus?.driver_id && !route.driver_id ? { driver_id: bus.driver_id } : {}) };
+          void act(() => supabase.from("routes").update(patch).eq("id", route.id), "تم تحديث باص المسار.");
+        }}><option value="">— بلا باص —</option>{buses.map((b) => <option key={b.id} value={b.id}>باص {b.bus_number} · {b.plate_number}</option>)}</select></label>
+        <label>السائق<select value={route.driver_id ?? ""} disabled={busy} onChange={(e) => void act(() => supabase.from("routes").update({ driver_id: e.target.value || null }).eq("id", route.id), "تم تحديث سائق المسار.")}>
+          <option value="">— بلا سائق —</option>{activeDrivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+        </select></label>
+      </div>
+      <p className="eyebrow ops-subhead">المحطات بالترتيب</p>
+      {route.route_stops.map((stop) => <StopRow key={stop.id} stop={stop} busy={busy} act={act} />)}
+    </article>)}
+    <NewRouteForm schoolId={schoolId} schoolLat={schoolLat} schoolLng={schoolLng} busy={busy} act={act} />
+  </>;
+}
+
+function StopRow({ stop, busy, act }: { stop: Stop; busy: boolean; act: Act }) {
+  const [coords, setCoords] = useState(formatLatLng(stop));
+  const parsed = parseLatLng(coords);
+  const changed = coords !== formatLatLng(stop);
+  const missing = stop.latitude == null || stop.longitude == null;
+  return <div className={`ops-row ops-stop ${missing ? "ops-missing" : ""}`}>
+    <div><strong>{stop.stop_order}. {stop.label}</strong><p>{stop.stop_type === "school" ? "محطة المدرسة" : stop.stop_type === "dropoff" ? "محطة نزول" : "محطة صعود"}{missing && " · بلا موقع — لن تبدأ الرحلة قبل تحديده"}</p></div>
+    <div className="ops-actions">
+      <input className="ops-coords" value={coords} onChange={(e) => setCoords(e.target.value)} placeholder="24.7501, 46.8001" dir="ltr" aria-label={`إحداثيات ${stop.label}`} />
+      <Button size="sm" variant="outline" disabled={busy || !changed || !parsed} onClick={() => parsed && void act(() => supabase.from("route_stops").update({ latitude: parsed.lat, longitude: parsed.lng }).eq("id", stop.id), `تم حفظ موقع ${stop.label}.`)}>حفظ</Button>
+    </div>
+  </div>;
+}
+
+function NewRouteForm({ schoolId, schoolLat, schoolLng, busy, act }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; busy: boolean; act: Act }) {
+  const empty = { name: "", direction: "to_school", time: "06:30", stops: "" };
+  const [form, setForm] = useState(empty);
+  // كل سطر: اسم المحطة | خط العرض, خط الطول
+  const lines = form.stops.split("\n").map((l) => l.trim()).filter(Boolean).map((line) => {
+    const [label, coords = ""] = line.split("|").map((part) => part.trim());
+    return { label, point: parseLatLng(coords) };
+  });
+  const badLines = lines.filter((l) => !l.label || !l.point).length;
+  const hasSchoolLocation = schoolLat != null && schoolLng != null;
+  const canAdd = form.name.trim() && form.time && lines.length >= 1 && badLines === 0 && hasSchoolLocation;
+  const add = async () => {
+    const ok = await act(async () => {
+      const { data: route, error } = await supabase.from("routes").insert({ school_id: schoolId, name: form.name.trim(), direction: form.direction, scheduled_time: form.time, estimated_duration_minutes: Math.max(lines.length * 10, 20) }).select("id").single();
+      if (error || !route) return { error };
+      // المدرسة آخر محطة في الذهاب وأول محطة في العودة
+      const school = { label: "المدرسة", point: { lat: schoolLat!, lng: schoolLng! }, type: "school" };
+      const homeStops = lines.map((l) => ({ ...l, type: form.direction === "to_home" ? "dropoff" : "pickup" }));
+      const ordered = form.direction === "to_home" ? [school, ...homeStops] : [...homeStops, school];
+      const { error: stopsError } = await supabase.from("route_stops").insert(ordered.map((s, i) => ({ route_id: route.id, stop_order: i + 1, label: s.label, stop_type: s.type, latitude: s.point!.lat, longitude: s.point!.lng })));
+      return { error: stopsError };
+    }, "تم إنشاء المسار ومحطاته.");
+    if (ok) setForm(empty);
+  };
+  return <article className="panel ops-panel">
+    <div className="panel-head"><div><p className="eyebrow">المسارات</p><h2>إنشاء مسار</h2></div></div>
+    {!hasSchoolLocation && <p className="save-strip ops-message ops-error"><X /><span>حدد موقع المدرسة أولًا من صفحة «المواقع»، لأنه يُضاف تلقائيًا كمحطة.</span></p>}
+    <div className="driver-form route-form">
+      <label>اسم المسار<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: مسار النسيم" /></label>
+      <label>الاتجاه<select value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })}><option value="to_school">إلى المدرسة</option><option value="to_home">إلى المنزل</option></select></label>
+      <label>وقت البداية<input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></label>
+      <label className="wide-field">المحطات بالترتيب، كل سطر: اسم المحطة | الإحداثيات (تُضاف المدرسة تلقائيًا)<textarea dir="auto" value={form.stops} onChange={(e) => setForm({ ...form, stops: e.target.value })} placeholder={"حي النسيم | 24.7501, 46.8001\nحي الروضة | 24.7430, 46.7680"} /></label>
+    </div>
+    {lines.length > 0 && badLines > 0 && <p className="muted-label">{badLines} سطر بلا إحداثيات صحيحة. انسخ الإحداثيات من خرائط Google بالضغط على الموقع.</p>}
+    <Button className="wide-action" disabled={!canAdd || busy} onClick={() => void add()}><Plus /> إنشاء المسار</Button>
+  </article>;
+}
+
+function StudentsTab({ students, routes, busy, act }: { students: Student[]; routes: RouteRow[]; busy: boolean; act: Act }) {
+  const routeName = (id: string) => routes.find((r) => r.id === id)?.name ?? "مسار";
+  const stopName = (routeId: string, stopId: string | null) => routes.find((r) => r.id === routeId)?.route_stops.find((s) => s.id === stopId)?.label ?? "بلا محطة";
+  return <article className="panel ops-panel">
+    <div className="panel-head"><div><p className="eyebrow">الطلاب</p><h2>إسناد الطلاب إلى المسارات</h2></div></div>
+    {students.length === 0 && <p className="muted-label">لا يوجد طلاب معتمدون بعد. اعتمد طلبات الطلاب من تبويب «الطلبات».</p>}
+    {students.map((student) => <div className="ops-row ops-student" key={student.id}>
+      <div><strong>{student.full_name}</strong><p>{student.grade ?? "—"}</p>
+        <div className="ops-chips">{student.student_route_assignments.map((a) => <span className="ops-chip" key={a.id}>{routeName(a.route_id)} · {stopName(a.route_id, a.stop_id)}<button aria-label="إلغاء الإسناد" disabled={busy} onClick={() => void act(() => supabase.from("student_route_assignments").delete().eq("id", a.id), "تم إلغاء الإسناد.")}><X /></button></span>)}</div>
+      </div>
+      <AssignForm student={student} routes={routes} busy={busy} act={act} />
+    </div>)}
+  </article>;
+}
+
+function AssignForm({ student, routes, busy, act }: { student: Student; routes: RouteRow[]; busy: boolean; act: Act }) {
+  const available = routes.filter((r) => r.is_active && !student.student_route_assignments.some((a) => a.route_id === r.id));
+  const [routeId, setRouteId] = useState("");
+  const [stopId, setStopId] = useState("");
+  const route = available.find((r) => r.id === routeId);
+  const stops = route?.route_stops.filter((s) => s.stop_type !== "school") ?? [];
+  if (!available.length) return null;
+  return <div className="ops-actions">
+    <select aria-label="المسار" value={routeId} onChange={(e) => { setRouteId(e.target.value); setStopId(""); }}><option value="">اختر المسار</option>{available.map((r) => <option key={r.id} value={r.id}>{r.name} ({directionLabel(r.direction)})</option>)}</select>
+    <select aria-label="المحطة" value={stopId} disabled={!route} onChange={(e) => setStopId(e.target.value)}><option value="">اختر المحطة</option>{stops.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+    <Button size="sm" disabled={busy || !routeId || !stopId} onClick={() => void act(() => supabase.from("student_route_assignments").insert({ student_id: student.id, route_id: routeId, stop_id: stopId }), `تم إسناد ${student.full_name} إلى ${route?.name}.`).then((ok) => { if (ok) { setRouteId(""); setStopId(""); } })}>إسناد</Button>
+  </div>;
+}
+
+function TripsTab({ schoolId, routes, trips, drivers, buses, students, busy, act, setMessage, reload }: { schoolId: string; routes: RouteRow[]; trips: Trip[]; drivers: Driver[]; buses: Bus[]; students: Student[]; busy: boolean; act: Act; setMessage: (m: { text: string; ok: boolean } | null) => void; reload: () => Promise<void> }) {
+  const active = routes.filter((r) => r.is_active);
+  const tripFor = (routeId: string) => trips.find((t) => t.route_id === routeId);
+  const studentsOn = (routeId: string) => students.filter((s) => s.student_route_assignments.some((a) => a.route_id === routeId)).length;
+  // سبب عدم جاهزية المسار لإنشاء رحلة اليوم، أو null إن كان جاهزًا
+  const blocker = (r: RouteRow) => !r.driver_id ? "بلا سائق" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
+    : r.route_stops.some((s) => s.latitude == null || s.longitude == null) ? "محطة بلا موقع" : !studentsOn(r.id) ? "لا طلاب مسندين" : null;
+  const ready = active.filter((r) => !tripFor(r.id) && !blocker(r));
+  const createAll = async () => {
+    const results = await Promise.all(ready.map((r) => supabase.from("trips").insert({ school_id: schoolId, route_id: r.id, bus_id: r.bus_id, driver_id: r.driver_id, direction: r.direction, status: "scheduled", trip_date: riyadhToday() })));
+    const failed = results.map((res, i) => res.error ? `${ready[i].name}: ${errorText(res.error)}` : null).filter(Boolean);
+    await reload();
+    setMessage(failed.length ? { text: `أُنشئت ${ready.length - failed.length} رحلة. تعذر: ${failed.join(" — ")}`, ok: false } : { text: `تم إنشاء ${ready.length} رحلة لليوم وإسنادها للسائقين.`, ok: true });
+  };
+  return <article className="panel ops-panel">
+    <div className="panel-head"><div><p className="eyebrow">{riyadhToday()}</p><h2>رحلات اليوم</h2></div><Button disabled={busy || ready.length === 0} onClick={() => void createAll()}><Plus /> إنشاء رحلات اليوم ({ready.length})</Button></div>
+    {active.length === 0 && <p className="muted-label">لا توجد مسارات نشطة.</p>}
+    {active.map((r) => {
+      const trip = tripFor(r.id); const why = blocker(r);
+      const driver = drivers.find((d) => d.id === r.driver_id)?.full_name; const bus = buses.find((b) => b.id === r.bus_id)?.bus_number;
+      return <div className="ops-row" key={r.id}>
+        <div><strong>{r.name}</strong><p>{[directionLabel(r.direction), r.scheduled_time?.slice(0, 5), driver && `السائق ${driver}`, bus && `باص ${bus}`, `${studentsOn(r.id)} طالب`].filter(Boolean).join(" · ")}</p></div>
+        <div className="ops-actions">
+          {trip ? <Badge className="status-badge tone-0">{tripStatusLabel[trip.status] ?? trip.status}</Badge> : why ? <Badge className="status-badge tone-1">{why}</Badge> : <Badge className="status-badge tone-2">جاهز للإنشاء</Badge>}
+          {trip && (trip.status === "scheduled" || trip.status === "ready") && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (window.confirm(`إلغاء رحلة ${r.name} اليوم؟`)) void act(() => supabase.from("trips").update({ status: "cancelled" }).eq("id", trip.id), "تم إلغاء الرحلة."); }}>إلغاء</Button>}
+        </div>
+      </div>;
+    })}
+  </article>;
+}

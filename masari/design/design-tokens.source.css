@@ -1,0 +1,173 @@
+/* ============================================================
+   مساري (Masari) — Design tokens · globals.css
+   Direction: RTL · Font: Noto Sans Arabic 400/600/800
+   Tailwind v4: the @theme inline block maps tokens to utilities
+   (bg-primary, text-muted, rounded-card, shadow-card …).
+   Tailwind v3: copy the same names into theme.extend in
+   tailwind.config.js as 'var(--token)'.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;800&display=swap");
+
+:root {
+  /* ---------- Brand ---------- */
+  --primary: #10394b;            /* sidebar, headings, dark headers */
+  --primary-strong: #0b2b3a;     /* gradient end of dark surfaces */
+  --accent: #35a5a5;             /* logo, focus ring, decorative only (fails AA under white text) */
+  --accent-strong: #1e7890;      /* active indicators, links on light */
+  --secondary: #176b87;          /* links, secondary emphasis */
+  --action-from: #20828a;        /* primary button gradient start (AA with white) */
+  --action-to: #176b87;          /* primary button gradient end */
+  --accent-soft: #e3f3f3;        /* selected chips, icon tiles */
+
+  /* ---------- Surfaces & text ---------- */
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;      /* table headers */
+  --border: #dfe6ec;
+  --border-subtle: #eef2f5;      /* row dividers */
+  --text: #16243a;
+  --text-muted: #5b6880;         /* replaces #748194 (4.0:1) → 5.6:1 on white */
+  --text-subtle: #3d4a5e;
+  --placeholder: #8792a2;
+
+  /* ---------- Feedback (text on soft background) ---------- */
+  --success: #287760;  --success-bg: #e5f6f1;  --success-text: #1f5f4c;
+  --warning: #9a5a13;  --warning-bg: #fff4e5;  --warning-text: #5c340b;
+  --danger: #b42318;   --danger-bg: #fdeceb;   --danger-text: #8f1d15;  --danger-border: #f5c8c3;
+  --info: #1f4f8a;     --info-bg: #e8f0fb;
+  --neutral-bg: #eef1f5; --neutral-text: #3d4a5e;
+
+  /* ---------- Domain statuses (badges on light UI) ---------- */
+  --trip-scheduled: var(--neutral-text);
+  --trip-ready: var(--info);
+  --trip-active: #135f6f;          /* bg: --accent-soft */
+  --trip-paused: var(--warning);
+  --trip-completed: var(--success);
+  --trip-cancelled: var(--neutral-text);
+  --trip-emergency: var(--danger); /* solid red badge, white text */
+
+  /* ---------- Live map / control tower (dark) ---------- */
+  --tower-bg: #0b2b3a;
+  --tower-map: #0e3242;
+  --tower-surface: #0f3446;
+  --tower-border: #1d4a5e;
+  --tower-text: #e8f1f4;
+  --tower-text-muted: #a9c2cc;
+  /* Contrast vs --tower-map: moving 8.2 · late 7.7 · offline 5.5 · stopped 4.3 · emergency 4.1 */
+  --status-moving: #5fe0a8;      /* circle + direction arrow */
+  --status-stopped: #4f8fff;     /* circle + fixed centre dot */
+  --status-late: #ffb547;        /* diamond + soft pulse */
+  --status-offline: #9aa8b1;     /* dashed ring + wifi-off icon, hollow */
+  --status-emergency: #ff4d42;   /* larger circle + strong pulse, z-index on top */
+
+  /* ---------- Typography ----------
+     Tailwind v4 note: --text-* and --radius-* below share names with Tailwind's
+     default scale, so they intentionally retune text-sm, text-lg, rounded-md …
+     to Masari's values (e.g. text-sm = 13px). Rename them if you need the defaults. */
+  --font-arabic: "Noto Sans Arabic", Tahoma, "Segoe UI", sans-serif;
+  --fw-regular: 400; --fw-semibold: 600; --fw-bold: 800;
+  --text-xs: 12px;   /* captions, “بيانات توضيحية” */
+  --text-sm: 13px;   /* helper text, meta */
+  --text-md: 14px;   /* labels, table body */
+  --text-base: 15px; /* body on mobile cards */
+  --text-input: 16px;/* inputs (prevents iOS zoom) */
+  --text-lg: 17px;   /* button labels mobile */
+  --text-xl: 20px;   /* section titles */
+  --text-2xl: 22px;  /* driver button labels, card titles */
+  --text-3xl: 26px;  /* page titles */
+  --text-4xl: 28px;  /* hero / auth titles */
+  --text-5xl: 34px;  /* driver next-stop name */
+  --leading-tight: 1.35; --leading-body: 1.8;
+
+  /* ---------- Spacing (4px grid) ---------- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  /* ---------- Radii ---------- */
+  --radius-xs: 6px;    /* plate, tiny tags */
+  --radius-sm: 10px;   /* small buttons */
+  --radius-md: 12px;   /* desktop buttons, inputs */
+  --radius-lg: 14px;   /* mobile inputs & buttons, alerts */
+  --radius-xl: 16px;   /* inner tiles */
+  --radius-card: 18px; /* desktop cards */
+  --radius-2xl: 20px;  /* mobile cards, driver XL button */
+  --radius-logo: 13px;
+  --radius-pill: 999px;
+
+  /* ---------- Elevation ---------- */
+  --shadow-card: 0 10px 28px -22px rgba(16, 57, 75, .35);
+  --shadow-raised: 0 16px 36px -16px rgba(16, 57, 75, .25);
+  --shadow-cta: 0 8px 20px -8px rgba(30, 120, 144, .6);
+  --shadow-dialog: 0 24px 48px -24px rgba(11, 26, 43, .45);
+  --ring-focus: 0 0 0 4px rgba(53, 165, 165, .2);  /* inputs */
+  --outline-focus: 3px solid var(--accent);         /* buttons/links, offset 2px */
+
+  /* ---------- Sizing ---------- */
+  --touch-min: 44px;   /* every tappable target */
+  --btn-sm: 36px; --btn-md: 44px; --btn-lg: 54px; --btn-xl: 76px; /* xl = driver */
+  --input-h: 48px;     /* 52px on auth screens, 58px for driver */
+  --sidebar-w: 252px;
+
+  /* ---------- Breakpoints (reference) ----------
+     mobile  < 768px   bottom tab bar (parent), top scroll menu (admin)
+     tablet  768–1023  sidebar collapses to top bar below 820px in current mocks → use md
+     desktop ≥ 1024px  right-hand sidebar
+     wall    ≥ 1920px  control tower                                   */
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-secondary: var(--secondary);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-success: var(--success);   --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);   --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);     --color-danger-bg: var(--danger-bg);  --color-danger-text: var(--danger-text);
+  --color-info: var(--info);         --color-info-bg: var(--info-bg);
+  --color-status-moving: var(--status-moving);
+  --color-status-stopped: var(--status-stopped);
+  --color-status-late: var(--status-late);
+  --color-status-offline: var(--status-offline);
+  --color-status-emergency: var(--status-emergency);
+  --color-tower-bg: var(--tower-bg);
+  --color-tower-surface: var(--tower-surface);
+  --font-sans: var(--font-arabic);
+}
+
+/* Static theme values (same numbers as :root above) → rounded-card, shadow-card, md:, lg:, wall: */
+@theme {
+  --radius-card: 18px;
+  --radius-pill: 999px;
+  --shadow-card: 0 10px 28px -22px rgba(16, 57, 75, .35);
+  --shadow-cta: 0 8px 20px -8px rgba(30, 120, 144, .6);
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-wall: 1920px;
+}
+
+html { direction: rtl; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-arabic);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+}
+*, *::before, *::after { box-sizing: border-box; }
+input, select, textarea, button { font: inherit; }
+:focus-visible { outline: var(--outline-focus); outline-offset: 2px; }
+.btn-primary { background: linear-gradient(135deg, var(--action-from), var(--action-to)); color: #fff; box-shadow: var(--shadow-cta); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
