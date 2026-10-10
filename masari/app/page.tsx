@@ -30,7 +30,7 @@ type StudentRow = StudentForm & { saved?: boolean };
 type RouteForm = { name: string; direction: "to_school" | "to_home"; scheduledTime: string; stopsText: string; status: string };
 type RouteRow = { name: string; direction: string; scheduledTime: string; stops: string; status: string; saved?: boolean };
 type MasariData = {
-  source: "cached" | "supabase";
+  source: "cached" | "supabase" | "empty";
   school: { id?: string; name: string; city: string; contactName: string; phone: string; location: LocationPoint };
   vehicle: { number: string; plate: string; capacity: number };
   driver: { name: string; email: string };
@@ -38,6 +38,7 @@ type MasariData = {
   student: { name: string; grade: string; address: string; status: string; location: LocationPoint };
   parent: { name: string; email: string; phone: string };
   ride: { date: string; status: string; studentStatus: string };
+  counts?: { students: number; buses: number; routes: number; subscriptions: number };
 };
 type SimulationState = {
   active: boolean;
@@ -79,12 +80,12 @@ const navByRole: Record<Role, { id: View; label: string; icon: typeof LayoutDash
   ],
 };
 const schoolLocation: LocationPoint = { label: "موقع المدرسة", address: "الرياض", lat: 24.74, lng: 46.82 };
-const homeLocation: LocationPoint = { label: "بيت عبدالله", address: "النسيم شارع عبدالله بن عمر", lat: 24.737, lng: 46.834 };
+const homeLocation: LocationPoint = { label: "بيت الطالب", address: "حي النسيم (تجريبي)", lat: 24.737, lng: 46.834 };
 const seededData: MasariData = {
   source: "cached",
-  school: { name: "مدرسة أووك ورد العالمية", city: "الرياض", contactName: "شريفه", phone: "0543840340", location: schoolLocation },
+  school: { name: "مدرسة تجريبية", city: "الرياض", contactName: "منسق تجريبي", phone: "0500000000", location: schoolLocation },
   vehicle: { number: "1", plate: "أ أ ب 2223", capacity: 20 },
-  driver: { name: "أحمد عسيري", email: "Hipf.20132044@gmail.com" },
+  driver: { name: "سائق تجريبي", email: "driver@example.com" },
   route: {
     name: "مسار 1",
     scheduledTime: "06:30",
@@ -92,25 +93,25 @@ const seededData: MasariData = {
     stops: [
       { label: "الروضة", time: "06:30", lat: 24.743, lng: 46.768 },
       { label: "النهضة", time: "06:45", lat: 24.781, lng: 46.815 },
-      { label: "النسيم - شارع عبدالله بن عمر", time: "07:00", lat: homeLocation.lat, lng: homeLocation.lng, studentName: "عبدالله" },
-      { label: "مدرسة أووك ورد العالمية", time: "07:15", lat: schoolLocation.lat, lng: schoolLocation.lng },
+      { label: "النسيم", time: "07:00", lat: homeLocation.lat, lng: homeLocation.lng, studentName: "طالب تجريبي" },
+      { label: "مدرسة تجريبية", time: "07:15", lat: schoolLocation.lat, lng: schoolLocation.lng },
     ],
   },
-  student: { name: "عبدالله", grade: "Kg3", address: "النسيم شارع عبدالله بن عمر", status: "جاهز للصعود", location: homeLocation },
-  parent: { name: "تركي", email: "dx.0707@hotmail.com", phone: "0580171222" },
+  student: { name: "طالب تجريبي", grade: "Kg3", address: "حي النسيم (تجريبي)", status: "جاهز للصعود", location: homeLocation },
+  parent: { name: "ولي أمر تجريبي", email: "parent@example.com", phone: "0500000001" },
   ride: { date: "اليوم", status: "scheduled", studentStatus: "scheduled" },
 };
 const defaultExtraDrivers: DriverRow[] = [
-  { name: "أحمد عسيري", phone: "—", email: "Hipf.20132044@gmail.com", plate: "أ أ ب 2223", status: "معتمد", capacity: 20, saved: true },
+  { name: "سائق تجريبي", phone: "—", email: "driver@example.com", plate: "أ أ ب 2223", status: "معتمد", capacity: 20, saved: true },
 ];
 const defaultStudentRows: StudentRow[] = [
-  { name: "عبدالله", grade: "Kg3", parentName: "تركي", parentPhone: "0580171222", parentEmail: "dx.0707@hotmail.com", address: "النسيم شارع عبدالله بن عمر", status: "مفعل", saved: true },
+  { name: "طالب تجريبي", grade: "Kg3", parentName: "ولي أمر تجريبي", parentPhone: "0500000001", parentEmail: "parent@example.com", address: "حي النسيم (تجريبي)", status: "مفعل", saved: true },
 ];
 const defaultRouteRows: RouteRow[] = [
-  { name: "مسار 1", direction: "إلى المدرسة", scheduledTime: "06:30", stops: "الروضة ← النهضة ← النسيم - شارع عبدالله بن عمر", status: "نشط", saved: true },
+  { name: "مسار 1", direction: "إلى المدرسة", scheduledTime: "06:30", stops: "الروضة ← النهضة ← النسيم", status: "نشط", saved: true },
 ];
 const defaultFeedbackRows: FeedbackItem[] = [
-  { id: "seed-feedback-1", author: "تركي", role: "parent", rating: 5, category: "تقييم الخدمة", message: "الرحلة واضحة في المتابعة، ونحتاج إشعار أسرع عند اقتراب الباص.", status: "قيد المتابعة", createdAt: new Date().toISOString(), saved: true },
+  { id: "seed-feedback-1", author: "ولي أمر تجريبي", role: "parent", rating: 5, category: "تقييم الخدمة", message: "الرحلة واضحة في المتابعة، ونحتاج إشعار أسرع عند اقتراب الباص.", status: "قيد المتابعة", createdAt: new Date().toISOString(), saved: true },
 ];
 
 const formatTime = (value?: string | null) => value ? value.slice(0, 5) : "";
@@ -220,95 +221,90 @@ const buildNotifications = (data: MasariData, simulation: SimulationState, drive
   return [gpsNotification, feedbackNotification, ...eventNotifications, fallback].filter(Boolean).slice(0, 6) as NotificationItem[];
 };
 
+// حساب فعلي بلا بيانات → "empty" (لا تظهر أي بيانات تجريبية). بلا جلسة → بيانات العرض التجريبي.
 async function loadMasariData(): Promise<MasariData> {
-  const next: MasariData = structuredClone(seededData);
+  const { data: sessionData } = await supabase.auth.getSession();
   const { data: schools } = await supabase
     .from("schools")
     .select("id,name,city,contact_name,phone,address,latitude,longitude")
-    .eq("name", "مدرسة أووك ورد العالمية")
+    .order("created_at")
     .limit(1);
   const school = schools?.[0];
-  if (!school) return next;
+  if (!school) return sessionData.session ? { ...structuredClone(seededData), source: "empty" } : structuredClone(seededData);
 
-  next.source = "supabase";
-  next.school = {
-    id: school.id,
-    name: school.name ?? next.school.name,
-    city: school.city ?? next.school.city,
-    contactName: school.contact_name ?? next.school.contactName,
-    phone: school.phone ?? next.school.phone,
-    location: makeLocation("موقع المدرسة", school.address ?? next.school.city, school.latitude, school.longitude, next.school.location),
+  const schoolLoc = makeLocation("موقع المدرسة", school.address ?? school.city ?? "—", school.latitude, school.longitude, schoolLocation);
+  const next: MasariData = {
+    source: "supabase",
+    school: { id: school.id, name: school.name, city: school.city ?? "—", contactName: school.contact_name ?? "—", phone: school.phone ?? "—", location: schoolLoc },
+    vehicle: { number: "—", plate: "—", capacity: 0 },
+    driver: { name: "—", email: "" },
+    route: { name: "لا يوجد مسار", scheduledTime: "—", estimatedMinutes: 0, stops: [] },
+    student: { name: "لا يوجد طالب", grade: "—", address: "—", status: "—", location: schoolLoc },
+    parent: { name: "—", email: "", phone: "—" },
+    ride: { date: "—", status: "scheduled", studentStatus: "scheduled" },
   };
 
   const { data: routes } = await supabase
     .from("routes")
-    .select("id,name,scheduled_time,estimated_duration_minutes,driver_id")
+    .select("id,name,scheduled_time,estimated_duration_minutes,bus_id")
     .eq("school_id", school.id)
-    .eq("name", "مسار 1")
+    .eq("is_active", true)
+    .order("created_at")
     .limit(1);
   const route = routes?.[0];
   if (route) {
-    next.route.name = route.name ?? next.route.name;
-    next.route.scheduledTime = formatTime(route.scheduled_time) || next.route.scheduledTime;
-    next.route.estimatedMinutes = route.estimated_duration_minutes ?? next.route.estimatedMinutes;
+    next.route.name = route.name;
+    next.route.scheduledTime = formatTime(route.scheduled_time) || "—";
+    next.route.estimatedMinutes = route.estimated_duration_minutes ?? 0;
 
     const { data: stops } = await supabase
       .from("route_stops")
-      .select("label,scheduled_time,stop_order,student_id,latitude,longitude")
+      .select("label,scheduled_time,stop_order,latitude,longitude")
       .eq("route_id", route.id)
       .order("stop_order");
-    if (stops?.length) {
-      next.route.stops = stops.map((stop) => ({
-        label: stop.label ?? "نقطة توقف",
-        time: formatTime(stop.scheduled_time),
-        lat: toNumber(stop.latitude, next.student.location.lat),
-        lng: toNumber(stop.longitude, next.student.location.lng),
-        studentName: null,
-      }));
-    }
+    next.route.stops = (stops ?? []).map((stop) => ({
+      label: stop.label ?? "نقطة توقف",
+      time: formatTime(stop.scheduled_time),
+      lat: toNumber(stop.latitude, schoolLoc.lat),
+      lng: toNumber(stop.longitude, schoolLoc.lng),
+      studentName: null,
+    }));
 
-    const { data: rides } = await supabase
-      .from("rides")
-      .select("id,ride_date,status")
+    const { data: trips } = await supabase
+      .from("trips")
+      .select("trip_date,status")
       .eq("route_id", route.id)
-      .order("created_at", { ascending: false })
+      .order("trip_date", { ascending: false })
       .limit(1);
-    if (rides?.[0]) next.ride = { ...next.ride, date: rides[0].ride_date ?? next.ride.date, status: rides[0].status ?? next.ride.status };
-  }
+    if (trips?.[0]) next.ride = { ...next.ride, date: trips[0].trip_date, status: trips[0].status };
 
-  const { data: vehicles } = await supabase
-    .from("vehicles")
-    .select("plate_number,capacity,notes")
-    .eq("plate_number", "أ أ ب 2223")
-    .limit(1);
-  if (vehicles?.[0]) {
-    next.vehicle = {
-      number: "1",
-      plate: vehicles[0].plate_number ?? next.vehicle.plate,
-      capacity: vehicles[0].capacity ?? next.vehicle.capacity,
-    };
+    if (route.bus_id) {
+      const { data: buses } = await supabase.from("buses").select("bus_number,plate_number,capacity").eq("id", route.bus_id).limit(1);
+      if (buses?.[0]) next.vehicle = { number: buses[0].bus_number, plate: buses[0].plate_number, capacity: buses[0].capacity };
+    }
   }
 
   const { data: studentsData } = await supabase
     .from("students")
     .select("full_name,grade,home_address,home_label,home_latitude,home_longitude,service_status,pickup_contact_name,pickup_contact_phone")
     .eq("school_id", school.id)
-    .eq("full_name", "عبدالله")
+    .order("created_at")
     .limit(1);
-  if (studentsData?.[0]) {
+  const student = studentsData?.[0];
+  if (student) {
     next.student = {
-      name: studentsData[0].full_name ?? next.student.name,
-      grade: studentsData[0].grade ?? next.student.grade,
-      address: studentsData[0].home_address ?? next.student.address,
-      status: statusLabel(studentsData[0].service_status),
-      location: makeLocation(studentsData[0].home_label ?? "موقع البيت", studentsData[0].home_address ?? next.student.address, studentsData[0].home_latitude, studentsData[0].home_longitude, next.student.location),
+      name: student.full_name,
+      grade: student.grade ?? "—",
+      address: student.home_address ?? "—",
+      status: statusLabel(student.service_status),
+      location: makeLocation(student.home_label ?? "موقع البيت", student.home_address ?? "—", student.home_latitude, student.home_longitude, schoolLoc),
     };
-    next.parent = {
-      ...next.parent,
-      name: studentsData[0].pickup_contact_name ?? next.parent.name,
-      phone: studentsData[0].pickup_contact_phone ?? next.parent.phone,
-    };
+    next.parent = { ...next.parent, name: student.pickup_contact_name ?? "—", phone: student.pickup_contact_phone ?? "—" };
   }
+
+  const countOf = async (table: string) => (await supabase.from(table).select("id", { count: "exact", head: true }).eq("school_id", school.id)).count ?? 0;
+  const [studentsCount, busesCount, routesCount, subscriptionsCount] = await Promise.all(["students", "buses", "routes", "subscriptions"].map(countOf));
+  next.counts = { students: studentsCount, buses: busesCount, routes: routesCount, subscriptions: subscriptionsCount };
 
   next.route = ensureSchoolDestination(next.route, next.school);
   return next;
@@ -336,8 +332,8 @@ async function resolveUserAccess(session: Session): Promise<{ role: Role | null;
   return { role, name, email };
 }
 
-async function loadDriverRows(): Promise<DriverRow[]> {
-  const rows: DriverRow[] = [...defaultExtraDrivers];
+async function loadDriverRows(includeDemo: boolean): Promise<DriverRow[]> {
+  const rows: DriverRow[] = includeDemo ? [...defaultExtraDrivers] : [];
   const { data: requests } = await supabase
     .from("driver_onboarding_requests")
     .select("driver_name,phone,email,vehicle_plate,vehicle_capacity,status")
@@ -358,8 +354,8 @@ async function loadDriverRows(): Promise<DriverRow[]> {
   return rows;
 }
 
-async function loadStudentRows(): Promise<StudentRow[]> {
-  const rows: StudentRow[] = [...defaultStudentRows];
+async function loadStudentRows(includeDemo: boolean): Promise<StudentRow[]> {
+  const rows: StudentRow[] = includeDemo ? [...defaultStudentRows] : [];
   const { data: requests } = await supabase
     .from("student_onboarding_requests")
     .select("student_name,grade,parent_name,parent_phone,parent_email,home_address,status")
@@ -381,13 +377,13 @@ async function loadStudentRows(): Promise<StudentRow[]> {
   return rows;
 }
 
-async function loadRouteRows(): Promise<RouteRow[]> {
+async function loadRouteRows(includeDemo: boolean): Promise<RouteRow[]> {
   const { data: routes } = await supabase
     .from("routes")
     .select("id,name,direction,scheduled_time,is_active,route_stops(label,stop_order)")
     .order("created_at", { ascending: false })
     .limit(20);
-  if (!routes?.length) return defaultRouteRows;
+  if (!routes?.length) return includeDemo ? defaultRouteRows : [];
   return routes.map((route) => {
     const stops = Array.isArray(route.route_stops) ? [...route.route_stops].sort((a, b) => (a.stop_order ?? 0) - (b.stop_order ?? 0)).map((stop) => stop.label).filter(Boolean).join(" ← ") : "";
     return {
@@ -476,22 +472,22 @@ function ExecutiveDashboard({ data, simulation, driverGps }: { data: MasariData;
   return <>
     <div className="welcome"><div><p className="eyebrow">{data.school.city} · {data.school.contactName}</p><h1>{data.school.name}</h1><p>هذه حالة أول تشغيل حقيقي للنظام اليوم.</p></div><Button className="primary-action"><Plus /> إضافة مدرسة</Button></div>
     <section className="stats-grid">
-      <Stat icon={GraduationCap} label="الطلاب المسجلون" value="1" detail={`${data.student.name} · ${data.student.grade}`} accent="blue" />
-      <Stat icon={BusFront} label="الباصات النشطة" value="1" detail={`${data.vehicle.plate} · ${data.vehicle.capacity} مقعدًا`} accent="teal" />
-      <Stat icon={Route} label="المسارات" value="1" detail={`${data.route.name} · ${data.route.stops.length} توقفات`} accent="purple" />
-      <Stat icon={CircleDollarSign} label="الاشتراكات" value="1" detail="اشتراك شهري قيد الإعداد" accent="amber" />
+      <Stat icon={GraduationCap} label="الطلاب المسجلون" value={String(data.counts?.students ?? 1)} detail={`${data.student.name} · ${data.student.grade}`} accent="blue" />
+      <Stat icon={BusFront} label="الباصات النشطة" value={String(data.counts?.buses ?? 1)} detail={data.vehicle.capacity ? `${data.vehicle.plate} · ${data.vehicle.capacity} مقعدًا` : "لا يوجد باص مسند للمسار"} accent="teal" />
+      <Stat icon={Route} label="المسارات" value={String(data.counts?.routes ?? 1)} detail={`${data.route.name} · ${data.route.stops.length} توقفات`} accent="purple" />
+      <Stat icon={CircleDollarSign} label="الاشتراكات" value={String(data.counts?.subscriptions ?? 1)} detail={data.counts ? "من قاعدة البيانات" : "اشتراك شهري قيد الإعداد"} accent="amber" />
     </section>
     <section className="main-grid"><LiveRoute data={data} simulation={simulation} driverGps={driverGps} /><article className="panel operations">
       <div className="panel-head"><div><p className="eyebrow">الآن</p><h2>حالة التشغيل</h2></div><Activity className="title-icon" /></div>
       <div className="operation-ring"><span><strong>{simulation.active ? 1 : 0}</strong><small>{simulation.active ? "رحلة جارية" : "رحلة مجدولة"}</small></span></div>
-      <div className="operation-list"><div><span className="dot green"/><p>محطات معتمدة</p><strong>{simulation.approvedStops.length}</strong></div><div><span className="dot amber"/><p>المحطة الحالية</p><strong>{simulation.currentStopIndex + 1}</strong></div><div><span className="dot red"/><p>بيانات ناقصة</p><strong>رخصة</strong></div></div>
+      <div className="operation-list"><div><span className="dot green"/><p>محطات معتمدة</p><strong>{simulation.approvedStops.length}</strong></div><div><span className="dot amber"/><p>المحطة الحالية</p><strong>{simulation.currentStopIndex + 1}</strong></div><div><span className="dot red"/><p>بيانات ناقصة</p><strong>{data.counts ? "—" : "رخصة"}</strong></div></div>
     </article></section>
     <section className="lower-grid">
-      <article className="panel"><div className="panel-head"><div><p className="eyebrow">آخر 7 أيام</p><h2>الالتزام بالمواعيد</h2></div><strong className="metric">96.4%</strong></div><div className="bars">{[82,91,88,96,94,98,96].map((h,i)=><div key={i}><span style={{height:h+"%"}}/><small>{["أحد","اثنين","ثلاثاء","أربعاء","خميس","أحد","اليوم"][i]}</small></div>)}</div></article>
+      <article className="panel"><div className="panel-head"><div><p className="eyebrow">آخر 7 أيام</p><h2>الالتزام بالمواعيد</h2></div>{!data.counts&&<strong className="metric">96.4%</strong>}</div>{data.counts ? <p className="muted-label">لا توجد رحلات مكتملة كافية لحساب المؤشر بعد.</p> : <div className="bars">{[82,91,88,96,94,98,96].map((h,i)=><div key={i}><span style={{height:h+"%"}}/><small>{["أحد","اثنين","ثلاثاء","أربعاء","خميس","أحد","اليوم"][i]}</small></div>)}</div>}</article>
       <article className="panel alerts"><div className="panel-head"><div><p className="eyebrow">تحتاج انتباهك</p><h2>التنبيهات</h2></div><Button variant="ghost" size="sm">عرض الكل</Button></div>
         <div className="alert-row"><span className="alert-icon amber"><Clock3 /></span><div><strong>رحلة اليوم لم تبدأ بعد</strong><p>{data.route.name} · موعد البداية {data.route.scheduledTime}</p></div><small>اليوم</small></div>
-        <div className="alert-row"><span className="alert-icon blue"><WalletCards /></span><div><strong>اشتراك {data.student.name}</strong><p>تم إنشاؤه كاشتراك شهري قيد الإعداد</p></div><small>اليوم</small></div>
-        <div className="alert-row"><span className="alert-icon red"><AlertTriangle /></span><div><strong>استكمال بيانات السائق</strong><p>{data.driver.name} · بيانات الرخصة تحتاج إدخال نهائي</p></div><small>مطلوب</small></div>
+        {!data.counts&&<><div className="alert-row"><span className="alert-icon blue"><WalletCards /></span><div><strong>اشتراك {data.student.name}</strong><p>تم إنشاؤه كاشتراك شهري قيد الإعداد</p></div><small>اليوم</small></div>
+        <div className="alert-row"><span className="alert-icon red"><AlertTriangle /></span><div><strong>استكمال بيانات السائق</strong><p>{data.driver.name} · بيانات الرخصة تحتاج إدخال نهائي</p></div><small>مطلوب</small></div></>}
       </article>
     </section>
   </>;
@@ -656,7 +652,7 @@ function AddRoutePanel({ onAdd, authMode }: { onAdd: (route: RouteForm) => Promi
 
 function ControlTower({ data, simulation, driverGps, tripEvents }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null; tripEvents: TripEventRow[] }) {
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
-  const events = tripEvents.length ? tripEvents : data.route.stops.map((stop, index)=>({
+  const events: TripEventRow[] = tripEvents.length ? tripEvents : data.route.stops.map((stop, index)=>({
     eventType: simulation.approvedStops.includes(index) ? "note" : "scheduled",
     note: `${stop.label} · ${simulation.approvedStops.includes(index) ? "تم اعتماد الوصول" : index === simulation.currentStopIndex ? "المحطة الحالية" : "بانتظار الوصول"}`,
     createdAt: new Date().toISOString(),
@@ -686,16 +682,23 @@ function DataView({ data, view, role, simulation, extraDrivers, studentRows, rou
     audit:{title:"سجل التدقيق",subtitle:"جميع العمليات الحساسة المسجلة في النظام",action:"تصفية السجل",icon:FileClock},
   };
   const c=config[view] ?? config.students; const Icon=c.icon;
-  const rows = view==="schools" ? [[data.school.name, `${data.school.city} · ${data.school.contactName}`, "نشط", "اليوم"]]
+  const noData = data.source === "empty";
+  const rows: string[][] = noData && ["schools","finance","audit"].includes(view) ? [] : view==="schools" ? [[data.school.name, `${data.school.city} · ${data.school.contactName}`, "نشط", "اليوم"]]
     : view==="fleet" ? extraDrivers.map((driver)=>[`${driver.name} · ${driver.plate}`, `${driver.email || driver.phone} · ${driver.capacity ?? data.vehicle.capacity} مقعدًا`, driver.status, driver.saved ? "محفوظ" : "محلي"])
     : view==="routes" ? routeRows.map((route)=>[route.name, `${route.direction} · ${route.stops}`, route.status, route.saved ? route.scheduledTime : "محلي"])
-    : view==="trips" ? (tripEvents.length ? tripEvents.map((event)=>[eventTypeLabel(event.eventType), event.note || `${data.student.name} · ${data.student.address}`, event.eventType === "pickup" ? "حضور" : event.eventType === "dropoff" ? "انصراف" : event.eventType === "emergency" ? "طارئ" : "تحديث", formatEventTime(event.createdAt)]) : [[`رحلة ${data.route.name}`, `${data.student.name} · ${data.student.address}`, statusLabel(data.ride.status), data.ride.date]])
+    : view==="trips" ? (tripEvents.length ? tripEvents.map((event)=>[eventTypeLabel(event.eventType), event.note || `${data.student.name} · ${data.student.address}`, event.eventType === "pickup" ? "حضور" : event.eventType === "dropoff" ? "انصراف" : event.eventType === "emergency" ? "طارئ" : "تحديث", formatEventTime(event.createdAt)]) : noData ? [] : [[`رحلة ${data.route.name}`, `${data.student.name} · ${data.student.address}`, statusLabel(data.ride.status), data.ride.date]])
     : view==="finance" ? [[`اشتراك ${data.student.name}`, `${data.parent.name} · ${data.parent.phone}`, "قيد الإعداد", "اليوم"]]
     : view==="reports" ? feedbackRows.map((item)=>[`${item.category} · ${item.rating}/5`, `${item.author} · ${item.message}`, item.status, formatEventTime(item.createdAt)])
     : view==="audit" ? [["إدخال بيانات التشغيل الأولى", `بواسطة ${data.school.contactName}`, "موثق", "اليوم"]]
     : studentRows.map((student)=>[student.name, `${student.grade} · ${student.parentName || "ولي الأمر"} · ${student.address}`, student.status, student.saved ? "محفوظ" : "محلي"]);
   const canManage = role === "school" || role === "executive";
-  return <><div className="welcome"><div><p className="eyebrow">إدارة النظام</p><h1>{c.title}</h1><p>{c.subtitle}</p></div><Button className="primary-action"><Plus/>{c.action}</Button></div>{view==="trips"&&<section className="trip-summary-grid"><article className="panel mini-metric"><span>أحداث اليوم</span><strong>{tripEvents.length || simulation.approvedStops.length}</strong></article><article className="panel mini-metric"><span>حالة الطالب</span><strong>{studentStatusLabel[simulation.studentStatus]}</strong></article><article className="panel mini-metric"><span>آخر تحديث</span><strong>{tripEvents[0] ? formatEventTime(tripEvents[0].createdAt) : "—"}</strong></article></section>}{view==="fleet"&&canManage&&<AddDriverPanel onAdd={onAddDriver} authMode={authMode}/>} {view==="students"&&canManage&&<AddStudentPanel onAdd={onAddStudent} authMode={authMode}/>} {view==="routes"&&canManage&&<AddRoutePanel onAdd={onAddRoute} authMode={authMode}/>}<article className="panel data-panel"><div className="data-tools"><div className="search-box"><Search/><input aria-label="بحث" placeholder="ابحث بالاسم أو الرقم…"/></div><Button variant="outline">الحالة: الكل</Button></div><div className="data-table"><div className="table-head"><span>الاسم / البيان</span><span>التفاصيل</span><span>الحالة</span><span>آخر تحديث</span></div>{rows.map((row,i)=><div className="table-row" key={i}><span><span className="row-icon"><Icon/></span><strong>{row[0]}</strong></span><span>{row[1]}</span><span><Badge className={"status-badge tone-"+(i%3)}>{row[2]}</Badge></span><span>{row[3]}</span></div>)}</div></article></>;
+  return <><div className="welcome"><div><p className="eyebrow">إدارة النظام</p><h1>{c.title}</h1><p>{c.subtitle}</p></div><Button className="primary-action"><Plus/>{c.action}</Button></div>{view==="trips"&&<section className="trip-summary-grid"><article className="panel mini-metric"><span>أحداث اليوم</span><strong>{tripEvents.length || simulation.approvedStops.length}</strong></article><article className="panel mini-metric"><span>حالة الطالب</span><strong>{studentStatusLabel[simulation.studentStatus]}</strong></article><article className="panel mini-metric"><span>آخر تحديث</span><strong>{tripEvents[0] ? formatEventTime(tripEvents[0].createdAt) : "—"}</strong></article></section>}{view==="fleet"&&canManage&&<AddDriverPanel onAdd={onAddDriver} authMode={authMode}/>} {view==="students"&&canManage&&<AddStudentPanel onAdd={onAddStudent} authMode={authMode}/>} {view==="routes"&&canManage&&<AddRoutePanel onAdd={onAddRoute} authMode={authMode}/>}<article className="panel data-panel"><div className="data-tools"><div className="search-box"><Search/><input aria-label="بحث" placeholder="ابحث بالاسم أو الرقم…"/></div><Button variant="outline">الحالة: الكل</Button></div><div className="data-table"><div className="table-head"><span>الاسم / البيان</span><span>التفاصيل</span><span>الحالة</span><span>آخر تحديث</span></div>{rows.length===0&&<div className="table-row table-empty"><span>لا توجد سجلات بعد.</span></div>}{rows.map((row,i)=><div className="table-row" key={i}><span><span className="row-icon"><Icon/></span><strong>{row[0]}</strong></span><span>{row[1]}</span><span><Badge className={"status-badge tone-"+(i%3)}>{row[2]}</Badge></span><span>{row[3]}</span></div>)}</div></article></>;
+}
+function EmptyState({ role }: { role: Role }) {
+  const hint = role === "parent" ? "لم يُربط حسابك بأي طالب بعد. ستظهر الرحلة هنا بعد أن تربطك المدرسة بابنك."
+    : role === "driver" ? "لا توجد رحلات مسندة إليك بعد. ستظهر رحلة اليوم بعد أن تسندك المدرسة إلى مسار."
+    : "لا توجد بيانات تشغيل بعد. أضف مدرسة ثم الباصات والمسارات والطلاب لتظهر هنا.";
+  return <article className="panel empty-state"><div className="brand-mark large"><School/></div><h2>لا توجد بيانات بعد</h2><p>{hint}</p></article>;
 }
 function LoginDialog({ onClose, onAuthenticated }: { onClose:()=>void; onAuthenticated: (session: Session) => Promise<void> }) {
   const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
@@ -773,14 +776,14 @@ export default function Home() {
   const eventsChannelRef = useRef<RealtimeChannel | null>(null);
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
   useEffect(()=>{let alive=true;const refresh=()=>loadMasariData().then((next)=>{if(alive)setData(next)}).catch(()=>{});refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>refresh());return()=>{alive=false;subscription.unsubscribe()}},[]);
-  useEffect(()=>{let alive=true;loadDriverRows().then((rows)=>{if(alive)setExtraDrivers(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;loadStudentRows().then((rows)=>{if(alive)setStudentRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;loadRouteRows().then((rows)=>{if(alive)setRouteRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;if(!access.role){await supabase.auth.signOut();return}setRole(access.role);setAccountName(access.name);setAuthMode("authenticated");setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
+  useEffect(()=>{let alive=true;loadDriverRows(authMode !== "authenticated").then((rows)=>{if(alive)setExtraDrivers(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
+  useEffect(()=>{let alive=true;loadStudentRows(authMode !== "authenticated").then((rows)=>{if(alive)setStudentRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
+  useEffect(()=>{let alive=true;loadRouteRows(authMode !== "authenticated").then((rows)=>{if(alive)setRouteRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
+  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;if(!access.role){await supabase.auth.signOut();return}setRole(access.role);setAccountName(access.name);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
   useEffect(()=>()=>{if(gpsWatchRef.current!==null) navigator.geolocation.clearWatch(gpsWatchRef.current); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
-  const nav=useMemo(()=>navByRole[role],[role]); const notifications=useMemo(()=>buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[data, simulation, driverGps, tripEvents, feedbackRows]); const switchRole=(r:Role)=>{setRole(r);setView("dashboard")};
+  const nav=useMemo(()=>navByRole[role],[role]); const notifications=useMemo(()=>data.source==="empty" ? [] : buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[data, simulation, driverGps, tripEvents, feedbackRows]); const switchRole=(r:Role)=>{setRole(r);setView("dashboard")};
   const enterAs=(nextRole: Role)=>{setRole(nextRole);setAccountName("");setAuthMode("demo");setView("dashboard");setEntered(true)};
-  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);if(!access.role)throw new Error("ACCOUNT_PENDING");setRole(access.role);setAccountName(access.name);setAuthMode("authenticated");setView("dashboard");setEntered(true)};
+  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);if(!access.role)throw new Error("ACCOUNT_PENDING");setRole(access.role);setAccountName(access.name);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
   const stopGpsTracking=()=>{if(gpsWatchRef.current!==null){navigator.geolocation.clearWatch(gpsWatchRef.current);gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
   const stopRealtimeTracking=()=>{if(realtimeChannelRef.current){void supabase.removeChannel(realtimeChannelRef.current);realtimeChannelRef.current=null}};
   const stopEventsRealtime=()=>{if(eventsChannelRef.current){void supabase.removeChannel(eventsChannelRef.current);eventsChannelRef.current=null}};
@@ -806,7 +809,7 @@ export default function Home() {
       status: "pending",
     });
     if (!error) {
-      const rows = await loadDriverRows().catch(()=>null);
+      const rows = await loadDriverRows(authMode !== "authenticated").catch(()=>null);
       if (rows) setExtraDrivers(rows);
     }
   };
@@ -834,7 +837,7 @@ export default function Home() {
       status: "pending_parent_account",
     });
     if (!error) {
-      const rows = await loadStudentRows().catch(()=>null);
+      const rows = await loadStudentRows(authMode !== "authenticated").catch(()=>null);
       if (rows) setStudentRows(rows);
     }
   };
@@ -864,7 +867,7 @@ export default function Home() {
         scheduled_time: route.scheduledTime,
       }))).throwOnError();
     } catch {}
-    const rows = await loadRouteRows().catch(()=>null);
+    const rows = await loadRouteRows(authMode !== "authenticated").catch(()=>null);
     if (rows) setRouteRows(rows);
   };
   const submitFeedback=async(feedback: Omit<FeedbackItem, "id" | "createdAt" | "saved">)=>{
@@ -1286,7 +1289,7 @@ export default function Home() {
   };
   if(!entered) return <AuthPage onEnter={enterAs} onAuthenticated={enterAuthenticated}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
-    <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view===item.id} onClick={()=>setView(item.id)} tooltip={item.label}><item.icon/><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.school.contactName} · {data.school.phone}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{authMode==="authenticated" ? "حساب فعلي" : "وضع تجريبي"} · {roleNames[role]}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
-    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} onSubmitFeedback={submitFeedback}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
+    <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view===item.id} onClick={()=>setView(item.id)} tooltip={item.label}><item.icon/><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" ? "تواصل مع إدارة مساري" : `${data.school.contactName} · ${data.school.phone}`}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{authMode==="authenticated" ? "حساب فعلي" : "وضع تجريبي"} · {roleNames[role]}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
+    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} onSubmitFeedback={submitFeedback}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
   </SidebarProvider>{login&&<LoginDialog onClose={()=>setLogin(false)} onAuthenticated={enterAuthenticated}/>}</div>;
 }
