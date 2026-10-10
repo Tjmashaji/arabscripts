@@ -54,13 +54,6 @@ type NotificationItem = { id: string; title: string; body: string; time: string;
 const roleNames: Record<Role, string> = {
   executive: "الإدارة التنفيذية", school: "إدارة المدرسة", driver: "السائق", parent: "ولي الأمر",
 };
-const roleFromDb = (value?: string | null): Role | null => {
-  if (value === "driver") return "driver";
-  if (value === "parent") return "parent";
-  if (value === "school_admin" || value === "operations") return "school";
-  if (value === "executive" || value === "super_admin" || value === "admin") return "executive";
-  return null;
-};
 const navByRole: Record<Role, { id: View; label: string; icon: typeof LayoutDashboard }[]> = {
   executive: [
     { id: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { id: "schools", label: "المدارس", icon: School },
@@ -321,32 +314,26 @@ async function loadMasariData(): Promise<MasariData> {
   return next;
 }
 
+type MyAccess = {
+  status: string; full_name: string | null; platform_roles: string[];
+  schools: { role: string; status: string; school_status: string }[];
+  driver: { status: string } | null;
+  guardian: { status: string }[];
+};
+// الدور يُحدَّد من الخادم عبر my_access() فقط؛ الحساب غير المفعّل لا يحصل على أي دور.
 async function resolveUserAccess(session: Session): Promise<{ role: Role | null; name: string; email: string }> {
-  const userId = session.user.id;
   const email = session.user.email ?? "";
-  const { data: roles } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .limit(1);
-
-  let role = roleFromDb(roles?.[0]?.role);
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("user_id", userId)
-    .limit(1);
-
-  if (!roles?.length) {
-    const { data: drivers } = await supabase.from("drivers").select("id").eq("user_id", userId).limit(1);
-    const { data: schools } = await supabase.from("school_members").select("id").eq("user_id", userId).limit(1);
-    const { data: parents } = await supabase.from("parents_students").select("id").eq("parent_id", userId).limit(1);
-    if (drivers?.length) role = "driver";
-    else if (schools?.length) role = "school";
-    else if (parents?.length) role = "parent";
-  }
-
-  return { role, name: profiles?.[0]?.full_name ?? email.split("@")[0] ?? "مستخدم", email };
+  await supabase.rpc("claim_my_invites");
+  const { data, error } = await supabase.rpc("my_access");
+  const access = data as MyAccess | null;
+  const name = access?.full_name || email.split("@")[0] || "مستخدم";
+  if (error || !access || access.status !== "active") return { role: null, name, email };
+  let role: Role | null = null;
+  if (access.platform_roles.some((r) => r === "super_admin" || r === "executive")) role = "executive";
+  else if (access.schools.some((m) => m.status === "active" && m.school_status === "active")) role = "school";
+  else if (access.driver?.status === "active") role = "driver";
+  else if (access.guardian.some((g) => g.status === "active")) role = "parent";
+  return { role, name, email };
 }
 
 async function loadDriverRows(): Promise<DriverRow[]> {
@@ -721,8 +708,8 @@ function LoginDialog({ onClose, onAuthenticated }: { onClose:()=>void; onAuthent
       setMessage("تم تسجيل الدخول بنجاح.");
       setTimeout(onClose,500);
     } catch {
-      await supabase.auth.signOut();
       setMessage("الحساب صحيح لكنه بانتظار التفعيل وربطه بدور معتمد من الإدارة.");
+      await supabase.auth.signOut({ scope: "local" });
     } finally { setBusy(false); }
   };
   return <div className="login-backdrop"><div className="login-card"><button className="close-login" onClick={onClose}><X/></button><div className="brand-mark large"><BusFront/></div><p className="eyebrow">مرحبًا بك</p><h2>تسجيل الدخول إلى مساري</h2><p>استخدم الحساب المسجل لدى المدرسة أو شركة النقل.</p><label>البريد الإلكتروني<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label><label>كلمة المرور<input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>{message&&<p className="login-message">{message}</p>}<Button className="wide-action" onClick={login} disabled={busy||!email||!password}>{busy?"جارٍ الدخول…":"تسجيل الدخول"}</Button><button className="text-link">نسيت كلمة المرور؟</button></div></div>;
@@ -757,8 +744,8 @@ function AuthPage({ onEnter, onAuthenticated }: { onEnter: (role: Role) => void;
       try {
         await onAuthenticated(result.data.session);
       } catch {
-        await supabase.auth.signOut();
-        setMessage("تم إنشاء الحساب بأمان، وهو الآن بانتظار اعتماد الإدارة وربطه بالدور المطلوب.");
+        setMessage(mode === "login" ? "الحساب صحيح لكنه بانتظار التفعيل وربطه بدور معتمد من الإدارة." : "تم إنشاء الحساب بأمان، وهو الآن بانتظار اعتماد الإدارة وربطه بالدور المطلوب.");
+        await supabase.auth.signOut({ scope: "local" });
       }
     } else setMessage("تم إنشاء الحساب. فعّل البريد ثم انتظر اعتماد الإدارة قبل تسجيل الدخول.");
   };

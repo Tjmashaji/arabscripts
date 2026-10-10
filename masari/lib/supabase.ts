@@ -1,2 +1,3 @@
 import { createClient } from "@supabase/supabase-js";
-export const supabase = createClient("https://marqqtwxshinjbceokty.supabase.co", "sb_publishable_LYjXaMLOECVfbUm_Hzs2bQ_SVzyAGel", { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+// مشروع Supabase «masari» (hramsoavpanetdhwpokr). المفتاح publishable وآمن للمتصفح؛ الحماية عبر RLS.
+export const supabase = createClient("https://hramsoavpanetdhwpokr.supabase.co", "sb_publishable_GoDofl1CxajoPvU4kjlJ3w_HKVury67", { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
