@@ -1,0 +1,165 @@
+/* ============================================================
+   مساري — رموز التصميم (Design tokens)
+   المصدر: design/design-tokens.source.css (من لوحة التصميم).
+
+   لماذا أسماء --m-* ؟
+   ملف التصميم الأصلي يعيد تعريف --primary و--secondary و--accent و--muted
+   و--text-sm و--radius-md، وهي نفس الأسماء التي تستخدمها مكونات shadcn
+   في components/ui بمعانٍ مختلفة (مثلًا --secondary خلفية فاتحة هناك،
+   وأزرق داكن في التصميم). لصقه كما هو يكسر الأزرار والقوائم والشريط الجانبي.
+   لذلك كل الرموز هنا بالبادئة m- ولا تغيّر أي أداة Tailwind افتراضية.
+
+   الاستخدام في Tailwind:  bg-m-primary  text-m-muted  rounded-m-card
+                            shadow-m-card  text-m-2xl  border-m-border  wall:
+   الاستخدام في CSS:       var(--m-primary)
+   ============================================================ */
+
+:root {
+  /* ---------- الهوية ---------- */
+  --m-primary: #10394b;          /* الشريط الجانبي والعناوين والرؤوس الداكنة */
+  --m-primary-strong: #0b2b3a;   /* نهاية تدرّج الأسطح الداكنة */
+  --m-accent: #35a5a5;           /* الشعار وحلقة التركيز والزخرفة فقط (لا نص أبيض عليه) */
+  --m-accent-strong: #1e7890;    /* مؤشرات العنصر النشط والروابط على الفاتح */
+  --m-secondary: #176b87;        /* الروابط والتأكيد الثانوي */
+  --m-action-from: #20828a;      /* بداية تدرّج الزر الأساسي (AA مع الأبيض) */
+  --m-action-to: #176b87;        /* نهاية تدرّج الزر الأساسي */
+  --m-accent-soft: #e3f3f3;      /* الشرائح المختارة وخلفيات الأيقونات */
+
+  /* ---------- الأسطح والنص ---------- */
+  --m-bg: #f4f7fb;
+  --m-surface: #ffffff;
+  --m-surface-muted: #f8fafc;
+  --m-border: #dfe6ec;
+  --m-border-subtle: #eef2f5;
+  --m-text: #16243a;
+  --m-text-muted: #5b6880;       /* بدل #748194 ← تباين 5.6:1 على الأبيض */
+  --m-text-subtle: #3d4a5e;
+  --m-placeholder: #8792a2;
+
+  /* ---------- حالات التنبيه ---------- */
+  --m-success: #287760;  --m-success-bg: #e5f6f1;  --m-success-text: #1f5f4c;
+  --m-warning: #9a5a13;  --m-warning-bg: #fff4e5;  --m-warning-text: #5c340b;
+  --m-danger: #b42318;   --m-danger-bg: #fdeceb;   --m-danger-text: #8f1d15;  --m-danger-border: #f5c8c3;
+  --m-info: #1f4f8a;     --m-info-bg: #e8f0fb;
+  --m-neutral-bg: #eef1f5; --m-neutral-text: #3d4a5e;
+
+  /* ---------- حالات الرحلة (شارات على الواجهة الفاتحة) ---------- */
+  --m-trip-scheduled: var(--m-neutral-text);
+  --m-trip-ready: var(--m-info);
+  --m-trip-active: #135f6f;
+  --m-trip-paused: var(--m-warning);
+  --m-trip-completed: var(--m-success);
+  --m-trip-cancelled: var(--m-neutral-text);
+  --m-trip-emergency: var(--m-danger);
+
+  /* ---------- برج المراقبة (داكن) ---------- */
+  --m-tower-bg: #0b2b3a;
+  --m-tower-map: #0e3242;
+  --m-tower-surface: #0f3446;
+  --m-tower-border: #1d4a5e;
+  --m-tower-text: #e8f1f4;
+  --m-tower-text-muted: #a9c2cc;
+  /* التباين مع --m-tower-map: متحرك 8.2 · متأخر 7.7 · غير متصل 5.5 · متوقف 4.3 · طوارئ 4.1 */
+  --m-status-moving: #5fe0a8;    /* دائرة + سهم الاتجاه */
+  --m-status-stopped: #4f8fff;   /* دائرة + نقطة ثابتة */
+  --m-status-late: #ffb547;      /* معيّن + نبض خفيف */
+  --m-status-offline: #9aa8b1;   /* إطار متقطع + أيقونة انقطاع */
+  --m-status-emergency: #ff4d42; /* دائرة أكبر + نبض قوي، فوق الجميع */
+
+  /* ---------- الخطوط ---------- */
+  --m-font: "Noto Sans Arabic", Tahoma, "Segoe UI", sans-serif;
+  --m-fw-regular: 400; --m-fw-semibold: 600; --m-fw-bold: 800;
+  --m-leading-tight: 1.35; --m-leading-body: 1.8;
+
+  /* ---------- المسافات (شبكة 4px) ---------- */
+  --m-space-1: 4px;  --m-space-2: 8px;  --m-space-3: 12px; --m-space-4: 16px;
+  --m-space-5: 20px; --m-space-6: 24px; --m-space-8: 32px; --m-space-10: 40px; --m-space-12: 48px;
+
+  /* ---------- الظلال والتركيز ---------- */
+  --m-ring-focus: 0 0 0 4px rgba(53, 165, 165, .2);
+  --m-outline-focus: 3px solid var(--m-accent);
+
+  /* ---------- المقاسات ---------- */
+  --m-touch-min: 44px;
+  --m-btn-sm: 36px; --m-btn-md: 44px; --m-btn-lg: 54px; --m-btn-xl: 76px; /* xl للسائق */
+  --m-input-h: 48px;   /* 52px في شاشات الدخول، 58px للسائق */
+  --m-sidebar-w: 252px;
+}
+
+/* ربط الألوان بأدوات Tailwind (bg-m-* و text-m-* و border-m-*) */
+@theme inline {
+  --color-m-primary: var(--m-primary);
+  --color-m-primary-strong: var(--m-primary-strong);
+  --color-m-accent: var(--m-accent);
+  --color-m-accent-strong: var(--m-accent-strong);
+  --color-m-accent-soft: var(--m-accent-soft);
+  --color-m-secondary: var(--m-secondary);
+  --color-m-bg: var(--m-bg);
+  --color-m-surface: var(--m-surface);
+  --color-m-surface-muted: var(--m-surface-muted);
+  --color-m-border: var(--m-border);
+  --color-m-border-subtle: var(--m-border-subtle);
+  --color-m-text: var(--m-text);
+  --color-m-muted: var(--m-text-muted);
+  --color-m-subtle: var(--m-text-subtle);
+  --color-m-success: var(--m-success);   --color-m-success-bg: var(--m-success-bg);   --color-m-success-text: var(--m-success-text);
+  --color-m-warning: var(--m-warning);   --color-m-warning-bg: var(--m-warning-bg);   --color-m-warning-text: var(--m-warning-text);
+  --color-m-danger: var(--m-danger);     --color-m-danger-bg: var(--m-danger-bg);     --color-m-danger-text: var(--m-danger-text);
+  --color-m-info: var(--m-info);         --color-m-info-bg: var(--m-info-bg);
+  --color-m-neutral-bg: var(--m-neutral-bg);
+  --color-m-status-moving: var(--m-status-moving);
+  --color-m-status-stopped: var(--m-status-stopped);
+  --color-m-status-late: var(--m-status-late);
+  --color-m-status-offline: var(--m-status-offline);
+  --color-m-status-emergency: var(--m-status-emergency);
+  --color-m-tower-bg: var(--m-tower-bg);
+  --color-m-tower-map: var(--m-tower-map);
+  --color-m-tower-surface: var(--m-tower-surface);
+  --color-m-tower-border: var(--m-tower-border);
+  --color-m-tower-text: var(--m-tower-text);
+  --color-m-tower-muted: var(--m-tower-text-muted);
+}
+
+/* قيم ثابتة: مقاسات النص والحواف والظلال ونقطة شاشة البرج.
+   بأسماء m- فلا يتغير text-sm أو rounded-md الافتراضي. */
+@theme {
+  --text-m-xs: 12px;     /* التعليقات و«بيانات توضيحية» */
+  --text-m-sm: 13px;     /* نص مساعد */
+  --text-m-md: 14px;     /* العناوين الصغيرة وجسم الجداول */
+  --text-m-base: 15px;   /* النص على بطاقات الجوال */
+  --text-m-input: 16px;  /* الحقول (يمنع تكبير iOS) */
+  --text-m-lg: 17px;     /* أزرار الجوال */
+  --text-m-xl: 20px;     /* عناوين الأقسام */
+  --text-m-2xl: 22px;    /* أزرار السائق وعناوين البطاقات */
+  --text-m-3xl: 26px;    /* عناوين الصفحات */
+  --text-m-4xl: 28px;    /* شاشات الدخول */
+  --text-m-5xl: 34px;    /* اسم المحطة التالية للسائق */
+
+  --radius-m-xs: 6px;
+  --radius-m-sm: 10px;
+  --radius-m-md: 12px;
+  --radius-m-lg: 14px;
+  --radius-m-xl: 16px;
+  --radius-m-card: 18px;
+  --radius-m-2xl: 20px;
+  --radius-m-logo: 13px;
+  --radius-m-pill: 999px;
+
+  --shadow-m-card: 0 10px 28px -22px rgba(16, 57, 75, .35);
+  --shadow-m-raised: 0 16px 36px -16px rgba(16, 57, 75, .25);
+  --shadow-m-cta: 0 8px 20px -8px rgba(30, 120, 144, .6);
+  --shadow-m-dialog: 0 24px 48px -24px rgba(11, 26, 43, .45);
+
+  --breakpoint-wall: 1920px; /* شاشة برج المراقبة */
+}
+
+/* زر الإجراء الأساسي حسب التصميم */
+.m-btn-primary {
+  background: linear-gradient(135deg, var(--m-action-from), var(--m-action-to));
+  color: #fff;
+  box-shadow: var(--shadow-m-cta);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
