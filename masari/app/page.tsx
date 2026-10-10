@@ -8,6 +8,8 @@ import {
   RadioTower, Route, School, Search, ShieldCheck, UserPlus, Users, WalletCards, X, ClipboardList,
 } from "lucide-react";
 import { SchoolOps } from "./school-ops";
+import { PendingAccount, AdminSchools } from "./onboarding";
+import { LiveControl } from "./live-control";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -32,7 +34,7 @@ type RouteForm = { name: string; direction: "to_school" | "to_home"; scheduledTi
 type RouteRow = { name: string; direction: string; scheduledTime: string; stops: string; status: string; saved?: boolean };
 type MasariData = {
   source: "cached" | "supabase" | "empty";
-  school: { id?: string; name: string; city: string; contactName: string; phone: string; location: LocationPoint };
+  school: { id?: string; located?: boolean; name: string; city: string; contactName: string; phone: string; location: LocationPoint };
   vehicle: { number: string; plate: string; capacity: number };
   driver: { name: string; email: string };
   route: { name: string; scheduledTime: string; estimatedMinutes: number; stops: { id?: string; status?: string; label: string; time: string; lat: number; lng: number; studentName?: string | null }[] };
@@ -298,7 +300,7 @@ const blankDataFor = (school: { id: string; name: string; city: string | null; c
   const schoolLoc = makeLocation("موقع المدرسة", school.address ?? school.city ?? "—", school.latitude, school.longitude, schoolLocation);
   return {
     source: "supabase",
-    school: { id: school.id, name: school.name, city: school.city ?? "—", contactName: school.contact_name ?? "—", phone: school.phone ?? "—", location: schoolLoc },
+    school: { id: school.id, located: school.latitude != null && school.longitude != null, name: school.name, city: school.city ?? "—", contactName: school.contact_name ?? "—", phone: school.phone ?? "—", location: schoolLoc },
     vehicle: { number: "—", plate: "—", capacity: 0 },
     driver: { name: "—", email: "" },
     route: { name: "لا يوجد مسار", scheduledTime: "—", estimatedMinutes: 0, stops: [] },
@@ -432,7 +434,7 @@ async function loadMasariData(childId?: string | null): Promise<MasariData> {
   const schoolLoc = makeLocation("موقع المدرسة", school.address ?? school.city ?? "—", school.latitude, school.longitude, schoolLocation);
   const next: MasariData = {
     source: "supabase",
-    school: { id: school.id, name: school.name, city: school.city ?? "—", contactName: school.contact_name ?? "—", phone: school.phone ?? "—", location: schoolLoc },
+    school: { id: school.id, located: school.latitude != null && school.longitude != null, name: school.name, city: school.city ?? "—", contactName: school.contact_name ?? "—", phone: school.phone ?? "—", location: schoolLoc },
     vehicle: { number: "—", plate: "—", capacity: 0 },
     driver: { name: "—", email: "" },
     route: { name: "لا يوجد مسار", scheduledTime: "—", estimatedMinutes: 0, stops: [] },
@@ -522,14 +524,16 @@ function roleFromAccess(access: MyAccess | null): Role | null {
   if (access.guardian.some((g) => g.status === "active")) return "parent";
   return null;
 }
-async function resolveUserAccess(session: Session): Promise<{ role: Role | null; name: string; email: string }> {
+type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string };
+async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const email = session.user.email ?? "";
   await supabase.rpc("claim_my_invites");
   const { data, error } = await supabase.rpc("my_access");
   const access = data as MyAccess | null;
   const name = access?.full_name || email.split("@")[0] || "مستخدم";
-  if (error) return { role: null, name, email };
-  return { role: roleFromAccess(access), name, email };
+  const requestedRole = typeof session.user.user_metadata?.requested_role === "string" ? session.user.user_metadata.requested_role : undefined;
+  if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole };
+  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole };
 }
 
 async function loadDriverRows(includeDemo: boolean): Promise<DriverRow[]> {
@@ -658,6 +662,7 @@ function LocationsView({ data, role, simulation, saveStatus, onSaveLocation }: {
   return <>
     <div className="welcome"><div><p className="eyebrow">المواقع الجغرافية</p><h1>موقع المدرسة والبيت والمسار</h1><p>استخدم الإحداثيات الدقيقة عند توفرها من خرائط الجوال، وستنعكس مباشرة على الخريطة وبرج المراقبة.</p></div><Badge className="safe-badge"><MapPin /> {data.source === "supabase" ? "متصل بقاعدة البيانات" : "قابل للتعديل محلياً"}</Badge></div>
     {saveStatus && <div className="save-strip"><Check /><span>{saveStatus}</span></div>}
+    {data.school.located === false && <p className="save-strip ops-message ops-error"><MapPin /><span>لم يُحدَّد موقع المدرسة بعد. الإحداثيات الظاهرة افتراضية؛ أدخل موقع المدرسة الصحيح واحفظه، فإنشاء المسارات يعتمد عليه.</span></p>}
     <section className="locations-grid">
       <LocationEditor key={`school-${data.school.location.lat}-${data.school.location.lng}`} title="المدرسة" icon={School} value={data.school.location} editable={editable} onSave={(point)=>onSaveLocation("school", point)} />
       <LocationEditor key={`home-${data.student.location.lat}-${data.student.location.lng}`} title="البيت" icon={MapPin} value={data.student.location} editable={editable} onSave={(point)=>onSaveLocation("home", point)} />
@@ -670,7 +675,7 @@ function LocationsView({ data, role, simulation, saveStatus, onSaveLocation }: {
 }
 function ExecutiveDashboard({ data, simulation, driverGps }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null }) {
   return <>
-    <div className="welcome"><div><p className="eyebrow">{data.school.city} · {data.school.contactName}</p><h1>{data.school.name}</h1><p>هذه حالة أول تشغيل حقيقي للنظام اليوم.</p></div><Button className="primary-action"><Plus /> إضافة مدرسة</Button></div>
+    <div className="welcome"><div><p className="eyebrow">{data.school.city} · {data.school.contactName}</p><h1>{data.school.name}</h1><p>{data.counts ? "نظرة على تشغيل اليوم." : "هذه حالة أول تشغيل حقيقي للنظام اليوم."}</p></div>{!data.counts && <Button className="primary-action"><Plus /> إضافة مدرسة</Button>}</div>
     <section className="stats-grid">
       <Stat icon={GraduationCap} label="الطلاب المسجلون" value={String(data.counts?.students ?? 1)} detail={`${data.student.name} · ${data.student.grade}`} accent="blue" />
       <Stat icon={BusFront} label="الباصات النشطة" value={String(data.counts?.buses ?? 1)} detail={data.vehicle.capacity ? `${data.vehicle.plate} · ${data.vehicle.capacity} مقعدًا` : "لا يوجد باص مسند للمسار"} accent="teal" />
@@ -988,7 +993,7 @@ function AuthPage({ onEnter, onAuthenticated }: { onEnter: (role: Role) => void;
   </main>;
 }
 export default function Home() {
-  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [login,setLogin]=useState(false); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(seededData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [extraDrivers,setExtraDrivers]=useState<DriverRow[]>(defaultExtraDrivers); const [studentRows,setStudentRows]=useState<StudentRow[]>(defaultStudentRows); const [routeRows,setRouteRows]=useState<RouteRow[]>(defaultRouteRows); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>(defaultFeedbackRows); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState("");
+  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [login,setLogin]=useState(false); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(seededData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [extraDrivers,setExtraDrivers]=useState<DriverRow[]>(defaultExtraDrivers); const [studentRows,setStudentRows]=useState<StudentRow[]>(defaultStudentRows); const [routeRows,setRouteRows]=useState<RouteRow[]>(defaultRouteRows); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>(defaultFeedbackRows); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const [platformAdmin,setPlatformAdmin]=useState(false);
   const gpsWatchRef = useRef<number | null>(null);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
@@ -1001,11 +1006,11 @@ export default function Home() {
   useEffect(()=>{let alive=true;loadDriverRows(authMode !== "authenticated").then((rows)=>{if(alive)setExtraDrivers(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
   useEffect(()=>{let alive=true;loadStudentRows(authMode !== "authenticated").then((rows)=>{if(alive)setStudentRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
   useEffect(()=>{let alive=true;loadRouteRows(authMode !== "authenticated").then((rows)=>{if(alive)setRouteRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;if(!access.role){await supabase.auth.signOut();return}setRole(access.role);setAccountName(access.name);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
+  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
   useEffect(()=>()=>{if(gpsWatchRef.current!==null) navigator.geolocation.clearWatch(gpsWatchRef.current); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
   const nav=useMemo(()=>navByRole[role],[role]); const notifications=useMemo(()=>data.source==="empty" ? [] : buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[data, simulation, driverGps, tripEvents, feedbackRows]); const switchRole=(r:Role)=>{setRole(r);setView("dashboard")};
   const enterAs=(nextRole: Role)=>{setRole(nextRole);setAccountName("");setAuthMode("demo");setView("dashboard");setEntered(true)};
-  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);if(!access.role)throw new Error("ACCOUNT_PENDING");setRole(access.role);setAccountName(access.name);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
+  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
   const stopGpsTracking=()=>{if(gpsWatchRef.current!==null){navigator.geolocation.clearWatch(gpsWatchRef.current);gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
   const stopRealtimeTracking=()=>{if(realtimeChannelRef.current){void supabase.removeChannel(realtimeChannelRef.current);realtimeChannelRef.current=null}};
   const stopEventsRealtime=()=>{if(eventsChannelRef.current){void supabase.removeChannel(eventsChannelRef.current);eventsChannelRef.current=null}};
@@ -1128,7 +1133,9 @@ export default function Home() {
         ? await supabase.from("schools").update({ address: point.address, latitude: point.lat, longitude: point.lng }).eq("id", targetId)
         : await supabase.from("students").update({ home_address: point.address, home_label: point.label, home_latitude: point.lat, home_longitude: point.lng }).eq("id", targetId);
       if (error) throw error;
+      if (kind === "school") setData((current)=>({ ...current, school: { ...current.school, located: true } }));
       setSaveStatus("تم حفظ الموقع وتحديث الخريطة.");
+      void reloadData().catch(()=>{});
     } catch {
       setSaveStatus("تم تحديث الموقع على الشاشة، وسيحتاج الحفظ النهائي لتسجيل دخول فعلي.");
     }
@@ -1373,9 +1380,12 @@ export default function Home() {
       showTripSaveStatus("تم حفظ البلاغ الطارئ وإشعار برج المراقبة.");
     })();
   };
+  const leavePending=async()=>{await supabase.auth.signOut({ scope: "local" });setPendingAccount(null)};
+  const recheckPending=async()=>{const {data:sessionData}=await supabase.auth.getSession();if(!sessionData.session)return;await enterAuthenticated(sessionData.session);await reloadData().catch(()=>{})};
+  if(pendingAccount) return <PendingAccount email={pendingAccount.email} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
   if(!entered) return <AuthPage onEnter={enterAs} onAuthenticated={enterAuthenticated}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
     <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view===item.id} onClick={()=>setView(item.id)} tooltip={item.label}><item.icon/><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{authMode==="authenticated" ? "حساب فعلي" : "وضع تجريبي"} · {roleNames[role]}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
-    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{view==="operations" ? (authMode==="authenticated" && data.school.id ? <SchoolOps schoolId={data.school.id}/> : <article className="panel empty-state"><h2>التشغيل اليومي</h2><p>هذه الصفحة تعمل بالحساب الفعلي لإدارة المدرسة فقط.</p></article>) : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
+    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{authMode==="authenticated" && view==="schools" ? <AdminSchools canManage={platformAdmin}/> : authMode==="authenticated" && view==="control" && (role==="school"||role==="executive") ? <LiveControl canHandleEmergencies={role==="school"||platformAdmin}/> : view==="operations" ? (authMode==="authenticated" && data.school.id ? <SchoolOps schoolId={data.school.id}/> : <article className="panel empty-state"><h2>التشغيل اليومي</h2><p>هذه الصفحة تعمل بالحساب الفعلي لإدارة المدرسة فقط.</p></article>) : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
   </SidebarProvider>{login&&<LoginDialog onClose={()=>setLogin(false)} onAuthenticated={enterAuthenticated}/>}</div>;
 }
