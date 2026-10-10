@@ -248,6 +248,7 @@ const rpcErrorText: Record<string, string> = {
   STOP_NOT_REACHED: "اعتمد الوصول إلى محطة الطالب أولًا.",
   INVALID_TRANSITION: "لا يمكن تسجيل هذه الحالة للطالب الآن.",
   STUDENT_NOT_IN_TRIP: "الطالب غير مسجل في هذه الرحلة.",
+  TRIP_ALREADY_STARTED: "بدأت الرحلة، ولا يمكن تغيير الغياب الآن. تواصل مع المدرسة.",
 };
 const rpcError = (error: { message?: string } | null) => {
   const code = Object.keys(rpcErrorText).find((key) => error?.message?.includes(key));
@@ -263,6 +264,14 @@ const attendanceDoneText: Record<AttendanceEvent, string> = {
   boarded: "تم تسجيل صعود الطالب وإشعار ولي الأمر.", boarded_return: "تم تسجيل صعود الطالب وإشعار ولي الأمر.",
   dropped_home: "تم تسجيل نزول الطالب عند المنزل وإشعار ولي الأمر.", no_show: "تم تسجيل عدم حضور الطالب وإشعار ولي الأمر.",
 };
+const tripBadge = (status?: string): { text: string; tone: "safe" | "warn" | "danger" | "muted" } =>
+  !status ? { text: "لا توجد رحلة اليوم", tone: "muted" }
+  : status === "in_progress" ? { text: "الرحلة جارية", tone: "safe" }
+  : status === "paused" ? { text: "الرحلة متوقفة مؤقتًا", tone: "warn" }
+  : status === "emergency" ? { text: "حالة طارئة", tone: "danger" }
+  : status === "completed" ? { text: "انتهت الرحلة", tone: "muted" }
+  : status === "cancelled" ? { text: "الرحلة ملغاة", tone: "warn" }
+  : { text: "الرحلة مجدولة", tone: "muted" };
 const studentStatusFromDb = (status?: string): SimulationState["studentStatus"] =>
   status === "boarded" || status === "boarded_return" ? "on_bus"
   : status === "arrived_school" || status === "dropped_home" ? "arrived"
@@ -281,7 +290,7 @@ const simulationFromTrip = (d: MasariData): SimulationState | null => {
     active: ACTIVE_TRIP_STATUSES.includes(d.trip.status),
     currentStopIndex: firstPending < 0 ? Math.max(0, d.route.stops.length - 1) : firstPending,
     approvedStops,
-    studentStatus: studentStatusFromDb(d.students?.[0]?.status),
+    studentStatus: studentStatusFromDb((d.students?.find((st) => st.id === d.student.id) ?? d.students?.[0])?.status),
   };
 };
 const blankDataFor = (school: { id: string; name: string; city: string | null; contact_name: string | null; phone: string | null; address: string | null; latitude: unknown; longitude: unknown }): MasariData => {
@@ -305,21 +314,18 @@ const toStops = (rows: StopRow[] | null, fallback: LocationPoint) => (rows ?? []
   lat: toNumber(stop.latitude, fallback.lat), lng: toNumber(stop.longitude, fallback.lng), studentName: null,
 }));
 async function applyRouteAndTrip(next: MasariData, routeId: string, trip: { id: string; status: string; trip_date: string; direction: string; bus_id: string | null; driver_id: string | null } | null) {
-  const { data: routes } = await supabase.from("routes").select("name,scheduled_time,estimated_duration_minutes,bus_id").eq("id", routeId).limit(1);
+  const [{ data: routes }, { data: tripStops }, { data: routeStops }] = await Promise.all([
+    supabase.from("routes").select("name,scheduled_time,estimated_duration_minutes,bus_id").eq("id", routeId).limit(1),
+    trip ? supabase.from("trip_stops").select("id,status,label,scheduled_time,latitude,longitude").eq("trip_id", trip.id).order("stop_order") : Promise.resolve({ data: null }),
+    supabase.from("route_stops").select("label,scheduled_time,latitude,longitude").eq("route_id", routeId).order("stop_order"),
+  ]);
   const route = routes?.[0];
   if (route) {
     next.route.name = route.name;
     next.route.scheduledTime = formatTime(route.scheduled_time) || "—";
     next.route.estimatedMinutes = route.estimated_duration_minutes ?? 0;
   }
-  const { data: tripStops } = trip
-    ? await supabase.from("trip_stops").select("id,status,label,scheduled_time,latitude,longitude").eq("trip_id", trip.id).order("stop_order")
-    : { data: null };
-  if (tripStops?.length) next.route.stops = toStops(tripStops, next.school.location);
-  else {
-    const { data: stops } = await supabase.from("route_stops").select("label,scheduled_time,latitude,longitude").eq("route_id", routeId).order("stop_order");
-    next.route.stops = toStops(stops, next.school.location);
-  }
+  next.route.stops = toStops(tripStops?.length ? tripStops : routeStops, next.school.location);
   const busId = trip?.bus_id ?? route?.bus_id;
   if (busId) {
     const { data: buses } = await supabase.from("buses").select("bus_number,plate_number,capacity").eq("id", busId).limit(1);
@@ -360,7 +366,7 @@ async function loadDriverData(userId: string): Promise<MasariData | null> {
 }
 
 // ولي الأمر: أبناؤه المرتبطون به فقط، ورحلة اليوم للابن الأول.
-async function loadParentData(userId: string): Promise<MasariData | null> {
+async function loadParentData(userId: string, childId?: string | null): Promise<MasariData | null> {
   const { data: guardians } = await supabase.from("guardians").select("id,full_name,phone,email").eq("user_id", userId).eq("status", "active");
   if (!guardians?.length) return null;
   const { data: links } = await supabase.from("guardian_students")
@@ -368,9 +374,12 @@ async function loadParentData(userId: string): Promise<MasariData | null> {
     .in("guardian_id", guardians.map((g) => g.id));
   type ChildRow = { id: string; school_id: string; full_name: string; grade: string | null; home_address: string | null; home_label: string | null; home_latitude: unknown; home_longitude: unknown; service_status: string };
   const children = (links ?? []).flatMap((row) => { const c = one(row.students as ChildRow | ChildRow[] | null); return c ? [c] : []; });
-  const child = children[0];
+  const child = children.find((c) => c.id === childId) ?? children[0];
   if (!child) return null;
-  const { data: schools } = await supabase.from("schools").select(SCHOOL_COLUMNS).eq("id", child.school_id).limit(1);
+  const [{ data: schools }, { data: assignments }] = await Promise.all([
+    supabase.from("schools").select(SCHOOL_COLUMNS).eq("id", child.school_id).limit(1),
+    supabase.from("student_route_assignments").select("route_id").eq("student_id", child.id).eq("status", "active"),
+  ]);
   if (!schools?.[0]) return null;
   const next = blankDataFor(schools[0]);
   next.parent = { name: guardians[0].full_name, email: guardians[0].email ?? "", phone: guardians[0].phone ?? "—" };
@@ -380,35 +389,34 @@ async function loadParentData(userId: string): Promise<MasariData | null> {
   };
   next.students = children.map((c) => ({ id: c.id, name: c.full_name, grade: c.grade ?? "—", status: "active" }));
 
-  type TripJoin = { id: string; route_id: string; bus_id: string | null; driver_id: string | null; trip_date: string; status: string; direction: string };
-  const { data: tripRows } = await supabase.from("trip_students")
-    .select("status,trips!inner(id,route_id,bus_id,driver_id,trip_date,status,direction)")
-    .eq("student_id", child.id).eq("trips.trip_date", riyadhToday());
-  const todays = (tripRows ?? []).flatMap((row) => { const t = one(row.trips as TripJoin | TripJoin[] | null); return t ? [{ ...t, studentStatus: row.status }] : []; });
-  const trip = todays.find((t) => ACTIVE_TRIP_STATUSES.includes(t.status)) ?? todays.find((t) => t.status !== "completed" && t.status !== "cancelled") ?? todays[0];
+  const routeIds = (assignments ?? []).map((row) => row.route_id);
+  const { data: todays } = routeIds.length
+    ? await supabase.from("trips").select("id,route_id,bus_id,driver_id,trip_date,status,direction,scheduled_start,completed_at")
+        .in("route_id", routeIds).eq("trip_date", riyadhToday()).neq("status", "cancelled").order("scheduled_start", { ascending: true, nullsFirst: true })
+    : { data: null };
+  const trip = todays?.find((t) => ACTIVE_TRIP_STATUSES.includes(t.status))
+    ?? todays?.find((t) => t.status === "scheduled" || t.status === "ready")
+    ?? [...(todays ?? [])].sort((x, y) => (y.completed_at ?? "").localeCompare(x.completed_at ?? ""))[0];
   if (trip) {
-    await applyRouteAndTrip(next, trip.route_id, trip);
-    next.students = next.students.map((c) => c.id === child.id ? { ...c, status: trip.studentStatus } : c);
-    if (trip.driver_id) {
-      const { data: drv } = await supabase.from("drivers").select("full_name").eq("id", trip.driver_id).limit(1);
-      if (drv?.[0]) next.driver = { name: drv[0].full_name, email: "" };
-    }
-  } else {
-    const { data: assignment } = await supabase.from("student_route_assignments").select("route_id").eq("student_id", child.id).eq("status", "active").limit(1);
-    if (assignment?.[0]) await applyRouteAndTrip(next, assignment[0].route_id, null);
-  }
-  next.students = [next.students.find((c) => c.id === child.id)!, ...next.students.filter((c) => c.id !== child.id)];
+    const [, { data: mine }, { data: drv }] = await Promise.all([
+      applyRouteAndTrip(next, trip.route_id, trip),
+      supabase.from("trip_students").select("status").eq("trip_id", trip.id).eq("student_id", child.id).limit(1),
+      trip.driver_id ? supabase.from("drivers").select("full_name").eq("id", trip.driver_id).limit(1) : Promise.resolve({ data: null }),
+    ]);
+    next.students = next.students.map((c) => c.id === child.id ? { ...c, status: mine?.[0]?.status ?? "not_boarded" } : c);
+    if (drv?.[0]) next.driver = { name: drv[0].full_name, email: "" };
+  } else if (routeIds[0]) await applyRouteAndTrip(next, routeIds[0], null);
   return next;
 }
 
-async function loadMasariData(): Promise<MasariData> {
+async function loadMasariData(childId?: string | null): Promise<MasariData> {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData.session;
   if (session) {
     const { data: accessData } = await supabase.rpc("my_access");
     const role = roleFromAccess(accessData as MyAccess | null);
     if (role === "driver" || role === "parent") {
-      const roleData = role === "driver" ? await loadDriverData(session.user.id) : await loadParentData(session.user.id);
+      const roleData = role === "driver" ? await loadDriverData(session.user.id) : await loadParentData(session.user.id, childId);
       return roleData ?? { ...structuredClone(seededData), source: "empty" };
     }
   }
@@ -747,18 +755,28 @@ function FeedbackPanel({ data, feedbackRows, authMode, onSubmit }: { data: Masar
   </article>;
 }
 
-function ParentDashboard({ data, simulation, driverGps, tripEvents, feedbackRows, authMode, onSubmitFeedback }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null; tripEvents: TripEventRow[]; feedbackRows: FeedbackItem[]; authMode: AuthMode; onSubmitFeedback: (feedback: Omit<FeedbackItem, "id" | "createdAt" | "saved">) => Promise<void> }) {
-  const childTripStatus = data.trip && data.trip.status !== "scheduled" ? data.students?.[0]?.status : undefined;
+function ParentDashboard({ data, simulation, driverGps, tripEvents, feedbackRows, authMode, tripSaveStatus, onSubmitFeedback, onSelectChild, onSetAbsence }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null; tripEvents: TripEventRow[]; feedbackRows: FeedbackItem[]; authMode: AuthMode; tripSaveStatus: string; onSubmitFeedback: (feedback: Omit<FeedbackItem, "id" | "createdAt" | "saved">) => Promise<void>; onSelectChild: (childId: string) => void; onSetAbsence: (absent: boolean) => Promise<void> }) {
+  const [absenceBusy, setAbsenceBusy] = useState(false);
+  const changeAbsence = async (absent: boolean) => { setAbsenceBusy(true); try { await onSetAbsence(absent); } finally { setAbsenceBusy(false); } };
+  const myStatus = data.students?.find((child) => child.id === data.student.id)?.status;
+  const childTripStatus = data.trip && (data.trip.status !== "scheduled" || myStatus === "absent") ? myStatus : undefined;
   const childStatus = childTripStatus ? tripStudentLabel[childTripStatus] ?? childTripStatus : studentStatusLabel[simulation.studentStatus];
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
+  const real = authMode === "authenticated";
+  const badge = real ? tripBadge(data.trip?.status) : { text: "الرحلة آمنة", tone: "safe" as const };
+  const canChangeAbsence = real && data.trip && (data.trip.status === "scheduled" || data.trip.status === "ready");
+  const children = real && data.students && data.students.length > 1 ? data.students : [];
   const events = tripEvents.length ? tripEvents : [
     { eventType: "note", note: simulation.active ? "تم تفعيل تتبع الباص" : `تمت جدولة رحلة ${data.student.name}`, createdAt: new Date().toISOString() },
     { eventType: "note", note: `${studentStatusLabel[simulation.studentStatus]} · ${simulation.approvedStops.length} من ${data.route.stops.length} محطات معتمدة`, createdAt: new Date().toISOString() },
   ];
   return <>
-    <div className="welcome"><div><p className="eyebrow">صباح الخير يا {data.parent.name}</p><h1>{data.student.name}: {childStatus}</h1><p>{simulation.active ? `الباص عند ${currentStop?.label}` : [data.route.name, data.driver.name !== "—" && `السائق ${data.driver.name}`, data.vehicle.number !== "—" && `الباص ${data.vehicle.number}`].filter(Boolean).join(" · ")}</p></div><Badge className="safe-badge"><ShieldCheck/> الرحلة آمنة</Badge></div>
+    <div className="welcome"><div><p className="eyebrow">صباح الخير يا {data.parent.name}</p><h1>{data.student.name}: {childStatus}</h1><p>{simulation.active ? `الباص عند ${currentStop?.label}` : [data.route.name, data.driver.name !== "—" && `السائق ${data.driver.name}`, data.vehicle.number !== "—" && `الباص ${data.vehicle.number}`].filter(Boolean).join(" · ")}</p></div><Badge className={`safe-badge tone-${badge.tone}`}>{badge.tone === "danger" ? <AlertTriangle/> : <ShieldCheck/>} {badge.text}</Badge></div>
+    {children.length > 0 && <div className="child-switcher" role="tablist" aria-label="الأبناء">{children.map((child)=><button key={child.id} role="tab" aria-selected={child.id === data.student.id} className={child.id === data.student.id ? "active" : ""} onClick={()=>onSelectChild(child.id)}>{child.name}</button>)}</div>}
+    {tripSaveStatus && <div className="save-strip trip-save"><Check/><span>{tripSaveStatus}</span></div>}
+    {canChangeAbsence && <article className="panel absence-panel"><div><p className="eyebrow">رحلة اليوم لم تبدأ بعد</p><strong>{myStatus === "absent" ? `${data.student.name} مسجل غائبًا اليوم` : `هل ${data.student.name} غائب اليوم؟`}</strong><span>{myStatus === "absent" ? "لن ينتظره السائق في المحطة." : "سجّل الغياب قبل بدء الرحلة حتى لا ينتظره السائق."}</span></div>{myStatus === "absent" ? <Button variant="outline" disabled={absenceBusy} onClick={()=>void changeAbsence(false)}>{absenceBusy ? "جارٍ الحفظ…" : "إلغاء الغياب"}</Button> : <Button className="danger-action" disabled={absenceBusy} onClick={()=>void changeAbsence(true)}>{absenceBusy ? "جارٍ الحفظ…" : "ابني غائب اليوم"}</Button>}</article>}
     <LiveRoute data={data} simulation={simulation} driverGps={driverGps} parent />
-    <section className="lower-grid parent-lower"><article className="panel child-card"><div className="student-avatar big">{data.student.name.charAt(0)}</div><div><p className="eyebrow">الطالب</p><h2>{data.student.name}</h2><p>{data.student.grade} · {data.school.name}</p></div><Badge className="onbus">{studentStatusLabel[simulation.studentStatus]}</Badge></article>
+    <section className="lower-grid parent-lower"><article className="panel child-card"><div className="student-avatar big">{data.student.name.charAt(0)}</div><div><p className="eyebrow">الطالب</p><h2>{data.student.name}</h2><p>{data.student.grade} · {data.school.name}</p></div><Badge className="onbus">{childStatus}</Badge></article>
       <article className="panel"><div className="panel-head"><div><p className="eyebrow">اليوم</p><h2>تحديثات الرحلة</h2></div><Bell className="title-icon"/></div>{events.slice(0,4).map((event, index)=><div className={`event ${event.eventType === "emergency" ? "emergency-event" : ""}`} key={event.id ?? `${event.eventType}-${index}`}><span className={index === 0 ? "done" : ""}>{event.eventType === "emergency" ? <AlertTriangle/> : event.eventType === "pickup" || event.eventType === "dropoff" ? <Check/> : <Navigation/>}</span><div><strong>{eventTypeLabel(event.eventType)}</strong><p>{event.note || currentStop?.label} · {formatEventTime(event.createdAt)}</p></div></div>)}</article>
     </section>
     <FeedbackPanel data={data} feedbackRows={feedbackRows} authMode={authMode} onSubmit={onSubmitFeedback}/>
@@ -971,10 +989,12 @@ export default function Home() {
   const gpsWatchRef = useRef<number | null>(null);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
+  const selectedChildRef = useRef<string | null>(null);
+  const loadSeqRef = useRef(0);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
   const eventsChannelRef = useRef<RealtimeChannel | null>(null);
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
-  useEffect(()=>{let alive=true;const refresh=()=>loadMasariData().then((next)=>{if(!alive)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{});refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>refresh());return()=>{alive=false;subscription.unsubscribe()}},[]);
+  useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>refresh());return()=>{alive=false;subscription.unsubscribe()}},[]);
   useEffect(()=>{let alive=true;loadDriverRows(authMode !== "authenticated").then((rows)=>{if(alive)setExtraDrivers(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
   useEffect(()=>{let alive=true;loadStudentRows(authMode !== "authenticated").then((rows)=>{if(alive)setStudentRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
   useEffect(()=>{let alive=true;loadRouteRows(authMode !== "authenticated").then((rows)=>{if(alive)setRouteRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
@@ -1169,7 +1189,7 @@ export default function Home() {
       if (latest.eventType === "dropoff") setSimulation((current)=>({ ...current, studentStatus: "arrived" }));
     }
   };
-  const reloadData=async()=>{const next=await loadMasariData();setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim);return next};
+  const reloadData=async()=>{const seq=++loadSeqRef.current;const next=await loadMasariData(selectedChildRef.current);if(seq!==loadSeqRef.current)return next;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim);return next};
   const liveTripId = authMode==="authenticated" && data.trip && ACTIVE_TRIP_STATUSES.includes(data.trip.status) ? data.trip.id : null;
   const loadLatestSavedGps=async()=>{
     const tripId = data.trip?.id;
@@ -1280,6 +1300,14 @@ export default function Home() {
       showTripSaveStatus("انتهت الرحلة وحُفظت.");
     })();
   };
+  const selectChild=(childId: string)=>{selectedChildRef.current=childId;setTripEvents([]);setDriverGps(null);void reloadData().catch(()=>{})};
+  const setAbsence=async(absent: boolean)=>{
+    if (!data.trip || !data.student.id) return;
+    const { error } = await supabase.rpc("guardian_set_absence", { p_trip: data.trip.id, p_student: data.student.id, p_absent: absent });
+    if (error) { showTripSaveStatus(rpcError(error)); return; }
+    await reloadData();
+    showTripSaveStatus(absent ? `تم تسجيل غياب ${data.student.name} اليوم، ولن ينتظره السائق.` : `تم إلغاء غياب ${data.student.name}.`);
+  };
   const recordStudent=(studentId: string, event: AttendanceEvent)=>{void (async()=>{
     if (!data.trip) return;
     const { error } = await supabase.rpc("record_attendance", {
@@ -1346,7 +1374,7 @@ export default function Home() {
   };
   if(!entered) return <AuthPage onEnter={enterAs} onAuthenticated={enterAuthenticated}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
-    <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view===item.id} onClick={()=>setView(item.id)} tooltip={item.label}><item.icon/><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" ? "تواصل مع إدارة مساري" : `${data.school.contactName} · ${data.school.phone}`}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{authMode==="authenticated" ? "حساب فعلي" : "وضع تجريبي"} · {roleNames[role]}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
-    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} onSubmitFeedback={submitFeedback}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
+    <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view===item.id} onClick={()=>setView(item.id)} tooltip={item.label}><item.icon/><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{authMode==="authenticated" ? "حساب فعلي" : "وضع تجريبي"} · {roleNames[role]}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
+    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
   </SidebarProvider>{login&&<LoginDialog onClose={()=>setLogin(false)} onAuthenticated={enterAuthenticated}/>}</div>;
 }
