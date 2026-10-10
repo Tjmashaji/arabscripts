@@ -5,8 +5,9 @@ import {
   Activity, AlertTriangle, BarChart3, Bell, BusFront, CalendarDays,
   Check, ChevronLeft, CircleDollarSign, Clock3, FileClock, GraduationCap,
   LayoutDashboard, MapPin, Menu, MessageSquareText, Navigation, Plus,
-  RadioTower, Route, School, Search, ShieldCheck, UserPlus, Users, WalletCards, X,
+  RadioTower, Route, School, Search, ShieldCheck, UserPlus, Users, WalletCards, X, ClipboardList,
 } from "lucide-react";
+import { SchoolOps } from "./school-ops";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -21,7 +22,7 @@ import type { RealtimeChannel, Session } from "@supabase/supabase-js";
 
 type Role = "executive" | "school" | "driver" | "parent";
 type AuthMode = "demo" | "authenticated";
-type View = "dashboard" | "control" | "locations" | "schools" | "students" | "fleet" | "routes" | "trips" | "finance" | "reports" | "audit";
+type View = "operations" | "dashboard" | "control" | "locations" | "schools" | "students" | "fleet" | "routes" | "trips" | "finance" | "reports" | "audit";
 type LocationPoint = { label: string; address: string; lat: number; lng: number };
 type DriverForm = { name: string; phone: string; email: string; plate: string; status: string };
 type DriverRow = DriverForm & { capacity?: number; saved?: boolean };
@@ -69,7 +70,7 @@ const navByRole: Record<Role, { id: View; label: string; icon: typeof LayoutDash
     { id: "audit", label: "سجل التدقيق", icon: FileClock },
   ],
   school: [
-    { id: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { id: "students", label: "الطلاب", icon: GraduationCap },
+    { id: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { id: "operations", label: "التشغيل اليومي", icon: ClipboardList }, { id: "students", label: "الطلاب", icon: GraduationCap },
     { id: "control", label: "برج المراقبة", icon: RadioTower },
     { id: "locations", label: "المواقع", icon: MapPin },
     { id: "fleet", label: "الباصات والسائقون", icon: BusFront }, { id: "routes", label: "المسارات", icon: Route },
@@ -760,7 +761,9 @@ function ParentDashboard({ data, simulation, driverGps, tripEvents, feedbackRows
   const changeAbsence = async (absent: boolean) => { setAbsenceBusy(true); try { await onSetAbsence(absent); } finally { setAbsenceBusy(false); } };
   const myStatus = data.students?.find((child) => child.id === data.student.id)?.status;
   const childTripStatus = data.trip && (data.trip.status !== "scheduled" || myStatus === "absent") ? myStatus : undefined;
-  const childStatus = childTripStatus ? tripStudentLabel[childTripStatus] ?? childTripStatus : studentStatusLabel[simulation.studentStatus];
+  const childStatus = childTripStatus ? tripStudentLabel[childTripStatus] ?? childTripStatus
+    : authMode === "authenticated" && !data.trip ? (data.route.stops.length ? "لا توجد رحلة اليوم" : "لم يُسند إلى مسار بعد")
+    : studentStatusLabel[simulation.studentStatus];
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
   const real = authMode === "authenticated";
   const badge = real ? tripBadge(data.trip?.status) : { text: "الرحلة آمنة", tone: "safe" as const };
@@ -790,9 +793,9 @@ function AddDriverPanel({ onAdd, authMode }: { onAdd: (driver: DriverForm) => Pr
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
     setBusy(true); setMessage("");
-    await onAdd(form);
+    try { await onAdd(form); } catch { setBusy(false); setMessage("تعذر حفظ الطلب. تحقق من البيانات وحاول مرة أخرى."); return; }
     setBusy(false);
-    setMessage(authMode === "authenticated" ? "تم حفظ طلب السائق وربطه بالمدرسة." : "تمت إضافته للعرض التجريبي فقط. سجّل دخول فعلي للحفظ.");
+    setMessage(authMode === "authenticated" ? "تم حفظ طلب السائق. اعتمده من «التشغيل اليومي»." : "تمت إضافته للعرض التجريبي فقط. سجّل دخول فعلي للحفظ.");
     setForm({ name: "", phone: "", email: "", plate: "", status: "قيد المراجعة" });
     setTimeout(()=>setMessage(""), 4200);
   };
@@ -817,9 +820,9 @@ function AddStudentPanel({ onAdd, authMode }: { onAdd: (student: StudentForm) =>
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
     setBusy(true); setMessage("");
-    await onAdd(form);
+    try { await onAdd(form); } catch { setBusy(false); setMessage("تعذر حفظ الطلب. تحقق من البيانات وحاول مرة أخرى."); return; }
     setBusy(false);
-    setMessage(authMode === "authenticated" ? "تم حفظ طلب الطالب وربطه بالمدرسة." : "تمت إضافته للعرض التجريبي فقط. سجّل دخول فعلي للحفظ.");
+    setMessage(authMode === "authenticated" ? "تم حفظ طلب الطالب. اعتمده من «التشغيل اليومي»." : "تمت إضافته للعرض التجريبي فقط. سجّل دخول فعلي للحفظ.");
     setForm({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "", status: "قيد المراجعة" });
     setTimeout(()=>setMessage(""), 4200);
   };
@@ -907,7 +910,7 @@ function DataView({ data, view, role, simulation, extraDrivers, studentRows, rou
     : view==="audit" ? [["إدخال بيانات التشغيل الأولى", `بواسطة ${data.school.contactName}`, "موثق", "اليوم"]]
     : studentRows.map((student)=>[student.name, `${student.grade} · ${student.parentName || "ولي الأمر"} · ${student.address}`, student.status, student.saved ? "محفوظ" : "محلي"]);
   const canManage = role === "school" || role === "executive";
-  return <><div className="welcome"><div><p className="eyebrow">إدارة النظام</p><h1>{c.title}</h1><p>{c.subtitle}</p></div><Button className="primary-action"><Plus/>{c.action}</Button></div>{view==="trips"&&<section className="trip-summary-grid"><article className="panel mini-metric"><span>أحداث اليوم</span><strong>{tripEvents.length || simulation.approvedStops.length}</strong></article><article className="panel mini-metric"><span>حالة الطالب</span><strong>{studentStatusLabel[simulation.studentStatus]}</strong></article><article className="panel mini-metric"><span>آخر تحديث</span><strong>{tripEvents[0] ? formatEventTime(tripEvents[0].createdAt) : "—"}</strong></article></section>}{view==="fleet"&&canManage&&<AddDriverPanel onAdd={onAddDriver} authMode={authMode}/>} {view==="students"&&canManage&&<AddStudentPanel onAdd={onAddStudent} authMode={authMode}/>} {view==="routes"&&canManage&&<AddRoutePanel onAdd={onAddRoute} authMode={authMode}/>}<article className="panel data-panel"><div className="data-tools"><div className="search-box"><Search/><input aria-label="بحث" placeholder="ابحث بالاسم أو الرقم…"/></div><Button variant="outline">الحالة: الكل</Button></div><div className="data-table"><div className="table-head"><span>الاسم / البيان</span><span>التفاصيل</span><span>الحالة</span><span>آخر تحديث</span></div>{rows.length===0&&<div className="table-row table-empty"><span>لا توجد سجلات بعد.</span></div>}{rows.map((row,i)=><div className="table-row" key={i}><span><span className="row-icon"><Icon/></span><strong>{row[0]}</strong></span><span>{row[1]}</span><span><Badge className={"status-badge tone-"+(i%3)}>{row[2]}</Badge></span><span>{row[3]}</span></div>)}</div></article></>;
+  return <><div className="welcome"><div><p className="eyebrow">إدارة النظام</p><h1>{c.title}</h1><p>{c.subtitle}</p></div><Button className="primary-action"><Plus/>{c.action}</Button></div>{view==="trips"&&<section className="trip-summary-grid"><article className="panel mini-metric"><span>أحداث اليوم</span><strong>{tripEvents.length || simulation.approvedStops.length}</strong></article><article className="panel mini-metric"><span>حالة الطالب</span><strong>{studentStatusLabel[simulation.studentStatus]}</strong></article><article className="panel mini-metric"><span>آخر تحديث</span><strong>{tripEvents[0] ? formatEventTime(tripEvents[0].createdAt) : "—"}</strong></article></section>}{view==="fleet"&&canManage&&<AddDriverPanel onAdd={onAddDriver} authMode={authMode}/>} {view==="students"&&canManage&&<AddStudentPanel onAdd={onAddStudent} authMode={authMode}/>} {view==="routes"&&canManage&&(authMode==="authenticated" ? <p className="save-strip compact"><Route/><span>إنشاء المسارات ومحطاتها بالإحداثيات من صفحة «التشغيل اليومي».</span></p> : <AddRoutePanel onAdd={onAddRoute} authMode={authMode}/>)}<article className="panel data-panel"><div className="data-tools"><div className="search-box"><Search/><input aria-label="بحث" placeholder="ابحث بالاسم أو الرقم…"/></div><Button variant="outline">الحالة: الكل</Button></div><div className="data-table"><div className="table-head"><span>الاسم / البيان</span><span>التفاصيل</span><span>الحالة</span><span>آخر تحديث</span></div>{rows.length===0&&<div className="table-row table-empty"><span>لا توجد سجلات بعد.</span></div>}{rows.map((row,i)=><div className="table-row" key={i}><span><span className="row-icon"><Icon/></span><strong>{row[0]}</strong></span><span>{row[1]}</span><span><Badge className={"status-badge tone-"+(i%3)}>{row[2]}</Badge></span><span>{row[3]}</span></div>)}</div></article></>;
 }
 function EmptyState({ role }: { role: Role }) {
   const hint = role === "parent" ? "لم يُربط حسابك بأي طالب بعد. ستظهر الرحلة هنا بعد أن تربطك المدرسة بابنك."
@@ -1024,13 +1027,12 @@ export default function Home() {
       phone: driver.phone,
       email: driver.email || null,
       vehicle_plate: driver.plate,
-      vehicle_capacity: data.vehicle.capacity,
+      vehicle_capacity: data.vehicle.capacity > 0 ? data.vehicle.capacity : null,
       status: "pending",
     });
-    if (!error) {
-      const rows = await loadDriverRows(authMode !== "authenticated").catch(()=>null);
-      if (rows) setExtraDrivers(rows);
-    }
+    const rows = await loadDriverRows(authMode !== "authenticated").catch(()=>null);
+    if (rows) setExtraDrivers(rows);
+    if (error) throw error;
   };
   const addStudent=async(student: StudentForm)=>{
     const optimistic: StudentRow = { ...student, status: authMode === "authenticated" ? "بانتظار حساب ولي الأمر" : "قيد المراجعة", saved: authMode === "authenticated" };
@@ -1055,10 +1057,9 @@ export default function Home() {
       home_longitude: null,
       status: "pending_parent_account",
     });
-    if (!error) {
-      const rows = await loadStudentRows(authMode !== "authenticated").catch(()=>null);
-      if (rows) setStudentRows(rows);
-    }
+    const rows = await loadStudentRows(authMode !== "authenticated").catch(()=>null);
+    if (rows) setStudentRows(rows);
+    if (error) throw error;
   };
   const addRoute=async(route: RouteForm)=>{
     const stops = route.stopsText.split("\n").map((line)=>line.trim()).filter(Boolean);
@@ -1375,6 +1376,6 @@ export default function Home() {
   if(!entered) return <AuthPage onEnter={enterAs} onAuthenticated={enterAuthenticated}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
     <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><SidebarMenuButton isActive={view===item.id} onClick={()=>setView(item.id)} tooltip={item.label}><item.icon/><span>{item.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{authMode==="authenticated" ? "حساب فعلي" : "وضع تجريبي"} · {roleNames[role]}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
-    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
+    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Select value={role} onValueChange={v=>switchRole(v as Role)} disabled={authMode==="authenticated"}><SelectTrigger className="role-select"><SelectValue/></SelectTrigger><SelectContent>{Object.entries(roleNames).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={()=>setNotificationsOpen((open)=>!open)}><Bell/><span>{notifications.length}</span></button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{view==="operations" ? (authMode==="authenticated" && data.school.id ? <SchoolOps schoolId={data.school.id}/> : <article className="panel empty-state"><h2>التشغيل اليومي</h2><p>هذه الصفحة تعمل بالحساب الفعلي لإدارة المدرسة فقط.</p></article>) : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}</main><nav className="mobile-nav">{nav.slice(0,4).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}</nav></SidebarInset>
   </SidebarProvider>{login&&<LoginDialog onClose={()=>setLogin(false)} onAuthenticated={enterAuthenticated}/>}</div>;
 }
