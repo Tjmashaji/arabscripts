@@ -775,15 +775,26 @@ function ParentDashboard({ data, simulation, driverGps, tripEvents, feedbackRows
     <FeedbackPanel data={data} feedbackRows={feedbackRows} authMode={authMode} onSubmit={onSubmitFeedback}/>
   </>;
 }
+// سبب واضح لفشل حفظ طلب طالب أو سائق
+function saveErrorText(e: unknown): string {
+  const m = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
+  if (m.includes("SCHOOL_NOT_ACTIVE")) return "المدرسة موقوفة أو غير مفعّلة، فلا يمكن إضافة طلاب أو سائقين لها. تواصل مع إدارة مساري.";
+  if (m.includes("NO_SCHOOL") || m.includes("NO_SESSION")) return "لم نجد مدرسة مرتبطة بحسابك. سجّل الخروج ثم ادخل مرة أخرى.";
+  if (m.includes("row-level security") || m.includes("permission denied") || m.includes("FORBIDDEN")) return "حسابك لا يملك صلاحية الإضافة لهذه المدرسة.";
+  if (m.includes("duplicate") || m.includes("unique")) return "هذا الطلب موجود مسبقًا.";
+  if (m.includes("Failed to fetch") || m.includes("NetworkError")) return "لا يوجد اتصال بالإنترنت. حاول مرة أخرى.";
+  return "تعذر حفظ الطلب. تحقق من البيانات وحاول مرة أخرى.";
+}
 function AddDriverPanel({ onAdd }: { onAdd: (driver: DriverForm) => Promise<void>; authMode: AuthMode }) {
   const [form, setForm] = useState({ name: "", phone: "", email: "", plate: "", status: "قيد المراجعة" });
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const canAdd = form.name.trim() && form.phone.trim() && form.plate.trim();
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
-    setBusy(true); setMessage("");
-    try { await onAdd(form); } catch { setBusy(false); setMessage("تعذر حفظ الطلب. تحقق من البيانات وحاول مرة أخرى."); return; }
+    setBusy(true); setMessage(""); setFailed(false);
+    try { await onAdd(form); } catch (e) { setBusy(false); setFailed(true); setMessage(saveErrorText(e)); return; }
     setBusy(false);
     setMessage("تم حفظ طلب السائق. اعتمده من «التشغيل اليومي».");
     setForm({ name: "", phone: "", email: "", plate: "", status: "قيد المراجعة" });
@@ -797,7 +808,7 @@ function AddDriverPanel({ onAdd }: { onAdd: (driver: DriverForm) => Promise<void
       <label>البريد الإلكتروني<input value={form.email} onChange={(e)=>update("email", e.target.value)} placeholder="driver@example.com"/></label>
       <label>لوحة الباص<input value={form.plate} onChange={(e)=>update("plate", e.target.value)} placeholder="أ ب ج 1234"/></label>
     </div>
-    {message && <p className="save-strip compact"><Check/><span>{message}</span></p>}
+    {message && <p className={`save-strip compact ${failed ? "ops-error" : ""}`}>{failed ? <X/> : <Check/>}<span>{message}</span></p>}
     <Button className="wide-action" disabled={!canAdd || busy} onClick={()=>void submit()}><Plus/> {busy ? "جارٍ الحفظ…" : "حفظ طلب السائق"}</Button>
   </article>;
 }
@@ -805,12 +816,13 @@ function AddDriverPanel({ onAdd }: { onAdd: (driver: DriverForm) => Promise<void
 function AddStudentPanel({ onAdd }: { onAdd: (student: StudentForm) => Promise<void>; authMode: AuthMode }) {
   const [form, setForm] = useState({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "", status: "قيد المراجعة" });
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const canAdd = form.name.trim() && form.grade.trim() && form.parentPhone.trim() && form.address.trim();
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
-    setBusy(true); setMessage("");
-    try { await onAdd(form); } catch { setBusy(false); setMessage("تعذر حفظ الطلب. تحقق من البيانات وحاول مرة أخرى."); return; }
+    setBusy(true); setMessage(""); setFailed(false);
+    try { await onAdd(form); } catch (e) { setBusy(false); setFailed(true); setMessage(saveErrorText(e)); return; }
     setBusy(false);
     setMessage("تم حفظ طلب الطالب. اعتمده من «التشغيل اليومي».");
     setForm({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "", status: "قيد المراجعة" });
@@ -826,7 +838,7 @@ function AddStudentPanel({ onAdd }: { onAdd: (student: StudentForm) => Promise<v
       <label>بريد ولي الأمر<input value={form.parentEmail} onChange={(e)=>update("parentEmail", e.target.value)} placeholder="parent@example.com"/></label>
       <label>عنوان البيت<input value={form.address} onChange={(e)=>update("address", e.target.value)} placeholder="الحي والشارع"/></label>
     </div>
-    {message && <p className="save-strip compact"><Check/><span>{message}</span></p>}
+    {message && <p className={`save-strip compact ${failed ? "ops-error" : ""}`}>{failed ? <X/> : <Check/>}<span>{message}</span></p>}
     <Button className="wide-action" disabled={!canAdd || busy} onClick={()=>void submit()}><Plus/> {busy ? "جارٍ الحفظ…" : "حفظ طلب الطالب"}</Button>
   </article>;
 }
@@ -1036,10 +1048,10 @@ export default function Home() {
     if (authMode !== "authenticated") return;
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user.id;
-    if (!userId) return;
+    if (!userId) { setExtraDrivers((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SESSION"); }
     const { data: schoolRows } = await supabase.from("schools").select("id").eq("name", data.school.name).limit(1);
     const schoolId = data.school.id ?? schoolRows?.[0]?.id;
-    if (!schoolId) return;
+    if (!schoolId) { setExtraDrivers((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SCHOOL"); }
     const { error } = await supabase.from("driver_onboarding_requests").insert({
       school_id: schoolId,
       created_by: userId,
@@ -1060,10 +1072,10 @@ export default function Home() {
     if (authMode !== "authenticated") return;
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user.id;
-    if (!userId) return;
+    if (!userId) { setStudentRows((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SESSION"); }
     const { data: schoolRows } = await supabase.from("schools").select("id").eq("name", data.school.name).limit(1);
     const schoolId = data.school.id ?? schoolRows?.[0]?.id;
-    if (!schoolId) return;
+    if (!schoolId) { setStudentRows((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SCHOOL"); }
     const { error } = await supabase.from("student_onboarding_requests").insert({
       school_id: schoolId,
       created_by: userId,
