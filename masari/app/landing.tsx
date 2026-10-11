@@ -45,7 +45,7 @@ const FAQ = [
   { q: "من يرى موقع الباص؟", a: "إدارة المدرسة، وولي الأمر أثناء رحلة ابنه فقط، والسائق نفسه." },
 ];
 
-export function Landing({ onLogin, onRegisterSchool, onDemo }: { onLogin: () => void; onRegisterSchool: () => void; onDemo: () => void }) {
+export function Landing({ onLogin, onRegisterSchool }: { onLogin: () => void; onRegisterSchool: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const links = [...AUDIENCES.map((a) => ({ href: `#${a.id}`, label: a.badge })), { href: "#pricing", label: "الأسعار" }, { href: "#faq", label: "الأسئلة الشائعة" }];
   return <div dir="rtl" className="landing">
@@ -67,7 +67,6 @@ export function Landing({ onLogin, onRegisterSchool, onDemo }: { onLogin: () => 
         <button className="lp-cta big" onClick={onRegisterSchool}><School /> سجّل مدرستك الآن</button>
         <button className="lp-ghost big" onClick={onLogin}><LogIn /> لدي حساب</button>
       </div>
-      <button className="lp-demo" onClick={onDemo}>جرّب الواجهة ببيانات تجريبية</button>
     </section>
 
     {AUDIENCES.map((a) => <section key={a.id} id={a.id} className="lp-section">
