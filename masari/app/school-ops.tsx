@@ -25,6 +25,7 @@ const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : 
 const tripStatusLabel: Record<string, string> = { scheduled: "مجدولة", ready: "جاهزة", in_progress: "جارية", paused: "متوقفة", completed: "انتهت", cancelled: "ملغاة", emergency: "طارئ" };
 const errorText = (error: { message?: string; code?: string } | null) => {
   const m = error?.message ?? "";
+  if (m.includes("SCHOOL_NOT_ACTIVE")) return "المدرسة موقوفة أو غير مفعّلة، فلا يمكن تعديل تشغيلها. تواصل مع إدارة مساري.";
   if (m.includes("DUPLICATE_STUDENT")) return "الطالب مسجل مسبقًا.";
   if (m.includes("DUPLICATE_DRIVER")) return "السائق مسجل مسبقًا.";
   if (m.includes("ALREADY_REVIEWED")) return "تمت مراجعة هذا الطلب مسبقًا.";
