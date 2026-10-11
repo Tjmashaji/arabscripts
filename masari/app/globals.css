@@ -119,27 +119,16 @@
 @media(max-width:600px){.lp-login span,.lp-login{padding:6px}.lp-actions .lp-cta{padding:9px 14px;font-size:13px}.lp-cards{grid-template-columns:1fr}.lp-brand strong{display:none}}
 .auth-back{align-self:flex-start;background:#ffffff1a;border:1px solid #ffffff33;color:#fff;border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;margin-bottom:18px}
 
-/* ── نموذج تسجيل المدرسة ── */
-.sf-page{min-height:100vh;background:#f4f7f9;padding-bottom:40px}
-.sf-top{display:flex;align-items:center;gap:14px;padding:14px clamp(16px,4vw,40px);background:#fff;border-bottom:1px solid #e1e8ee}.sf-top .lp-brand{color:#10394b}.sf-top-email{margin-inline-start:auto;color:#687587;font-size:13px}
-.school-form{max-width:1100px;margin:0 auto;padding:28px clamp(16px,3vw,32px) 0;display:grid;gap:18px}
-.school-form-head h1{font-size:clamp(26px,4vw,36px);margin:0 0 6px}.school-form-head p{margin:0;color:#687587}
-.sf-card{background:#fff;border:1px solid #e1e8ee;border-radius:18px;padding:0 0 20px;box-shadow:0 9px 30px #1b3a5010;display:grid;gap:14px}
-.sf-card>h2{font-size:17px;margin:0;padding:18px 22px;border-bottom:1px solid #edf1f4}.sf-card>*:not(h2){margin-inline:22px}
-.sf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}.sf-grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
-.sf-card label{display:grid;gap:6px;font-size:13px;font-weight:600;color:#24364a}
-.sf-card input,.sf-card select,.sf-card textarea{height:44px;border:1px solid #d6e0e7;border-radius:11px;padding:0 12px;font:inherit;font-weight:400;background:#fff;width:100%}
-.sf-card textarea{height:96px;padding:10px 12px;resize:vertical}.sf-card input:focus,.sf-card select:focus,.sf-card textarea:focus{outline:2px solid #2bb3c055;border-color:#2b8c95}
-.req{color:#d33;margin-inline-start:2px}.field-error{color:#c62828;font-weight:400;font-size:12px}
-.logo-drop{position:relative;display:grid;justify-items:center;gap:6px;padding:26px;border:2px dashed #cfdbe3;border-radius:14px;cursor:pointer;color:#687587;text-align:center}
-.logo-drop.dragging{border-color:#2b8c95;background:#e9f6f7}.logo-drop svg{width:30px;height:30px;color:#2b8c95}.logo-drop b{color:#176b87}.logo-drop img{max-height:90px;max-width:220px;object-fit:contain}
-.logo-remove{position:absolute;top:10px;inset-inline-end:10px;border:0;background:#fde8e8;color:#b42f2f;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;cursor:pointer}.logo-remove svg{width:16px;height:16px}
+/* ── منتقي موقع المدرسة ── */
 .map-picker{position:relative;display:grid;gap:8px}.map-picker-canvas{height:380px;border-radius:14px;overflow:hidden;border:1px solid #d6e0e7;z-index:0}
 .map-locate{position:absolute;top:12px;inset-inline-start:50%;transform:translateX(50%);z-index:500;display:inline-flex;align-items:center;gap:6px;background:#fff;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-weight:700;box-shadow:0 4px 14px #0003;cursor:pointer}.map-locate svg{width:16px;height:16px;color:#176b87}
 .map-pin span{display:block;width:28px;height:28px;border-radius:50% 50% 50% 0;background:#d93025;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 3px 8px #0005}
-.sf-submit{margin-top:4px}.sf-back{display:block;margin:16px auto 0}
-.admin-school{display:flex;gap:12px;align-items:flex-start}.admin-logo{width:44px;height:44px;border-radius:10px;object-fit:contain;background:#f4f7f9;border:1px solid #e1e8ee;flex:none}.admin-logo.empty{display:grid;place-items:center;color:#8995a3}.admin-logo.empty svg{width:20px}.admin-desc{max-width:560px}
-@media(max-width:900px){.sf-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.sf-grid,.sf-grid-4{grid-template-columns:1fr}.map-picker-canvas{height:300px}.sf-top-email{display:none}}
+@media(max-width:600px){.map-picker-canvas{height:300px}}
 @media(max-width:600px){.lp-nav{gap:10px;padding-inline:16px}.lp-login{font-size:0;gap:0}.lp-login svg{width:20px;height:20px}.lp-actions{gap:6px}}
 @media(max-width:1100px){.lp-nav nav.open{background:#0b1d2b;box-shadow:0 18px 30px #0008}}
+.finder-search{display:flex;gap:8px;margin:4px 0 8px}.finder-search input{flex:1;min-width:0;height:40px;border:1px solid #d6e0e7;border-radius:11px;padding:0 12px;font:inherit;background:#fff}.claim-state{color:#a76d1c!important;font-weight:600}.osm-attr{font-size:11px;margin-top:10px}.osm-attr a{color:inherit;text-decoration:underline}
+.claim-form{display:grid;gap:12px}.claim-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}.claim-grid label{display:grid;gap:5px;font-size:12px;font-weight:600;color:#24364a}.claim-grid .wide{grid-column:1/-1}.claim-grid input,.claim-grid textarea{height:40px;border:1px solid #d6e0e7;border-radius:10px;padding:0 10px;font:inherit;font-weight:400;background:#fff;width:100%}.claim-grid textarea{height:80px;padding:8px 10px;resize:vertical}
+.dir-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 6px}.dir-filters>button{border:1px solid #dce4ea;background:#fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer}.dir-filters>button.active{background:#10394b;color:#fff;border-color:#10394b}.dir-filters form{display:flex;gap:6px;margin-inline-start:auto}.dir-filters input{height:32px;border:1px solid #dce4ea;border-radius:9px;padding:0 10px;font-size:12px;width:200px}
+.dir-tool{display:grid;gap:10px;padding:12px;margin-bottom:12px;border:1px dashed #cfdbe3;border-radius:14px;background:#f9fbfc}.dup-box{display:grid;gap:4px;padding:10px;border-radius:10px;background:#fff0da;color:#7a4f12;font-size:12px}.dup-box p{margin:0}
+@media(max-width:600px){.claim-grid{grid-template-columns:1fr}.dir-filters form{width:100%;margin:0}.dir-filters input{flex:1;width:auto}}
+.dir-map-link{color:#1f6274;text-decoration:underline}

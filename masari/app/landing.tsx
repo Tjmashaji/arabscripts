@@ -3,10 +3,10 @@
 import { useState } from "react";
 import {
   BellRing, BusFront, ChartNoAxesCombined, ClipboardCheck, HeadsetIcon, LogIn, MapPinned, Menu, MessageCircleQuestion,
-  RadioTower, Route, School, ShieldCheck, Siren, Smartphone, UserCheck, Users, X,
+  RadioTower, Route, School, Search, ShieldCheck, Siren, Smartphone, UserCheck, Users, X,
 } from "lucide-react";
 
-// الصفحة التعريفية العامة لمساري: لكل جمهور قسم، وأزرار الدخول وتسجيل المدرسة.
+// الصفحة التعريفية العامة لمساري: لكل جمهور قسم، وأزرار الدخول والبحث عن مدرسة وطلب تفعيلها.
 
 type Feature = { icon: typeof School; title: string; text: string };
 type Audience = { id: string; badge: string; icon: typeof School; title: string; subtitle: string; features: Feature[] };
@@ -39,13 +39,14 @@ const AUDIENCES: Audience[] = [
 ];
 
 const FAQ = [
-  { q: "كيف تسجّل المدرسة في مساري؟", a: "اضغط «سجّل مدرستك»، أنشئ حسابًا وأكّد بريدك، ثم أكمل ملف المدرسة وموقعها. بعد مراجعة الطلب واعتماده تصبح مدير المدرسة في النظام." },
+  { q: "مدرسة ابني ليست على مساري، ماذا أفعل؟", a: "اضغط «ابحث عن مدرسة ابنك»، أنشئ حسابك، ثم ابحث عن المدرسة واضغط «أريد الخدمة في هذه المدرسة». نعرض للمدارس عدد أولياء الأمور الطالبين للخدمة، ونبلغك فور تفعيلها." },
+  { q: "كيف تنضم المدرسة إلى مساري؟", a: "مدارس الخرج موجودة مسبقًا في دليلنا بحالة «غير مشتركة بعد». اضغط «اطلب تفعيل مدرستك»، ابحث عن مدرستك واضغط «أنا من إدارة المدرسة». يتحقق فريق مساري منك ثم يفعّل المدرسة ويرسل دعوة لبريد مديرها." },
   { q: "كيف ينضم ولي الأمر والسائق؟", a: "تضيفهم المدرسة ببريدهم، وعندما يسجّلون في مساري بنفس البريد يُربط حسابهم ويُفعَّل تلقائيًا." },
   { q: "هل يعمل على الجوال؟", a: "نعم، من متصفح الجوال مباشرة، ويمكن إضافته للشاشة الرئيسية ليعمل كتطبيق ويستقبل الإشعارات." },
   { q: "من يرى موقع الباص؟", a: "إدارة المدرسة، وولي الأمر أثناء رحلة ابنه فقط، والسائق نفسه." },
 ];
 
-export function Landing({ onLogin, onRegisterSchool }: { onLogin: () => void; onRegisterSchool: () => void }) {
+export function Landing({ onLogin, onRegisterSchool, onFindSchool }: { onLogin: () => void; onRegisterSchool: () => void; onFindSchool: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const links = [...AUDIENCES.map((a) => ({ href: `#${a.id}`, label: a.badge })), { href: "#pricing", label: "الأسعار" }, { href: "#faq", label: "الأسئلة الشائعة" }];
   return <div dir="rtl" className="landing">
@@ -54,7 +55,7 @@ export function Landing({ onLogin, onRegisterSchool }: { onLogin: () => void; on
       <nav className={menuOpen ? "open" : ""} aria-label="الأقسام">{links.map((l) => <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)}>{l.label}</a>)}</nav>
       <div className="lp-actions">
         <button className="lp-login" onClick={onLogin}><LogIn /> تسجيل الدخول</button>
-        <button className="lp-cta" onClick={onRegisterSchool}><School /> سجّل مدرستك</button>
+        <button className="lp-cta" onClick={onFindSchool}><Search /> ابحث عن مدرسة ابنك</button>
         <button className="lp-menu" aria-label="القائمة" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>{menuOpen ? <X /> : <Menu />}</button>
       </div>
     </header>
@@ -64,8 +65,8 @@ export function Landing({ onLogin, onRegisterSchool }: { onLogin: () => void; on
       <h1>كل رحلة مدرسية،<br />آمنة ومعروفة لحظة بلحظة</h1>
       <p>مساري يربط المدرسة والسائق وولي الأمر في نظام واحد: مسارات، حضور، تتبع مباشر، وتنبيهات فورية.</p>
       <div className="lp-hero-actions">
-        <button className="lp-cta big" onClick={onRegisterSchool}><School /> سجّل مدرستك الآن</button>
-        <button className="lp-ghost big" onClick={onLogin}><LogIn /> لدي حساب</button>
+        <button className="lp-cta big" onClick={onFindSchool}><Search /> ابحث عن مدرسة ابنك</button>
+        <button className="lp-ghost big" onClick={onRegisterSchool}><School /> أنا من إدارة مدرسة</button>
       </div>
     </section>
 
@@ -79,8 +80,8 @@ export function Landing({ onLogin, onRegisterSchool }: { onLogin: () => void; on
     <section id="pricing" className="lp-section">
       <span className="lp-pill"><ChartNoAxesCombined /> الأسعار</span>
       <h2>باقات تناسب حجم مدرستك</h2>
-      <p className="lp-sub">الاستخدام مجاني لأولياء الأمور والسائقين. باقة المدرسة حسب عدد الباصات والطلاب — تواصل معنا بعد التسجيل لعرض مناسب.</p>
-      <button className="lp-cta" onClick={onRegisterSchool}><School /> ابدأ بتسجيل مدرستك</button>
+      <p className="lp-sub">الاستخدام مجاني لأولياء الأمور والسائقين. باقة المدرسة حسب عدد الباصات والطلاب — يتواصل معك فريقنا بعد طلب التفعيل لعرض مناسب.</p>
+      <button className="lp-cta" onClick={onRegisterSchool}><School /> اطلب تفعيل مدرستك</button>
     </section>
 
     <section id="faq" className="lp-section">
