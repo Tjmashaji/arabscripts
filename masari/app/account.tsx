@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BusFront, Check, KeyRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -67,4 +67,73 @@ export function ResetPasswordPage({ onDone, onCancel }: { onDone: () => void; on
       <button className="text-link" onClick={onCancel}>إلغاء</button>
     </div></section>
   </main>;
+}
+
+// ── الإشعارات الفورية (Web Push) ──
+type PushState = "unsupported" | "ios-install" | "denied" | "off" | "on" | "busy";
+const urlBase64ToUint8Array = (base64: string) => {
+  const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+};
+const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+async function currentPushState(): Promise<PushState> {
+  if (typeof window === "undefined") return "unsupported";
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return isIos() && !isStandalone() ? "ios-install" : "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = await reg?.pushManager.getSubscription();
+  return sub && Notification.permission === "granted" ? "on" : "off";
+}
+
+export function PushToggle({ compact = false }: { compact?: boolean }) {
+  const [state, setState] = useState<PushState>("busy");
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    let alive = true;
+    const run = async () => { const s = await currentPushState().catch(() => "unsupported" as const); if (alive) setState(s); };
+    void run();
+    return () => { alive = false; };
+  }, []);
+
+  const enable = async () => {
+    setState("busy"); setMessage("");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { setState(permission === "denied" ? "denied" : "off"); return; }
+      const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js"));
+      await navigator.serviceWorker.ready;
+      const { data: key } = await supabase.rpc("push_public_key");
+      if (!key) throw new Error("NO_KEY");
+      const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key as string) }));
+      const raw = sub.toJSON();
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session.session?.user.id;
+      if (!userId) throw new Error("NO_SESSION");
+      const { error } = await supabase.from("device_tokens").upsert({ user_id: userId, endpoint: sub.endpoint, p256dh: raw.keys?.p256dh, auth_key: raw.keys?.auth, platform: isIos() ? "ios" : /android/i.test(navigator.userAgent) ? "android" : "web" }, { onConflict: "endpoint" });
+      if (error) throw error;
+      await supabase.from("notification_preferences").upsert({ user_id: userId, push_enabled: true }, { onConflict: "user_id" });
+      setState("on"); setMessage("تم تفعيل الإشعارات على هذا الجهاز.");
+    } catch {
+      setState("off"); setMessage("تعذر تفعيل الإشعارات. حاول مرة أخرى.");
+    }
+  };
+  const disable = async () => {
+    setState("busy"); setMessage("");
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) { await supabase.from("device_tokens").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); }
+    setState("off"); setMessage("تم إيقاف الإشعارات على هذا الجهاز.");
+  };
+
+  const hint = state === "ios-install" ? "على الآيفون: اضغط زر المشاركة ثم «إضافة إلى الشاشة الرئيسية»، وافتح مساري من الأيقونة لتفعيل الإشعارات."
+    : state === "denied" ? "الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح ثم أعد المحاولة."
+    : state === "unsupported" ? "هذا المتصفح لا يدعم الإشعارات الفورية."
+    : state === "on" ? "ستصلك التنبيهات حتى والتطبيق مغلق." : "فعّلها لتصلك تنبيهات الباص وصعود ابنك ووصوله حتى والتطبيق مغلق.";
+  return <div className={compact ? "push-toggle compact" : "panel push-toggle"}>
+    <div><strong>{state === "on" ? "الإشعارات مفعّلة" : "الإشعارات الفورية"}</strong><p>{message || hint}</p></div>
+    {(state === "off" || state === "busy") && <Button size="sm" disabled={state === "busy"} onClick={() => void enable()}>{state === "busy" ? "…" : "تفعيل"}</Button>}
+    {state === "on" && <Button size="sm" variant="outline" onClick={() => void disable()}>إيقاف</Button>}
+  </div>;
 }
