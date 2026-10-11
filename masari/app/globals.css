@@ -137,3 +137,5 @@
 .danger-btn{background:#b42f2f!important;color:#fff!important}.danger-note{font-size:11px;color:#b42f2f}.data-row{align-items:flex-start}.data-edit{display:grid;gap:10px;width:100%}.claim-grid select{height:40px;border:1px solid #d6e0e7;border-radius:10px;padding:0 10px;font:inherit;background:#fff}
 .audit-json{margin:8px 0 0;max-height:260px;overflow:auto;background:#f6f8fa;border-radius:10px;padding:10px;font-size:11px;white-space:pre-wrap;word-break:break-word}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.field-hint{font-size:11px;font-weight:400;color:#b42f2f}.field-title{margin:4px 0 0;font-size:13px;font-weight:600;color:#24364a}.claim-grid-single{display:grid;gap:5px;font-size:12px;font-weight:600;color:#24364a}.claim-grid-single textarea{height:72px;border:1px solid #d6e0e7;border-radius:10px;padding:8px 10px;font:inherit;font-weight:400;resize:vertical}
+.parent-add-child{margin-top:20px;display:grid;gap:10px}.parent-add-child>h2{font-size:18px;margin:0;color:#10394b}.req-badge{margin-inline-start:8px}

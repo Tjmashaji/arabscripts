@@ -22,7 +22,7 @@ export function PendingAccount({ email, requestedRole, suspended, onSignOut, onR
           <div className="panel-head"><div><p className="eyebrow">بعد الربط</p><h2>{schoolStaff ? "بعد تفعيل مدرستك" : "مدرسة ابنك على مساري؟"}</h2></div></div>
           <p className="muted-label">{schoolStaff
             ? <>عند تفعيل المدرسة تُربط صلاحية مديرها بالبريد الذي اعتمدته إدارة مساري. إن كان بريدك <strong dir="ltr">{email}</strong> فاضغط «تحقق الآن».</>
-            : <>أعطِ المدرسة بريدك <strong dir="ltr">{email}</strong> لتضيفك به. يُفعَّل حسابك تلقائيًا عند إضافتك، ثم اضغط «تحقق الآن».</>}</p>
+            : <>ابحث عن مدرسة ابنك أعلاه واضغط «سجّل ابنك في النقل». عند قبول المدرسة يتفعل حسابك، فاضغط «تحقق الآن». وإن أضافتك المدرسة ببريدك <strong dir="ltr">{email}</strong> فالأمر نفسه.</>}</p>
           <Button variant="outline" className="wide-action" disabled={busy} onClick={() => void recheck()}>تحقق الآن</Button>
         </article>
       </>}

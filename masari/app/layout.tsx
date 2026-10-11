@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-export const metadata: Metadata = { title: "مساري | إدارة النقل المدرسي", description: "منصة ذكية وآمنة لإدارة وتتبع نقل الطلاب المدرسي.", manifest: "/manifest.webmanifest", icons: { icon: "/favicon.svg", apple: "/favicon.svg" } };
+export const metadata: Metadata = { title: "مساري | إدارة النقل المدرسي", description: "منصة ذكية وآمنة لإدارة وتتبع نقل الطلاب المدرسي.", manifest: "/manifest.webmanifest", icons: { icon: "/favicon.svg", apple: "/apple-touch-icon.png" } };
 export const viewport: Viewport = { themeColor: "#10394b", width: "device-width", initialScale: 1 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="ar" dir="rtl">

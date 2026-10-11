@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 // الصلاحيات تفرضها سياسات RLS ودوال الخادم؛ الواجهة تعرض النتيجة فقط.
 
 type Tab = "requests" | "fleet" | "routes" | "students" | "trips";
-type StudentRequest = { id: string; student_name: string; grade: string | null; parent_name: string | null; parent_phone: string | null; parent_email: string | null; status: string };
+type StudentRequest = { id: string; student_name: string; grade: string | null; parent_name: string | null; parent_phone: string | null; parent_email: string | null; status: string; student_national_id: string | null; home_address: string | null; home_latitude: number | null; home_longitude: number | null; note: string | null; created_by: string | null };
 type DriverRequest = { id: string; driver_name: string; phone: string | null; email: string | null; vehicle_plate: string | null };
 type Driver = { id: string; full_name: string; status: string; user_id: string | null };
 type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null };
@@ -60,7 +60,7 @@ export function SchoolOps({ schoolId }: { schoolId: string }) {
   const load = useCallback(async () => {
     const [sc, sr, dr, dv, bs, rt, st, tr] = await Promise.all([
       supabase.from("schools").select("latitude,longitude").eq("id", schoolId).single(),
-      supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
+      supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status,student_national_id,home_address,home_latitude,home_longitude,note,created_by").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
       supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
       supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
@@ -131,9 +131,9 @@ function RequestsTab({ studentRequests, driverRequests, busy, act }: { studentRe
       <div className="panel-head"><div><p className="eyebrow">بانتظار الاعتماد</p><h2>طلبات الطلاب</h2></div></div>
       {studentRequests.length === 0 && <p className="muted-label">لا توجد طلبات طلاب جديدة.</p>}
       {studentRequests.map((r) => <div className="ops-row" key={r.id}>
-        <div><strong>{r.student_name}</strong><p>{[r.grade, r.parent_name && `ولي الأمر: ${r.parent_name}`, r.parent_phone, r.parent_email].filter(Boolean).join(" · ")}</p></div>
+        <div><strong>{r.student_name}</strong>{r.status === "pending" && r.home_latitude != null && <Badge className="status-badge tone-2 req-badge">طلب من ولي الأمر</Badge>}<p>{[r.grade, r.student_national_id && `الهوية: ${r.student_national_id}`, r.parent_name && `ولي الأمر: ${r.parent_name}`, r.parent_phone, r.parent_email].filter(Boolean).join(" · ")}</p>{(r.home_address || r.home_latitude != null) && <p>{r.home_address ?? "المنزل"}{r.home_latitude != null && r.home_longitude != null && <> · <a className="dir-map-link" href={`https://www.openstreetmap.org/?mlat=${r.home_latitude}&mlon=${r.home_longitude}#map=17/${r.home_latitude}/${r.home_longitude}`} target="_blank" rel="noreferrer">موقع المنزل على الخريطة</a></>}</p>}{r.note && <p>ملاحظة: {r.note}</p>}</div>
         <div className="ops-actions">
-          <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("review_student_request", { p_request: r.id, p_approve: true }), `تم اعتماد ${r.student_name}. سيُربط حساب ولي الأمر تلقائيًا عند تسجيله بنفس البريد.`)}>اعتماد</Button>
+          <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("review_student_request", { p_request: r.id, p_approve: true }), r.home_latitude != null ? `تم اعتماد ${r.student_name} وربطه بحساب ولي أمره. حدّد له المسار والمحطة من «إسناد الطلاب».` : `تم اعتماد ${r.student_name}. سيُربط حساب ولي الأمر تلقائيًا عند تسجيله بنفس البريد.`)}>اعتماد</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => reject("student", r.id)}>رفض</Button>
         </div>
       </div>)}
