@@ -8,7 +8,10 @@ import { supabase } from "@/lib/supabase";
 // استعادة كلمة المرور: رابط بالبريد يعيد المستخدم للتطبيق بجلسة استعادة (type=recovery)،
 // فتظهر صفحة تعيين كلمة المرور الجديدة.
 
-export const isRecoveryLink = () => typeof window !== "undefined" && /type=recovery/.test(window.location.hash + window.location.search);
+// يُلتقط نوع الرابط عند تحميل الصفحة، لأن Supabase يمسح الـ hash بعد قراءة الجلسة منه.
+// invite: مدير مدرسة مدعو يضع كلمة مروره لأول مرة؛ recovery: استعادة كلمة المرور.
+const LINK_AT_LOAD = typeof window !== "undefined" && /type=(recovery|invite)/.test(window.location.hash + window.location.search);
+export const isRecoveryLink = () => LINK_AT_LOAD;
 
 export async function requestPasswordReset(email: string): Promise<string> {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
