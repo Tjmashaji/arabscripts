@@ -328,7 +328,7 @@ function CsvImport({ onDone }: { onDone: (text: string) => Promise<void> }) {
   const upload = async () => {
     if (!rows) return;
     setBusy(true); setErr("");
-    const payload = rows.map((r) => ({ name: r.name, district: r.district || null, city: r.city || null, ministry_code: r.ministry_code || null, lat: r.lat ? Number(r.lat) : null, lng: r.lng ? Number(r.lng) : null }));
+    const payload = rows.map((r) => ({ name: r.name, district: r.district || null, city: r.city || null, region: r.region || r.city || "الخرج", ministry_code: r.ministry_code || null, lat: r.lat ? Number(r.lat) : null, lng: r.lng ? Number(r.lng) : null }));
     const { data, error } = await supabase.rpc("admin_import_schools", { p_rows: payload, p_source: "import" });
     setBusy(false);
     if (error) { setErr(errText(error.message)); return; }
@@ -336,7 +336,7 @@ function CsvImport({ onDone }: { onDone: (text: string) => Promise<void> }) {
     await onDone(`تم الاستيراد: ${r.inserted} جديدة، ${r.updated} محدّثة، ${r.skipped} صفوف ناقصة تم تجاهلها.`);
   };
   return <div className="dir-tool">
-    <p className="muted-label">ملف CSV (يمكن حفظه من Excel) بالأعمدة: <code dir="ltr">name, district, ministry_code, lat, lng</code> و<code dir="ltr">city</code> اختياريًا. إعادة رفع نفس الملف تحدّث المدارس دون تكرار (حسب الرقم الوزاري).</p>
+    <p className="muted-label">ملف CSV (يمكن حفظه من Excel) بالأعمدة: <code dir="ltr">name, district, ministry_code, lat, lng</code> و<code dir="ltr">city</code> و<code dir="ltr">region</code> اختياريًا (المنطقة الافتراضية الخرج، وللإدارة التنفيذية منطقتها دائمًا). إعادة رفع نفس الملف تحدّث المدارس دون تكرار (حسب الرقم الوزاري).</p>
     <input type="file" accept=".csv,text/csv" onChange={(e) => void read(e.target.files?.[0])} />
     {rows && <p className="muted-label">جاهز: {rows.length} مدرسة. أول مدرسة: {rows[0]?.name}</p>}
     {err && <p className="auth-message">{err}</p>}
