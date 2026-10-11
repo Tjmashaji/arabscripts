@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Check, Clock3, FileUp, Hand, Plus, Search, School, ShieldCheck, X } from "lucide-react";
+import { Building2, Check, Clock3, FileUp, GraduationCap, Hand, Plus, Search, School, ShieldCheck, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
@@ -16,10 +16,13 @@ const OSM_NOTE = <p className="muted-label osm-attr">بيانات المدارس
 const claimText: Record<string, string> = { new: "طلب التفعيل قيد المراجعة", contacting: "فريق مساري يتواصل معكم", accepted: "تم قبول الطلب", rejected: "رُفض طلب التفعيل" };
 const statusText: Record<string, string> = { unclaimed: "غير مشتركة بعد", pending: "قيد المراجعة", active: "مشتركة", suspended: "موقوفة" };
 const statusTone: Record<string, string> = { unclaimed: "tone-1", pending: "tone-1", active: "tone-0", suspended: "tone-2" };
-const errText = (m: string) => m.includes("FORBIDDEN") ? "هذا الإجراء لإدارة مساري فقط." : m.includes("SCHOOL_NOT_ACTIVE") ? "المدرسة غير مفعّلة بعد." : m.includes("duplicate") || m.includes("unique") ? "لديك طلب مفتوح لهذه المدرسة بالفعل." : m.includes("REASON_REQUIRED") ? "اكتب سبب الرفض." : "تعذر تنفيذ الطلب. حاول مرة أخرى.";
+const errText = (m: string) => m.includes("HOME_LOCATION_REQUIRED") ? "حدد موقع المنزل على الخريطة." : m.includes("national_id") ? "رقم الهوية 10 أرقام يبدأ بـ 1 أو 2." : m.includes("student_requests_one_open") ? "أرسلت طلبًا لهذا الابن في هذه المدرسة، وهو قيد المراجعة." : m.includes("FORBIDDEN") ? "هذا الإجراء لإدارة مساري فقط." : m.includes("SCHOOL_NOT_ACTIVE") ? "المدرسة غير مفعّلة بعد." : m.includes("duplicate") || m.includes("unique") ? "لديك طلب مفتوح لهذه المدرسة بالفعل." : m.includes("REASON_REQUIRED") ? "اكتب سبب الرفض." : "تعذر تنفيذ الطلب. حاول مرة أخرى.";
 
 type FoundSchool = { id: string; name: string; district: string | null; city: string | null; status: string; my_interest: boolean; my_claim_status: string | null };
 type MyRequest = FoundSchool & { school_id: string; reject_reason: string | null };
+type StudentReq = { id: string; school_name: string; student_name: string; grade: string | null; status: string; review_note: string | null; created_at: string };
+const reqText: Record<string, [string, string]> = { pending: ["بانتظار مراجعة المدرسة", "tone-1"], pending_parent_account: ["بانتظار مراجعة المدرسة", "tone-1"], approved: ["مقبول", "tone-0"], rejected: ["مرفوض", "tone-2"] };
+const GRADES = ["روضة", "تمهيدي", "الأول الابتدائي", "الثاني الابتدائي", "الثالث الابتدائي", "الرابع الابتدائي", "الخامس الابتدائي", "السادس الابتدائي", "الأول المتوسط", "الثاني المتوسط", "الثالث المتوسط", "الأول الثانوي", "الثاني الثانوي", "الثالث الثانوي"];
 
 // ───────── واجهة المستخدم: «ابحث عن مدرسة ابنك» ─────────
 export function SchoolFinder({ email, schoolStaff }: { email: string; schoolStaff?: boolean }) {
@@ -27,12 +30,15 @@ export function SchoolFinder({ email, schoolStaff }: { email: string; schoolStaf
   const [results, setResults] = useState<FoundSchool[] | null>(null);
   const [mine, setMine] = useState<MyRequest[]>([]);
   const [claimFor, setClaimFor] = useState<FoundSchool | null>(null);
+  const [registerFor, setRegisterFor] = useState<FoundSchool | null>(null);
+  const [studentReqs, setStudentReqs] = useState<StudentReq[]>([]);
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
 
   const loadMine = useCallback(async () => {
-    const { data } = await supabase.rpc("my_school_requests");
+    const [{ data }, sr] = await Promise.all([supabase.rpc("my_school_requests"), supabase.rpc("my_student_requests")]);
     setMine(((data ?? []) as MyRequest[]).map((r) => ({ ...r, id: r.school_id })));
+    setStudentReqs((sr.data ?? []) as StudentReq[]);
   }, []);
   useEffect(() => {
     let alive = true;
@@ -65,15 +71,17 @@ export function SchoolFinder({ email, schoolStaff }: { email: string; schoolStaf
   const row = (s: FoundSchool) => <div className="ops-row" key={s.id}>
     <div><strong>{s.name}</strong><p>{[s.district, s.city].filter(Boolean).join(" · ") || "—"}</p>
       {s.my_claim_status && <p className="claim-state">{claimText[s.my_claim_status] ?? s.my_claim_status}{(s as MyRequest).reject_reason ? `: ${(s as MyRequest).reject_reason}` : ""}</p>}
-      {s.status === "active" && <p>المدرسة على مساري. أعطِ إدارتها بريدك <strong dir="ltr">{email}</strong> لتضيفك، ثم اضغط «تحقق الآن».</p>}
+      {s.status === "active" && !schoolStaff && <p>المدرسة على مساري. سجّل ابنك وستراجع المدرسة طلبك.</p>}
     </div>
     <div className="ops-actions">
       <Badge className={`status-badge ${statusTone[s.status] ?? "tone-1"}`}>{statusText[s.status] ?? s.status}</Badge>
+      {s.status === "active" && !schoolStaff && <Button size="sm" disabled={busy} onClick={() => { setMsg(null); setRegisterFor(s); }}><UserPlus /> سجّل ابنك في النقل</Button>}
       {s.status === "unclaimed" && !schoolStaff && <Button size="sm" variant={s.my_interest ? "outline" : "default"} disabled={busy} onClick={() => void toggleInterest(s)}>{s.my_interest ? <><Check /> طلبت الخدمة (إلغاء)</> : <><Hand /> أريد الخدمة في هذه المدرسة</>}</Button>}
       {s.status === "unclaimed" && !(s.my_claim_status === "new" || s.my_claim_status === "contacting") && <Button size="sm" variant="outline" disabled={busy} onClick={() => { setMsg(null); setClaimFor(s); }}><Building2 /> أنا من إدارة المدرسة</Button>}
     </div>
   </div>;
 
+  if (registerFor) return <StudentRequestForm school={registerFor} onCancel={() => setRegisterFor(null)} onDone={async (text) => { setRegisterFor(null); setMsg({ text, ok: true }); await refresh(); }} />;
   if (claimFor) return <ClaimForm school={claimFor} email={email} onCancel={() => setClaimFor(null)} onDone={async (text) => { setClaimFor(null); setMsg({ text, ok: true }); await refresh(); }} />;
 
   return <>
@@ -89,6 +97,15 @@ export function SchoolFinder({ email, schoolStaff }: { email: string; schoolStaf
         : results.map(row))}
       {results && results.length > 0 && OSM_NOTE}
     </article>
+    {studentReqs.length > 0 && <article className="panel ops-panel">
+      <div className="panel-head"><div><p className="eyebrow">طلباتك</p><h2>طلبات تسجيل أبنائك</h2></div><GraduationCap className="title-icon" /></div>
+      {studentReqs.map((r) => <div className="ops-row" key={r.id}>
+        <div><strong>{r.student_name}</strong><p>{[r.grade, r.school_name].filter(Boolean).join(" · ")}</p>
+          {r.status === "rejected" && r.review_note && <p className="claim-state">السبب: {r.review_note}</p>}
+          {r.status === "approved" && <p>ستحدد المدرسة المسار والمحطة، ثم اضغط «تحقق الآن» لتدخل حسابك.</p>}</div>
+        <div className="ops-actions"><Badge className={`status-badge ${reqText[r.status]?.[1] ?? "tone-1"}`}>{reqText[r.status]?.[0] ?? r.status}</Badge></div>
+      </div>)}
+    </article>}
     {mine.length > 0 && <article className="panel ops-panel">
       <div className="panel-head"><div><p className="eyebrow">طلباتك</p><h2>المدارس التي طلبتها</h2></div><Clock3 className="title-icon" /></div>
       {mine.map(row)}
@@ -124,6 +141,50 @@ function ClaimForm({ school, email, onCancel, onDone }: { school: FoundSchool; e
     </div>
     {err && <p className="auth-message">{err}</p>}
     <div className="ops-actions"><Button disabled={busy || !valid} onClick={() => void submit()}>{busy ? "جارٍ الإرسال…" : "إرسال طلب التفعيل"}</Button><Button variant="outline" onClick={onCancel}>رجوع</Button></div>
+  </article>;
+}
+
+// ───────── ولي الأمر يطلب تسجيل ابنه في نقل مدرسة مشتركة ─────────
+type Point = { lat: number; lng: number };
+function StudentRequestForm({ school, onCancel, onDone }: { school: FoundSchool; onCancel: () => void; onDone: (text: string) => Promise<void> }) {
+  const [f, setF] = useState({ student_name: "", grade: "", national_id: "", parent_name: "", phone: "", address: "", note: "" });
+  const [home, setHome] = useState<Point | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const idOk = !f.national_id.trim() || /^[12][0-9]{9}$/.test(f.national_id.trim());
+  const valid = f.student_name.trim().length >= 3 && !!f.grade && /^\+?[0-9\s-]{9,20}$/.test(f.phone.trim()) && !!home && idOk;
+  const submit = async () => {
+    if (!home) return;
+    setBusy(true); setErr("");
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from("student_onboarding_requests").insert({
+      school_id: school.id, created_by: auth.user?.id, status: "pending",
+      student_name: f.student_name.trim(), grade: f.grade, student_national_id: f.national_id.trim() || null,
+      parent_name: f.parent_name.trim() || null, parent_phone: f.phone.trim(), home_address: f.address.trim() || null,
+      home_latitude: home.lat, home_longitude: home.lng, note: f.note.trim() || null,
+    });
+    setBusy(false);
+    if (error) { setErr(errText(error.message)); return; }
+    await onDone(`أرسلنا طلب تسجيل ${f.student_name.trim()} إلى ${school.name}. سيصلك إشعار عند قبول الطلب أو رفضه.`);
+  };
+  return <article className="panel ops-panel claim-form">
+    <div className="panel-head"><div><p className="eyebrow">تسجيل ابنك في النقل</p><h2>{school.name}</h2></div><GraduationCap className="title-icon" /></div>
+    <p className="muted-label">تراجع المدرسة الطلب، وعند القبول يُربط ابنك بحسابك وتحدد المدرسة المسار والمحطة الأقرب لمنزلك.</p>
+    <div className="claim-grid">
+      <label htmlFor="sr-name">اسم الطالب الكامل<input id="sr-name" value={f.student_name} onChange={set("student_name")} /></label>
+      <label htmlFor="sr-grade">الصف<select id="sr-grade" value={f.grade} onChange={set("grade")}><option value="">اختر الصف</option>{GRADES.map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
+      <label htmlFor="sr-id">رقم هوية الطالب (اختياري)<input id="sr-id" value={f.national_id} onChange={set("national_id")} dir="ltr" inputMode="numeric" maxLength={10} placeholder="1xxxxxxxxx" />{!idOk && <span className="field-hint">10 أرقام تبدأ بـ 1 أو 2</span>}</label>
+      <label htmlFor="sr-parent">اسمك<input id="sr-parent" value={f.parent_name} onChange={set("parent_name")} /></label>
+      <label htmlFor="sr-phone">جوالك<input id="sr-phone" value={f.phone} onChange={set("phone")} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" /></label>
+      <label htmlFor="sr-address">العنوان (الحي والشارع)<input id="sr-address" value={f.address} onChange={set("address")} /></label>
+    </div>
+    <p className="field-title">موقع المنزل <span className="muted-inline">اضغط على الخريطة أو «الموقع الحالي»</span></p>
+    <MapPicker value={home} onChange={setHome} />
+    {home && <p className="muted-label">تم تحديد الموقع.</p>}
+    <label htmlFor="sr-note" className="claim-grid-single">ملاحظة للمدرسة (اختياري)<textarea id="sr-note" value={f.note} onChange={set("note")} maxLength={500} /></label>
+    {err && <p className="auth-message">{err}</p>}
+    <div className="ops-actions"><Button disabled={busy || !valid} onClick={() => void submit()}>{busy ? "جارٍ الإرسال…" : "إرسال طلب التسجيل"}</Button><Button variant="outline" onClick={onCancel}>رجوع</Button></div>
   </article>;
 }
 
@@ -238,7 +299,6 @@ export function AdminDirectory({ canManage }: { canManage: boolean }) {
   </>;
 }
 
-type Point = { lat: number; lng: number };
 type Dup = { id: string; name: string; status: string; distance_m: number };
 
 function AddSchool({ onDone }: { onDone: (text: string) => Promise<void> }) {
