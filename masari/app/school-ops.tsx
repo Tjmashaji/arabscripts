@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 // التشغيل اليومي للمدرسة: كل ما يلزم قبل أن يبدأ السائق رحلته.
 // الصلاحيات تفرضها سياسات RLS ودوال الخادم؛ الواجهة تعرض النتيجة فقط.
 
-type Tab = "requests" | "fleet" | "routes" | "students" | "trips";
+export type OpsTab = "requests" | "fleet" | "routes" | "students" | "trips";
 type StudentRequest = { id: string; student_name: string; grade: string | null; parent_name: string | null; parent_phone: string | null; parent_email: string | null; status: string; student_national_id: string | null; home_address: string | null; home_latitude: number | null; home_longitude: number | null; note: string | null; created_by: string | null };
 type DriverRequest = { id: string; driver_name: string; phone: string | null; email: string | null; vehicle_plate: string | null };
 type Driver = { id: string; full_name: string; status: string; user_id: string | null };
@@ -45,9 +45,16 @@ const parseLatLng = (text: string): { lat: number; lng: number } | null => {
 };
 const formatLatLng = (stop: Pick<Stop, "latitude" | "longitude">) => stop.latitude != null && stop.longitude != null ? `${stop.latitude}, ${stop.longitude}` : "";
 
-export function SchoolOps({ schoolId }: { schoolId: string }) {
+const TAB_TITLES: Record<OpsTab, [string, string]> = {
+  requests: ["الطلبات", "إضافة الطلاب والسائقين، واعتماد طلبات أولياء الأمور والسائقين."],
+  students: ["الطلاب", "كل طلاب المدرسة، وإسناد كل طالب إلى مساره ومحطته."],
+  fleet: ["الباصات والسائقون", "الباصات وسائق كل باص."],
+  routes: ["المسارات", "مسارات الذهاب والعودة ومحطاتها على الخريطة."],
+  trips: ["رحلات اليوم", "إنشاء رحلات اليوم لكل مسار جاهز ومتابعة حالتها."],
+};
+
+export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) {
   const [schoolPoint, setSchoolPoint] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
-  const [tab, setTab] = useState<Tab>("requests");
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [studentRequests, setStudentRequests] = useState<StudentRequest[]>([]);
@@ -98,20 +105,11 @@ export function SchoolOps({ schoolId }: { schoolId: string }) {
     } finally { setBusy(false); }
   };
 
-  const pendingCount = studentRequests.length + driverRequests.length;
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "requests", label: pendingCount ? `الطلبات (${pendingCount})` : "الطلبات" },
-    { id: "fleet", label: "الباصات" },
-    { id: "routes", label: "المسارات" },
-    { id: "students", label: "إسناد الطلاب" },
-    { id: "trips", label: "رحلات اليوم" },
-  ];
 
   return <>
-    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>التشغيل اليومي</h1><p>اعتماد الطلبات، الباصات، المسارات، إسناد الطلاب، ورحلات اليوم.</p></div></div>
-    <div className="child-switcher" role="tablist">{tabs.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? "active" : ""} onClick={() => { setTab(t.id); setMessage(null); }}>{t.label}</button>)}</div>
+    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>{TAB_TITLES[tab][0]}</h1><p>{TAB_TITLES[tab][1]}</p></div></div>
     {message && <p className={`save-strip ops-message ${message.ok ? "" : "ops-error"}`}>{message.ok ? <Check /> : <X />}<span>{message.text}</span></p>}
-    {tab === "requests" && <RequestsTab studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
+    {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
     {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab students={students} routes={routes} busy={busy} act={act} />}
@@ -121,13 +119,57 @@ export function SchoolOps({ schoolId }: { schoolId: string }) {
 
 type Act = (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>, ok: string) => Promise<boolean>;
 
-function RequestsTab({ studentRequests, driverRequests, busy, act }: { studentRequests: StudentRequest[]; driverRequests: DriverRequest[]; busy: boolean; act: Act }) {
+// إضافة طالب أو سائق بالبريد: يُنشأ طلب يُعتمد أدناه، ويُربط الحساب عند تسجيل صاحبه بنفس البريد.
+function AddForms({ schoolId, busy, act }: { schoolId: string; busy: boolean; act: Act }) {
+  const [open, setOpen] = useState<"" | "student" | "driver">("");
+  const [st, setSt] = useState({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "" });
+  const [dr, setDr] = useState({ name: "", phone: "", email: "", plate: "" });
+  const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  const stOk = st.name.trim().length >= 3 && st.parentPhone.trim().length >= 9 && email.test(st.parentEmail.trim());
+  const drOk = dr.name.trim().length >= 3 && dr.phone.trim().length >= 9 && email.test(dr.email.trim());
+  const addStudent = async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    const ok = await act(() => supabase.from("student_onboarding_requests").insert({
+      school_id: schoolId, created_by: auth.user?.id, status: "pending_parent_account", student_name: st.name.trim(), grade: st.grade.trim() || null,
+      parent_name: st.parentName.trim() || null, parent_phone: st.parentPhone.trim(), parent_email: st.parentEmail.trim().toLowerCase(), home_address: st.address.trim() || null,
+    }), `أُضيف طلب ${st.name.trim()}. اعتمده أدناه، ويُربط ولي الأمر عند تسجيله بالبريد ${st.parentEmail.trim()}.`);
+    if (ok) { setSt({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "" }); setOpen(""); }
+  };
+  const addDriver = async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    const ok = await act(() => supabase.from("driver_onboarding_requests").insert({
+      school_id: schoolId, created_by: auth.user?.id, status: "pending", driver_name: dr.name.trim(), phone: dr.phone.trim(),
+      email: dr.email.trim().toLowerCase(), vehicle_plate: dr.plate.trim() || null,
+    }), `أُضيف طلب السائق ${dr.name.trim()}. اعتمده أدناه، ويُربط حسابه عند تسجيله بالبريد ${dr.email.trim()}.`);
+    if (ok) { setDr({ name: "", phone: "", email: "", plate: "" }); setOpen(""); }
+  };
+  return <article className="panel ops-panel">
+    <div className="ops-actions"><Button variant={open === "student" ? "default" : "outline"} onClick={() => setOpen(open === "student" ? "" : "student")}><Plus /> إضافة طالب</Button><Button variant={open === "driver" ? "default" : "outline"} onClick={() => setOpen(open === "driver" ? "" : "driver")}><Plus /> إضافة سائق</Button></div>
+    {open === "student" && <div className="dir-tool"><div className="claim-grid">
+      <label htmlFor="as-name">اسم الطالب<input id="as-name" value={st.name} onChange={(e) => setSt({ ...st, name: e.target.value })} /></label>
+      <label htmlFor="as-grade">الصف<input id="as-grade" value={st.grade} onChange={(e) => setSt({ ...st, grade: e.target.value })} /></label>
+      <label htmlFor="as-pname">اسم ولي الأمر<input id="as-pname" value={st.parentName} onChange={(e) => setSt({ ...st, parentName: e.target.value })} /></label>
+      <label htmlFor="as-pphone">جوال ولي الأمر<input id="as-pphone" dir="ltr" inputMode="tel" value={st.parentPhone} onChange={(e) => setSt({ ...st, parentPhone: e.target.value })} placeholder="05xxxxxxxx" /></label>
+      <label htmlFor="as-pemail">بريد ولي الأمر<input id="as-pemail" dir="ltr" type="email" value={st.parentEmail} onChange={(e) => setSt({ ...st, parentEmail: e.target.value })} /></label>
+      <label htmlFor="as-addr">عنوان المنزل<input id="as-addr" value={st.address} onChange={(e) => setSt({ ...st, address: e.target.value })} /></label>
+    </div><Button disabled={busy || !stOk} onClick={() => void addStudent()}>حفظ طلب الطالب</Button></div>}
+    {open === "driver" && <div className="dir-tool"><div className="claim-grid">
+      <label htmlFor="ad-name">اسم السائق<input id="ad-name" value={dr.name} onChange={(e) => setDr({ ...dr, name: e.target.value })} /></label>
+      <label htmlFor="ad-phone">الجوال<input id="ad-phone" dir="ltr" inputMode="tel" value={dr.phone} onChange={(e) => setDr({ ...dr, phone: e.target.value })} placeholder="05xxxxxxxx" /></label>
+      <label htmlFor="ad-email">البريد<input id="ad-email" dir="ltr" type="email" value={dr.email} onChange={(e) => setDr({ ...dr, email: e.target.value })} /></label>
+      <label htmlFor="ad-plate">لوحة الباص (اختياري)<input id="ad-plate" value={dr.plate} onChange={(e) => setDr({ ...dr, plate: e.target.value })} /></label>
+    </div><Button disabled={busy || !drOk} onClick={() => void addDriver()}>حفظ طلب السائق</Button></div>}
+  </article>;
+}
+
+function RequestsTab({ schoolId, studentRequests, driverRequests, busy, act }: { schoolId: string; studentRequests: StudentRequest[]; driverRequests: DriverRequest[]; busy: boolean; act: Act }) {
   const reject = (kind: "student" | "driver", id: string) => {
     const note = window.prompt("سبب الرفض:");
     if (!note?.trim()) return;
     void act(() => supabase.rpc(kind === "student" ? "review_student_request" : "review_driver_request", { p_request: id, p_approve: false, p_note: note.trim() }), "تم رفض الطلب.");
   };
   return <>
+    <AddForms schoolId={schoolId} busy={busy} act={act} />
     <article className="panel ops-panel">
       <div className="panel-head"><div><p className="eyebrow">بانتظار الاعتماد</p><h2>طلبات الطلاب</h2></div></div>
       {studentRequests.length === 0 && <p className="muted-label">لا توجد طلبات طلاب جديدة.</p>}

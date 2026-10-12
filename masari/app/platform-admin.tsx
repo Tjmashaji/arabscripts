@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 type Msg = { text: string; ok: boolean } | null;
 const Flash = ({ msg }: { msg: Msg }) => msg && <p className={`save-strip ops-message ${msg.ok ? "" : "ops-error"}`}>{msg.ok ? <Check /> : <X />}<span>{msg.text}</span></p>;
 const errText = (m: string) => m.includes("FORBIDDEN") ? "هذا الإجراء غير مسموح لحسابك." : m.includes("CANNOT_CHANGE_SELF") ? "لا يمكنك تغيير صلاحيات حسابك بنفسك." : m.includes("REASON_REQUIRED") ? "اكتب السبب." : m.includes("REGION_REQUIRED") ? "حدد المنطقة." : m.includes("foreign key") || m.includes("violates") ? "لا يمكن: السجل مرتبط ببيانات أخرى أو القيمة غير مقبولة." : m.includes("Could not find the function") ? "هذه الميزة تحتاج تشغيل ملف SQL الأخير في Supabase." : m.includes("invalid input") ? "قيمة غير صحيحة لأحد الحقول." : "تعذر تنفيذ الطلب. حاول مرة أخرى.";
-const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString("ar-SA-u-ca-gregory", { dateStyle: "medium", timeStyle: "short" }) : "—";
+const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString("ar-SA-u-ca-gregory", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" }) : "—";
 
 // ───────── نظرة المنطقة ─────────
 type DirRow = { status: string; interest_count: number; open_claims: number };
