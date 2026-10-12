@@ -252,3 +252,19 @@
 .stars { display: flex; gap: 2px; direction: ltr; }
 .stars button { border: 0; background: none; padding: 2px; cursor: pointer; color: #cfdfe3; }
 .stars button svg { width: 26px; height: 26px; } .stars button.on { color: #e0a21e; } .stars button.on svg { fill: currentColor; }
+.chat-layout { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .chat-layout { grid-template-columns: 1fr; } }
+.chat-threads { display: grid; gap: 6px; max-height: 70vh; overflow-y: auto; }
+.thread-row { display: grid; gap: 2px; text-align: right; padding: 10px 12px; border-radius: 12px; border: 1px solid #e3edf0; background: #fff; cursor: pointer; font: inherit; }
+.thread-row.active { border-color: #1f8a93; background: #eef8f8; }
+.thread-row strong { display: flex; justify-content: space-between; gap: 8px; }
+.thread-row span { color: #5a7280; font-size: 13px; } .thread-row small { color: #10394b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unread { background: #c23b3b; color: #fff !important; border-radius: 999px; padding: 0 8px; font-size: 12px; }
+.chat-panel { display: grid; gap: 10px; }
+.chat-list { display: flex; flex-direction: column; gap: 8px; max-height: 55vh; min-height: 200px; overflow-y: auto; padding: 4px; }
+.chat-msg { max-width: 80%; padding: 10px 14px; border-radius: 16px; }
+.chat-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; } .chat-msg small { display: block; margin-top: 4px; font-size: 11px; opacity: .7; }
+.chat-msg.mine { align-self: flex-start; background: #1f8a93; color: #fff; border-bottom-right-radius: 4px; }
+.chat-msg.theirs { align-self: flex-end; background: #eef4f5; color: #10394b; border-bottom-left-radius: 4px; }
+.chat-input { display: flex; gap: 8px; align-items: flex-end; }
+.chat-input textarea { flex: 1; min-width: 0; border: 1px solid #cfdfe3; border-radius: 12px; padding: 10px 12px; font: inherit; resize: vertical; }
