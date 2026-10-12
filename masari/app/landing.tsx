@@ -43,7 +43,7 @@ const FAQ = [
   { q: "كيف تنضم المدرسة إلى مساري؟", a: "مدارس الخرج موجودة مسبقًا في دليلنا بحالة «غير مشتركة بعد». اضغط «اطلب تفعيل مدرستك»، ابحث عن مدرستك واضغط «أنا من إدارة المدرسة». يتحقق فريق مساري منك ثم يفعّل المدرسة ويرسل دعوة لبريد مديرها." },
   { q: "كيف ينضم ولي الأمر والسائق؟", a: "تضيفهم المدرسة ببريدهم، وعندما يسجّلون في مساري بنفس البريد يُربط حسابهم ويُفعَّل تلقائيًا." },
   { q: "هل يعمل على الجوال؟", a: "نعم، من متصفح الجوال مباشرة، ويمكن إضافته للشاشة الرئيسية ليعمل كتطبيق ويستقبل الإشعارات." },
-  { q: "من يرى موقع الباص؟", a: "إدارة المدرسة، وولي الأمر أثناء رحلة ابنه فقط، والسائق نفسه." },
+  { q: "من يرى موقع الباص؟", a: "إدارة المدرسة، وولي الأمر أثناء رحلة ابنه فقط، والسائق نفسه. وتُحذف مواقع الباص تلقائيًا بعد 90 يومًا. التفاصيل في سياسة الخصوصية." },
 ];
 
 export function Landing({ onLogin, onRegisterSchool, onFindSchool }: { onLogin: () => void; onRegisterSchool: () => void; onFindSchool: () => void }) {
@@ -90,6 +90,6 @@ export function Landing({ onLogin, onRegisterSchool, onFindSchool }: { onLogin: 
       <div className="lp-faq">{FAQ.map((f) => <details key={f.q}><summary>{f.q}</summary><p>{f.a}</p></details>)}</div>
     </section>
 
-    <footer className="lp-footer"><span className="brand-mark"><BusFront /></span><strong>مساري</strong><span>إدارة وتتبع النقل المدرسي</span></footer>
+    <footer className="lp-footer"><span className="brand-mark"><BusFront /></span><strong>مساري</strong><span>إدارة وتتبع النقل المدرسي</span><a href="#privacy">سياسة الخصوصية</a></footer>
   </div>;
 }

@@ -2,15 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
-  Activity, AlertTriangle, BarChart3, Bell, BusFront, CalendarDays,
+  Activity, AlertTriangle, Bell, BusFront, CalendarDays,
   Check, ChevronLeft, CircleDollarSign, Clock3, FileClock, GraduationCap,
-  LayoutDashboard, MapPin, Menu, MessageSquareText, Navigation, Plus,
-  RadioTower, Route, School, Search, ShieldCheck, UserPlus, Users, WalletCards, X, ClipboardList, Database,
+  LayoutDashboard, MapPin, Menu, MessageSquareText, Navigation, RadioTower, Bug, Route, ScanLine, School, WalletCards, ShieldCheck, Users, X, ClipboardList, Database,
 } from "lucide-react";
-import { SchoolOps } from "./school-ops";
-import { PendingAccount } from "./onboarding";
-import { AdminDirectory, SchoolFinder } from "./school-directory";
-import { AuditLog, DataManager, RegionOverview, UsersAdmin } from "./platform-admin";
+import { SchoolOps, type OpsTab } from "./school-ops";
+import { QrScanner } from "./student-card";
+import { installErrorReporter } from "@/lib/error-reporter";
+import { isNativeApp, locateOnce, watchLocation, type Fix } from "@/lib/location";
+import { ConsentGate, PRIVACY_URL, PRIVACY_VERSION, PrivacyPolicy } from "./privacy";
+import { TripMap, navigateUrl, fullRouteUrl } from "./trip-map";
+import { ParentHomeLocations } from "./home-location";
+import { ParentGate, SchoolGate } from "./gate";
+import { PendingAccount, SIGNUP_ROLES, type SignupRole } from "./onboarding";
+import { AdminDirectory } from "./school-directory";
+import { FeedbackList, ParentChildren, TripHistory } from "./role-pages";
+import { AdminBilling, SchoolBilling } from "./billing";
+import { AuditLog, DataManager, ErrorLog, RegionOverview, UsersAdmin } from "./platform-admin";
 import { LiveControl } from "./live-control";
 import { ForgotPassword, ResetPasswordPage, isRecoveryLink, PushToggle } from "./account";
 import { Landing } from "./landing";
@@ -27,20 +35,14 @@ import type { RealtimeChannel, Session } from "@supabase/supabase-js";
 
 type Role = "executive" | "school" | "driver" | "parent";
 type AuthMode = "demo" | "authenticated";
-type View = "operations" | "dashboard" | "control" | "locations" | "schools" | "students" | "fleet" | "routes" | "trips" | "finance" | "reports" | "audit" | "users" | "data";
+type View = "gate" | "pickup" | "errors" | "billing" | "requests" | "children" | "history" | "feedback" | "dashboard" | "control" | "locations" | "schools" | "students" | "fleet" | "routes" | "trips" | "finance" | "reports" | "audit" | "users" | "data";
 type LocationPoint = { label: string; address: string; lat: number; lng: number };
-type DriverForm = { name: string; phone: string; email: string; plate: string; status: string };
-type DriverRow = DriverForm & { capacity?: number; saved?: boolean };
-type StudentForm = { name: string; grade: string; parentName: string; parentPhone: string; parentEmail: string; address: string; status: string };
-type StudentRow = StudentForm & { saved?: boolean };
-type RouteForm = { name: string; direction: "to_school" | "to_home"; scheduledTime: string; stopsText: string; status: string };
-type RouteRow = { name: string; direction: string; scheduledTime: string; stops: string; status: string; saved?: boolean };
 type MasariData = {
   source: "cached" | "supabase" | "empty";
   school: { id?: string; located?: boolean; name: string; city: string; contactName: string; phone: string; location: LocationPoint };
   vehicle: { number: string; plate: string; capacity: number };
   driver: { name: string; email: string };
-  route: { name: string; scheduledTime: string; estimatedMinutes: number; stops: { id?: string; status?: string; label: string; time: string; lat: number; lng: number; studentName?: string | null }[] };
+  route: { name: string; scheduledTime: string; estimatedMinutes: number; stops: { id?: string; status?: string; label: string; time: string; lat: number; lng: number; studentName?: string | null; students?: string[] }[] };
   student: { id?: string; name: string; grade: string; address: string; status: string; location: LocationPoint };
   parent: { name: string; email: string; phone: string };
   ride: { date: string; status: string; studentStatus: string };
@@ -56,7 +58,7 @@ type SimulationState = {
   studentStatus: "waiting" | "approaching" | "on_bus" | "arrived";
 };
 type TripContext = { tripId: string };
-type DriverGps = LocationPoint & { accuracy?: number | null; updatedAt?: string };
+type DriverGps = LocationPoint & { accuracy?: number | null; speed?: number | null; updatedAt?: string };
 type TripEventRow = { id?: string; eventType: string; note: string; createdAt: string; studentName?: string | null };
 type FeedbackItem = { id: string; author: string; role: "parent" | "school" | "driver" | "executive"; rating: number; category: string; message: string; status: string; createdAt: string; saved?: boolean };
 type NotificationItem = { id: string; title: string; body: string; time: string; tone: "green" | "blue" | "amber" | "red" };
@@ -71,25 +73,25 @@ const navByRole: Record<Role, { id: View; label: string; icon: typeof LayoutDash
     { id: "control", label: "برج المراقبة", icon: RadioTower },
   ],
   school: [
-    { id: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { id: "operations", label: "التشغيل اليومي", icon: ClipboardList }, { id: "students", label: "الطلاب", icon: GraduationCap },
-    { id: "control", label: "برج المراقبة", icon: RadioTower },
-    { id: "locations", label: "المواقع", icon: MapPin },
-    { id: "fleet", label: "الباصات والسائقون", icon: BusFront }, { id: "routes", label: "المسارات", icon: Route },
-    { id: "trips", label: "الرحلات اليومية", icon: Navigation }, { id: "reports", label: "التقارير", icon: BarChart3 },
+    { id: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { id: "gate", label: "نداء البوابة", icon: Bell },
+    { id: "requests", label: "الطلبات", icon: ClipboardList }, { id: "students", label: "الطلاب", icon: GraduationCap }, { id: "fleet", label: "الباصات والسائقون", icon: BusFront },
+    { id: "routes", label: "المسارات", icon: Route }, { id: "trips", label: "رحلات اليوم", icon: Navigation },
+    { id: "control", label: "برج المراقبة", icon: RadioTower }, { id: "locations", label: "موقع المدرسة", icon: MapPin },
+    { id: "feedback", label: "ملاحظات أولياء الأمور", icon: MessageSquareText }, { id: "billing", label: "اشتراك مساري", icon: WalletCards },
   ],
-  driver: [{ id: "dashboard", label: "رحلة اليوم", icon: Navigation }, { id: "trips", label: "سجل الرحلات", icon: CalendarDays }],
+  driver: [{ id: "dashboard", label: "رحلة اليوم", icon: Navigation }, { id: "history", label: "سجل الرحلات", icon: CalendarDays }],
   parent: [
-    { id: "dashboard", label: "متابعة الرحلة", icon: MapPin }, { id: "students", label: "أبنائي", icon: GraduationCap },
-    { id: "locations", label: "المواقع", icon: Navigation },
-    { id: "trips", label: "سجل الرحلات", icon: CalendarDays }, { id: "finance", label: "الاشتراك", icon: WalletCards },
+    { id: "dashboard", label: "متابعة الرحلة", icon: MapPin }, { id: "pickup", label: "النداء والتصاريح", icon: Bell }, { id: "children", label: "أبنائي", icon: GraduationCap },
+    { id: "history", label: "سجل الرحلات", icon: CalendarDays }, { id: "locations", label: "موقع المنزل", icon: Navigation },
   ],
 };
 // مدير النظام (المطوّر): ما للإدارة التنفيذية لكل المناطق، مع المستخدمين وإدارة البيانات وسجل التدقيق.
 const platformNav: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "نظرة عامة", icon: LayoutDashboard }, { id: "schools", label: "دليل المدارس", icon: School },
   { id: "control", label: "برج المراقبة", icon: RadioTower }, { id: "users", label: "المستخدمون والصلاحيات", icon: Users },
-  { id: "data", label: "إدارة البيانات", icon: Database }, { id: "audit", label: "سجل التدقيق", icon: FileClock },
+  { id: "billing", label: "الاشتراكات والفواتير", icon: WalletCards }, { id: "data", label: "إدارة البيانات", icon: Database }, { id: "audit", label: "سجل التدقيق", icon: FileClock }, { id: "errors", label: "الأعطال", icon: Bug },
 ];
+const OPS_VIEWS: View[] = ["requests", "students", "fleet", "routes", "trips"];
 const schoolLocation: LocationPoint = { label: "موقع المدرسة", address: "الرياض", lat: 24.7136, lng: 46.6753 };
 // قالب فارغ محايد قبل تحميل بيانات الحساب (لا أسماء ولا أرقام).
 const blankData: MasariData = {
@@ -147,15 +149,6 @@ const ensureSchoolDestination = (route: MasariData["route"], school: MasariData[
     ...route,
     stops: [...route.stops, { label: school.name, time: addMinutes(lastTime, 15), lat: school.location.lat, lng: school.location.lng }],
   };
-};
-const buildMapUrl = (points: LocationPoint[], marker: LocationPoint) => {
-  const lats = points.map((point) => point.lat);
-  const lngs = points.map((point) => point.lng);
-  const south = Math.min(...lats) - 0.025;
-  const north = Math.max(...lats) + 0.025;
-  const west = Math.min(...lngs) - 0.035;
-  const east = Math.max(...lngs) + 0.035;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${west}%2C${south}%2C${east}%2C${north}&layer=mapnik&marker=${marker.lat}%2C${marker.lng}`;
 };
 const initialSimulation: SimulationState = { active: false, currentStopIndex: 0, approvedStops: [], studentStatus: "waiting" };
 const studentStatusLabel: Record<SimulationState["studentStatus"], string> = {
@@ -350,6 +343,14 @@ async function loadDriverData(userId: string): Promise<MasariData | null> {
     next.students = (assigned ?? []).flatMap((row) => { const st = one(row.students as StudentJoin); return st ? [{ id: st.id, name: st.full_name, grade: st.grade ?? "—", status: "not_boarded" }] : []; });
   }
   if (next.students[0]) next.student = { ...next.student, id: next.students[0].id, name: next.students[0].name, grade: next.students[0].grade, status: tripStudentLabel[next.students[0].status] ?? next.students[0].status };
+  // أسماء الطلاب عند كل محطة (للخريطة وقائمة المحطات)
+  const [{ data: rStops }, { data: assigns }] = await Promise.all([
+    supabase.from("route_stops").select("id,stop_order").eq("route_id", trip.route_id).order("stop_order"),
+    supabase.from("student_route_assignments").select("stop_id,students(full_name)").eq("route_id", trip.route_id).eq("status", "active"),
+  ]);
+  const byStop = new Map<string, string[]>();
+  for (const a of assigns ?? []) { const st = one(a.students as StudentJoin); if (st && a.stop_id) byStop.set(a.stop_id, [...(byStop.get(a.stop_id) ?? []), st.full_name]); }
+  (rStops ?? []).forEach((rs, i) => { if (next.route.stops[i]) next.route.stops[i].students = byStop.get(rs.id) ?? []; });
   return next;
 }
 
@@ -495,7 +496,7 @@ async function loadMasariData(childId?: string | null): Promise<MasariData> {
 }
 
 type MyAccess = {
-  status: string; full_name: string | null; platform_roles: string[]; region?: string | null;
+  status: string; full_name: string | null; platform_roles: string[]; region?: string | null; privacy_version?: string | null;
   schools: { role: string; status: string; school_status: string }[];
   driver: { status: string } | null;
   guardian: { status: string }[];
@@ -509,7 +510,7 @@ function roleFromAccess(access: MyAccess | null): Role | null {
   if (access.guardian.some((g) => g.status === "active")) return "parent";
   return null;
 }
-type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string; region?: string | null };
+type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string; phone?: string; region?: string | null; privacyOk?: boolean };
 async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const email = session.user.email ?? "";
   await supabase.rpc("claim_my_invites");
@@ -517,73 +518,9 @@ async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const access = data as MyAccess | null;
   const name = access?.full_name || email.split("@")[0] || "مستخدم";
   const requestedRole = typeof session.user.user_metadata?.requested_role === "string" ? session.user.user_metadata.requested_role : undefined;
-  if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole };
-  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, region: access?.region ?? null };
-}
-
-async function loadDriverRows(): Promise<DriverRow[]> {
-  const rows: DriverRow[] = [];
-  const { data: requests } = await supabase
-    .from("driver_onboarding_requests")
-    .select("driver_name,phone,email,vehicle_plate,vehicle_capacity,status")
-    .order("created_at", { ascending: false })
-    .limit(20);
-  if (requests?.length) {
-    const pending = requests.map((item) => ({
-      name: item.driver_name ?? "سائق جديد",
-      phone: item.phone ?? "—",
-      email: item.email ?? "",
-      plate: item.vehicle_plate ?? "—",
-      capacity: item.vehicle_capacity ?? 20,
-      status: item.status === "pending" ? "بانتظار تفعيل الحساب" : item.status ?? "قيد المراجعة",
-      saved: true,
-    }));
-    return [...pending, ...rows.filter((driver) => !pending.some((item) => item.plate === driver.plate))];
-  }
-  return rows;
-}
-
-async function loadStudentRows(): Promise<StudentRow[]> {
-  const rows: StudentRow[] = [];
-  const { data: requests } = await supabase
-    .from("student_onboarding_requests")
-    .select("student_name,grade,parent_name,parent_phone,parent_email,home_address,status")
-    .order("created_at", { ascending: false })
-    .limit(30);
-  if (requests?.length) {
-    const pending = requests.map((item) => ({
-      name: item.student_name ?? "طالب جديد",
-      grade: item.grade ?? "—",
-      parentName: item.parent_name ?? "—",
-      parentPhone: item.parent_phone ?? "—",
-      parentEmail: item.parent_email ?? "",
-      address: item.home_address ?? "—",
-      status: item.status === "pending_parent_account" ? "بانتظار حساب ولي الأمر" : item.status ?? "قيد المراجعة",
-      saved: true,
-    }));
-    return [...pending, ...rows.filter((student) => !pending.some((item) => item.name === student.name && item.parentPhone === student.parentPhone))];
-  }
-  return rows;
-}
-
-async function loadRouteRows(): Promise<RouteRow[]> {
-  const { data: routes } = await supabase
-    .from("routes")
-    .select("id,name,direction,scheduled_time,is_active,route_stops(label,stop_order)")
-    .order("created_at", { ascending: false })
-    .limit(20);
-  if (!routes?.length) return [];
-  return routes.map((route) => {
-    const stops = Array.isArray(route.route_stops) ? [...route.route_stops].sort((a, b) => (a.stop_order ?? 0) - (b.stop_order ?? 0)).map((stop) => stop.label).filter(Boolean).join(" ← ") : "";
-    return {
-      name: route.name ?? "مسار",
-      direction: route.direction === "to_home" ? "إلى المنزل" : "إلى المدرسة",
-      scheduledTime: formatTime(route.scheduled_time) || "—",
-      stops: stops || "لم تحدد المحطات",
-      status: route.is_active ? "نشط" : "متوقف",
-      saved: true,
-    };
-  });
+  const phone = typeof session.user.user_metadata?.phone === "string" ? session.user.user_metadata.phone : undefined;
+  if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole, phone };
+  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, phone, region: access?.region ?? null, privacyOk: access?.privacy_version === PRIVACY_VERSION };
 }
 
 function Stat({ icon: Icon, label, value, detail, accent }: { icon: typeof Users; label: string; value: string; detail: string; accent: string }) {
@@ -591,40 +528,13 @@ function Stat({ icon: Icon, label, value, detail, accent }: { icon: typeof Users
 }
 function LiveRoute({ data, simulation, driverGps, parent = false }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null; parent?: boolean }) {
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
-  const currentPoint = driverGps ?? data.student.location;
-  const routePoints = data.route.stops.map((stop) => ({ label: stop.label, address: stop.label, lat: stop.lat, lng: stop.lng }));
-  const allMapPoints = [data.school.location, data.student.location, ...routePoints, currentPoint];
-  const lats = allMapPoints.map((point)=>point.lat);
-  const lngs = allMapPoints.map((point)=>point.lng);
-  const bounds = { south: Math.min(...lats) - .025, north: Math.max(...lats) + .025, west: Math.min(...lngs) - .035, east: Math.max(...lngs) + .035 };
-  const position = (point: Pick<LocationPoint, "lat" | "lng">) => ({
-    left: ((point.lng - bounds.west) / (bounds.east - bounds.west)) * 100,
-    top: ((bounds.north - point.lat) / (bounds.north - bounds.south)) * 100,
-  });
-  const routeSvgPoints = routePoints.map((point)=>{const p=position(point);return `${p.left},${p.top}`}).join(" ");
-  const busPosition = position(currentPoint);
-  const mapUrl = buildMapUrl(allMapPoints, currentPoint);
   return <article className="panel map-panel">
     <div className="panel-head"><div><p className="eyebrow">تتبع مباشر</p><h2>{parent ? `رحلة ${data.student.name} إلى المدرسة` : `${data.route.name} — ${data.school.city}`}</h2></div><Badge className="live-badge"><span /> {simulation.active ? driverGps ? "GPS مباشر" : "بانتظار GPS" : "بانتظار بدء الرحلة"}</Badge></div>
-    <div className="route-map real-map" aria-label="خريطة حقيقية لمسار الباص في شرق الرياض">
-      <iframe
-        title="خريطة مسار أووك ورد العالمية"
-        src={mapUrl}
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-      />
-      <svg className="map-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points={routeSvgPoints}/></svg>
-      <div className="map-stops" aria-label="نقاط التوقف">
-        {data.route.stops.map((stop, index) => {const stopPosition=position(stop);return <div className="map-stop" style={{left:`${stopPosition.left}%`,top:`${stopPosition.top}%`}} key={stop.label}>
-          <strong>{simulation.approvedStops.includes(index) ? "✓" : index + 1}</strong><span>{stop.label}</span>
-        </div>})}
-      </div>
-      {(!simulation.active || driverGps) ? <div className={`bus-marker ${simulation.active ? "gps-lock moving" : ""}`} style={{left:`${busPosition.left}%`,top:`${busPosition.top}%`}}><BusFront /><span>{driverGps && simulation.active ? "GPS مباشر" : `الباص ${data.vehicle.number}`}</span></div> : <div className="map-gps-warning"><AlertTriangle/> موقع الباص غير متاح</div>}
-      <div className="eta-card"><strong>{simulation.active ? currentStop?.time : data.route.scheduledTime}</strong><span>{simulation.active && driverGps ? "موقع الجهاز" : simulation.active ? "بانتظار GPS" : "وقت البداية"}</span></div>
-    </div>
+    <TripMap stops={data.route.stops.map((st,i)=>({lat:st.lat,lng:st.lng,label:st.label,done:simulation.approvedStops.includes(i)}))} school={{...data.school.location,label:data.school.name}} home={parent?{...data.student.location,label:`بيت ${data.student.name}`}:null} bus={simulation.active&&driverGps?{lat:driverGps.lat,lng:driverGps.lng}:null} nextIndex={simulation.active?simulation.currentStopIndex:undefined}/>
+    {simulation.active&&!driverGps&&<p className="map-gps-note"><AlertTriangle/> موقع الباص غير متاح الآن</p>}
     <div className="route-summary">
       <div><span className="summary-dot done"/><p>موعد البداية</p><strong>{data.route.scheduledTime}</strong></div><ChevronLeft />
-      <div><span className="summary-dot active"/><p>{driverGps && simulation.active ? "آخر موقع" : simulation.active ? "حالة الموقع" : "المحطة الأولى"}</p><strong>{driverGps && simulation.active ? `${driverGps.lat.toFixed(5)}, ${driverGps.lng.toFixed(5)}` : simulation.active ? "غير متاح" : currentStop?.label ?? data.student.address}</strong></div><ChevronLeft />
+      <div><span className="summary-dot active"/><p>{simulation.active ? "المحطة التالية" : "المحطة الأولى"}</p><strong>{currentStop?.label ?? data.student.address}</strong></div><ChevronLeft />
       <div><span className="summary-dot"/><p>حالة الطالب</p><strong>{studentStatusLabel[simulation.studentStatus]}</strong></div>
     </div>
   </article>;
@@ -639,25 +549,26 @@ function LocationEditor({ title, icon: Icon, value, editable, onSave }: { title:
       <label>خط العرض<input value={draft.lat} disabled={!editable} type="number" step="0.000001" onChange={(event)=>update("lat", event.target.value)} /></label>
       <label>خط الطول<input value={draft.lng} disabled={!editable} type="number" step="0.000001" onChange={(event)=>update("lng", event.target.value)} /></label>
     </div>
-    {editable ? <Button className="wide-action" onClick={()=>onSave(draft)}><Check /> حفظ الموقع</Button> : <p className="readonly-note">هذا الموقع يدار من المدرسة ويظهر لولي الأمر للمتابعة.</p>}
+    {editable ? <Button className="wide-action" onClick={()=>{if(window.confirm("بعد الحفظ لا يمكن تعديل موقع المدرسة إلا عن طريق إدارة مساري. هل الموقع صحيح؟"))onSave(draft)}}><Check /> حفظ الموقع</Button> : <p className="readonly-note">موقع المدرسة ثابت. لتعديله تواصل مع إدارة مساري.</p>}
   </article>;
 }
 function LocationsView({ data, role, simulation, saveStatus, onSaveLocation }: { data: MasariData; role: Role; simulation: SimulationState; saveStatus: string; onSaveLocation: (kind: "school" | "home", point: LocationPoint) => void }) {
-  const editable = role === "school" || role === "executive";
+  // موقع المدرسة يُحدَّد مرة واحدة، وبعدها لا يغيّره إلا مدير النظام.
+  const editable = role === "school" && data.school.located === false;
   return <>
-    <div className="welcome"><div><p className="eyebrow">المواقع الجغرافية</p><h1>موقع المدرسة والبيت والمسار</h1><p>استخدم الإحداثيات الدقيقة عند توفرها من خرائط الجوال، وستنعكس مباشرة على الخريطة وبرج المراقبة.</p></div><Badge className="safe-badge"><MapPin /> {data.source === "supabase" ? "متصل بقاعدة البيانات" : "قابل للتعديل محلياً"}</Badge></div>
+    <div className="welcome"><div><p className="eyebrow">المواقع الجغرافية</p><h1>موقع المدرسة والمسار</h1><p>موقع المدرسة ثابت بعد تحديده، وتُبنى عليه المسارات وبرج المراقبة.</p></div></div>
     {saveStatus && <div className="save-strip"><Check /><span>{saveStatus}</span></div>}
-    {data.school.located === false && <p className="save-strip ops-message ops-error"><MapPin /><span>لم يُحدَّد موقع المدرسة بعد. الإحداثيات الظاهرة افتراضية؛ أدخل موقع المدرسة الصحيح واحفظه، فإنشاء المسارات يعتمد عليه.</span></p>}
+    {data.school.located === false && <p className="save-strip ops-message ops-error"><MapPin /><span>لم يُحدَّد موقع المدرسة بعد. حدده بدقة واحفظه مرة واحدة؛ بعد الحفظ لا يُعدَّل إلا عن طريق إدارة مساري.</span></p>}
     <section className="locations-grid">
       <LocationEditor key={`school-${data.school.location.lat}-${data.school.location.lng}`} title="المدرسة" icon={School} value={data.school.location} editable={editable} onSave={(point)=>onSaveLocation("school", point)} />
-      <LocationEditor key={`home-${data.student.location.lat}-${data.student.location.lng}`} title="البيت" icon={MapPin} value={data.student.location} editable={editable} onSave={(point)=>onSaveLocation("home", point)} />
     </section>
-    <section className="main-grid location-main"><LiveRoute data={data} simulation={simulation} parent={role === "parent"} /><article className="panel">
-      <div className="panel-head"><div><p className="eyebrow">إحداثيات المحطات</p><h2>{data.route.name}</h2></div><Route className="title-icon" /></div>
-      {data.route.stops.map((stop, index)=><div className="location-row" key={stop.label}><span>{index + 1}</span><div><strong>{stop.label}</strong><p>{stop.time} · {stop.lat.toFixed(5)}, {stop.lng.toFixed(5)}</p></div></div>)}
+    <section className="main-grid location-main"><LiveRoute data={data} simulation={simulation} /><article className="panel">
+      <div className="panel-head"><div><p className="eyebrow">محطات المسار</p><h2>{data.route.name}</h2></div><Route className="title-icon" /></div>
+      {data.route.stops.map((stop, index)=><div className="location-row" key={`${stop.label}-${index}`}><span>{index + 1}</span><div><strong>{stop.label}</strong><p>{stop.time}</p></div><a className="stop-nav" href={navigateUrl(stop)} target="_blank" rel="noreferrer" aria-label={`فتح ${stop.label} في الخرائط`}><MapPin/></a></div>)}
     </article></section>
   </>;
 }
+
 function ExecutiveDashboard({ data, simulation, driverGps }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null }) {
   return <>
     <div className="welcome"><div><p className="eyebrow">{data.school.city} · {data.school.contactName}</p><h1>{data.school.name}</h1><p>نظرة على تشغيل اليوم.</p></div></div>
@@ -681,7 +592,8 @@ function ExecutiveDashboard({ data, simulation, driverGps }: { data: MasariData;
     </section>
   </>;
 }
-function DriverDashboard({ data, simulation, tripSaveStatus, driverGps, gpsStatus, onStart, onEnd, onApproveStop, onRefreshGps, onReportIssue, onStudentEvent }: { data: MasariData; simulation: SimulationState; tripSaveStatus: string; driverGps?: DriverGps | null; gpsStatus: string; onStart: () => void; onEnd: () => void; onApproveStop: () => void; onRefreshGps: () => void; onReportIssue: () => void; onStudentEvent: (studentId: string, event: AttendanceEvent) => void }) {
+function DriverDashboard({ data, simulation, tripSaveStatus, driverGps, gpsStatus, onStart, onEnd, onApproveStop, onRefreshGps, onReportIssue, onStudentEvent, onScanned }: { onScanned: () => void; data: MasariData; simulation: SimulationState; tripSaveStatus: string; driverGps?: DriverGps | null; gpsStatus: string; onStart: () => void; onEnd: () => void; onApproveStop: () => void; onRefreshGps: () => void; onReportIssue: () => void; onStudentEvent: (studentId: string, event: AttendanceEvent) => void }) {
+  const [scanning,setScanning]=useState(false);
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
   const finished = simulation.approvedStops.length >= data.route.stops.length;
   const distanceToStop = driverGps && currentStop ? Math.round(distanceMeters(driverGps, currentStop)) : null;
@@ -703,14 +615,21 @@ function DriverDashboard({ data, simulation, tripSaveStatus, driverGps, gpsStatu
       {driverGps && <div className="gps-coords"><MapPin/><span>{driverGps.lat.toFixed(5)}, {driverGps.lng.toFixed(5)}</span><small>دقة {Math.round(driverGps.accuracy ?? 0)}م</small></div>}
       <Button variant="outline" onClick={onRefreshGps}><Navigation/> تحديث GPS الآن</Button>
     </article>
+    {data.route.stops.length>0&&<article className="panel driver-map-panel">
+      <div className="panel-head"><div><p className="eyebrow">خريطة المسار</p><h2>{finished ? `الوجهة: ${data.school.name}` : `المحطة التالية: ${currentStop?.label ?? "—"}`}</h2>{!finished&&currentStop?.students?.length ? <p className="muted-label">{currentStop.students.join("، ")}</p> : null}</div></div>
+      <TripMap stops={data.route.stops.map((st,i)=>({lat:st.lat,lng:st.lng,label:st.label,done:simulation.approvedStops.includes(i),students:st.students}))} school={{...data.school.location,label:data.school.name}} bus={driverGps?{lat:driverGps.lat,lng:driverGps.lng}:null} nextIndex={finished?undefined:simulation.currentStopIndex} follow={simulation.active}/>
+      <div className="nav-actions">{!finished&&currentStop&&<a className="nav-link primary" href={navigateUrl(currentStop)} target="_blank" rel="noreferrer"><Navigation/> الملاحة إلى المحطة التالية</a>}<a className="nav-link" href={fullRouteUrl([...data.route.stops.filter((_,i)=>!simulation.approvedStops.includes(i)),data.school.location])} target="_blank" rel="noreferrer"><Route/> المسار كاملًا في خرائط Google</a></div>
+    </article>}
     <section className="driver-grid"><article className="panel stops">
       <div className="panel-head"><div><p className="eyebrow">{finished ? "اكتملت الرحلة" : "المحطة الحالية"}</p><h2>{finished ? data.school.name : currentStop?.label}</h2></div><div className="eta-pill">{finished ? "تم" : currentStop?.time}</div></div>
       <div className="stop-progress"><Progress value={data.route.stops.length ? (simulation.approvedStops.length / data.route.stops.length) * 100 : 0}/><span>{simulation.approvedStops.length} من {data.route.stops.length} محطات معتمدة</span></div>
+      {data.trip&&students.length>0&&!tripDone&&<Button className="wide-action scan-action" disabled={data.trip.status!=="in_progress"} onClick={()=>setScanning(true)}><ScanLine/> {data.trip.status==="in_progress"?"مسح بطاقة طالب":"ابدأ الرحلة لتفعيل مسح البطاقات"}</Button>}
+      {scanning&&data.trip&&<QrScanner tripId={data.trip.id} names={Object.fromEntries((data.students??[]).map((st)=>[st.id,st.name]))} gps={driverGps?{lat:driverGps.lat,lng:driverGps.lng}:null} onClose={()=>setScanning(false)} onRecorded={onScanned}/>}
       <div className="student-checklist">{students.length===0&&<p className="muted-label">لا يوجد طلاب في هذه الرحلة.</p>}{students.map((student)=><div key={student.id || student.name} className={"check-row "+(student.checked?"checked":"")}><span className="student-avatar">{student.name.charAt(0)}</span><div><strong>{student.name}</strong><p>{student.grade} · {student.status}</p></div>{student.actions.length ? <span className="student-actions">{student.actions.map((action)=><Button key={action.event} size="sm" variant="outline" onClick={()=>onStudentEvent(student.id, action.event)}>{action.label}</Button>)}</span> : <span className="check-box">{student.checked && <Check/>}</span>}</div>)}</div>
       {!finished && <p className={`geofence-status ${withinStopRadius ? "ready" : "blocked"}`}><MapPin/>{distanceToStop === null ? "لا يمكن الاعتماد دون موقع GPS فعلي" : withinStopRadius ? `داخل نطاق المحطة · ${distanceToStop} متر` : `اقترب حتى 250 متر من ${currentStop?.label}`}</p>}
       <Button className="wide-action" disabled={!canApprove} onClick={onApproveStop}><Check/> {approveLabel}</Button>
     </article><article className="panel compact-route"><div className="panel-head"><div><p className="eyebrow">تسلسل الرحلة</p><h2>نقاط التوقف</h2></div></div>
-      {data.route.stops.map((stop,i)=><div className={"timeline-row "+(simulation.approvedStops.includes(i)?"passed":i===simulation.currentStopIndex?"current":"")} key={stop.id ?? `${stop.label}-${i}`}><span>{simulation.approvedStops.includes(i)?<Check/>:i+1}</span><div><strong>{stop.label}</strong><p>{stop.time}</p></div></div>)}
+      {data.route.stops.map((stop,i)=><div className={"timeline-row "+(simulation.approvedStops.includes(i)?"passed":i===simulation.currentStopIndex?"current":"")} key={stop.id ?? `${stop.label}-${i}`}><span>{simulation.approvedStops.includes(i)?<Check/>:i+1}</span><div><strong>{stop.label}</strong><p>{[stop.time,stop.students?.length?stop.students.join("، "):""].filter(Boolean).join(" · ")}</p></div><a className="stop-nav" href={navigateUrl(stop)} target="_blank" rel="noreferrer" aria-label={`الملاحة إلى ${stop.label}`}><Navigation/></a></div>)}
       <Button variant="outline" className="report-btn" disabled={!simulation.active} onClick={onReportIssue}><AlertTriangle/> إرسال بلاغ طارئ</Button>
     </article></section>
   </>;
@@ -775,101 +694,6 @@ function ParentDashboard({ data, simulation, driverGps, tripEvents, feedbackRows
     <FeedbackPanel data={data} feedbackRows={feedbackRows} authMode={authMode} onSubmit={onSubmitFeedback}/>
   </>;
 }
-// سبب واضح لفشل حفظ طلب طالب أو سائق
-function saveErrorText(e: unknown): string {
-  const m = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
-  if (m.includes("SCHOOL_NOT_ACTIVE")) return "المدرسة موقوفة أو غير مفعّلة، فلا يمكن إضافة طلاب أو سائقين لها. تواصل مع إدارة مساري.";
-  if (m.includes("NO_SCHOOL") || m.includes("NO_SESSION")) return "لم نجد مدرسة مرتبطة بحسابك. سجّل الخروج ثم ادخل مرة أخرى.";
-  if (m.includes("row-level security") || m.includes("permission denied") || m.includes("FORBIDDEN")) return "حسابك لا يملك صلاحية الإضافة لهذه المدرسة.";
-  if (m.includes("duplicate") || m.includes("unique")) return "هذا الطلب موجود مسبقًا.";
-  if (m.includes("Failed to fetch") || m.includes("NetworkError")) return "لا يوجد اتصال بالإنترنت. حاول مرة أخرى.";
-  return "تعذر حفظ الطلب. تحقق من البيانات وحاول مرة أخرى.";
-}
-function AddDriverPanel({ onAdd }: { onAdd: (driver: DriverForm) => Promise<void>; authMode: AuthMode }) {
-  const [form, setForm] = useState({ name: "", phone: "", email: "", plate: "", status: "قيد المراجعة" });
-  const [message, setMessage] = useState("");
-  const [failed, setFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const canAdd = form.name.trim() && form.phone.trim() && form.plate.trim();
-  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async () => {
-    setBusy(true); setMessage(""); setFailed(false);
-    try { await onAdd(form); } catch (e) { setBusy(false); setFailed(true); setMessage(saveErrorText(e)); return; }
-    setBusy(false);
-    setMessage("تم حفظ طلب السائق. اعتمده من «التشغيل اليومي».");
-    setForm({ name: "", phone: "", email: "", plate: "", status: "قيد المراجعة" });
-    setTimeout(()=>setMessage(""), 4200);
-  };
-  return <article className="panel add-driver-panel">
-    <div className="panel-head"><div><p className="eyebrow">إدارة المدرسة</p><h2>إضافة سائق جديد</h2></div><UserPlus className="title-icon"/></div>
-    <div className="driver-form">
-      <label>اسم السائق<input value={form.name} onChange={(e)=>update("name", e.target.value)} placeholder="مثال: محمد السبيعي"/></label>
-      <label>الجوال<input value={form.phone} onChange={(e)=>update("phone", e.target.value)} placeholder="05xxxxxxxx"/></label>
-      <label>البريد الإلكتروني<input value={form.email} onChange={(e)=>update("email", e.target.value)} placeholder="driver@example.com"/></label>
-      <label>لوحة الباص<input value={form.plate} onChange={(e)=>update("plate", e.target.value)} placeholder="أ ب ج 1234"/></label>
-    </div>
-    {message && <p className={`save-strip compact ${failed ? "ops-error" : ""}`}>{failed ? <X/> : <Check/>}<span>{message}</span></p>}
-    <Button className="wide-action" disabled={!canAdd || busy} onClick={()=>void submit()}><Plus/> {busy ? "جارٍ الحفظ…" : "حفظ طلب السائق"}</Button>
-  </article>;
-}
-
-function AddStudentPanel({ onAdd }: { onAdd: (student: StudentForm) => Promise<void>; authMode: AuthMode }) {
-  const [form, setForm] = useState({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "", status: "قيد المراجعة" });
-  const [message, setMessage] = useState("");
-  const [failed, setFailed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const canAdd = form.name.trim() && form.grade.trim() && form.parentPhone.trim() && form.address.trim();
-  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async () => {
-    setBusy(true); setMessage(""); setFailed(false);
-    try { await onAdd(form); } catch (e) { setBusy(false); setFailed(true); setMessage(saveErrorText(e)); return; }
-    setBusy(false);
-    setMessage("تم حفظ طلب الطالب. اعتمده من «التشغيل اليومي».");
-    setForm({ name: "", grade: "", parentName: "", parentPhone: "", parentEmail: "", address: "", status: "قيد المراجعة" });
-    setTimeout(()=>setMessage(""), 4200);
-  };
-  return <article className="panel add-driver-panel">
-    <div className="panel-head"><div><p className="eyebrow">إدارة المدرسة</p><h2>إضافة طالب جديد</h2></div><GraduationCap className="title-icon"/></div>
-    <div className="driver-form student-form">
-      <label>اسم الطالب<input value={form.name} onChange={(e)=>update("name", e.target.value)} placeholder="مثال: نورة"/></label>
-      <label>الصف<input value={form.grade} onChange={(e)=>update("grade", e.target.value)} placeholder="Kg3"/></label>
-      <label>ولي الأمر<input value={form.parentName} onChange={(e)=>update("parentName", e.target.value)} placeholder="اسم ولي الأمر"/></label>
-      <label>جوال ولي الأمر<input value={form.parentPhone} onChange={(e)=>update("parentPhone", e.target.value)} placeholder="05xxxxxxxx"/></label>
-      <label>بريد ولي الأمر<input value={form.parentEmail} onChange={(e)=>update("parentEmail", e.target.value)} placeholder="parent@example.com"/></label>
-      <label>عنوان البيت<input value={form.address} onChange={(e)=>update("address", e.target.value)} placeholder="الحي والشارع"/></label>
-    </div>
-    {message && <p className={`save-strip compact ${failed ? "ops-error" : ""}`}>{failed ? <X/> : <Check/>}<span>{message}</span></p>}
-    <Button className="wide-action" disabled={!canAdd || busy} onClick={()=>void submit()}><Plus/> {busy ? "جارٍ الحفظ…" : "حفظ طلب الطالب"}</Button>
-  </article>;
-}
-
-function AddRoutePanel({ onAdd }: { onAdd: (route: RouteForm) => Promise<void>; authMode: AuthMode }) {
-  const [form, setForm] = useState<RouteForm>({ name: "", direction: "to_school", scheduledTime: "06:30", stopsText: "", status: "قيد الإعداد" });
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const canAdd = form.name.trim() && form.scheduledTime.trim() && form.stopsText.split("\n").filter((line)=>line.trim()).length >= 2;
-  const update = (key: keyof RouteForm, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async () => {
-    setBusy(true); setMessage("");
-    await onAdd(form);
-    setBusy(false);
-    setMessage("تم حفظ المسار ومحطاته.");
-    setForm({ name: "", direction: "to_school", scheduledTime: "06:30", stopsText: "", status: "قيد الإعداد" });
-    setTimeout(()=>setMessage(""), 4200);
-  };
-  return <article className="panel add-driver-panel">
-    <div className="panel-head"><div><p className="eyebrow">إدارة المدرسة</p><h2>إنشاء مسار جديد</h2></div><Route className="title-icon"/></div>
-    <div className="driver-form route-form">
-      <label>اسم المسار<input value={form.name} onChange={(e)=>update("name", e.target.value)} placeholder="مثال: مسار 2"/></label>
-      <label>الاتجاه<select value={form.direction} onChange={(e)=>update("direction", e.target.value)}><option value="to_school">إلى المدرسة</option><option value="to_home">إلى المنزل</option></select></label>
-      <label>وقت البداية<input value={form.scheduledTime} type="time" onChange={(e)=>update("scheduledTime", e.target.value)} /></label>
-      <label className="wide-field">المحطات، كل محطة في سطر<textarea value={form.stopsText} onChange={(e)=>update("stopsText", e.target.value)} placeholder={"الروضة\nالنهضة\nالنسيم - شارع عبدالله بن عمر"} /></label>
-    </div>
-    {message && <p className="save-strip compact"><Check/><span>{message}</span></p>}
-    <Button className="wide-action" disabled={!canAdd || busy} onClick={()=>void submit()}><Plus/> {busy ? "جارٍ الحفظ…" : "حفظ المسار"}</Button>
-  </article>;
-}
-
 function ControlTower({ data, simulation, driverGps, tripEvents }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null; tripEvents: TripEventRow[] }) {
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
   const events: TripEventRow[] = tripEvents.length ? tripEvents : data.route.stops.map((stop, index)=>({
@@ -890,103 +714,60 @@ function ControlTower({ data, simulation, driverGps, tripEvents }: { data: Masar
   </>;
 }
 
-function DataView({ data, view, role, simulation, extraDrivers, studentRows, routeRows, tripEvents, feedbackRows, onAddDriver, onAddStudent, onAddRoute, authMode }: { data: MasariData; view: View; role: Role; simulation: SimulationState; extraDrivers: DriverRow[]; studentRows: StudentRow[]; routeRows: RouteRow[]; tripEvents: TripEventRow[]; feedbackRows: FeedbackItem[]; onAddDriver: (driver: DriverForm) => Promise<void>; onAddStudent: (student: StudentForm) => Promise<void>; onAddRoute: (route: RouteForm) => Promise<void>; authMode: AuthMode }) {
-  const config: Record<string,{title:string;subtitle:string;action:string;icon:typeof School}> = {
-    schools:{title:"المدارس والفروع",subtitle:"إدارة المدارس المرتبطة بخدمة النقل",action:"إضافة مدرسة",icon:School},
-    students:{title:"الطلاب",subtitle:"بيانات الطلاب وحالة النقل والاشتراك",action:"إضافة طالب",icon:GraduationCap},
-    fleet:{title:"الأسطول والسائقون",subtitle:"إدارة الباصات والسائقين والتراخيص",action:"إضافة باص",icon:BusFront},
-    routes:{title:"المسارات",subtitle:"المسارات النشطة ونقاط التوقف",action:"إنشاء مسار",icon:Route},
-    trips:{title:"الرحلات",subtitle:"متابعة الرحلات اليومية وسجل الحضور",action:"جدولة رحلة",icon:Navigation},
-    finance:{title:"الاشتراكات والمدفوعات",subtitle:"متابعة الاشتراكات والتحصيل",action:"إضافة اشتراك",icon:WalletCards},
-    reports:{title:"التقارير",subtitle:"مؤشرات الأداء والتشغيل عبر الزمن",action:"تصدير التقرير",icon:BarChart3},
-    audit:{title:"سجل التدقيق",subtitle:"جميع العمليات الحساسة المسجلة في النظام",action:"تصفية السجل",icon:FileClock},
-  };
-  const c=config[view] ?? config.students; const Icon=c.icon;
-  const noData = data.source === "empty";
-  const rows: string[][] = noData && ["schools","finance","audit"].includes(view) ? [] : view==="schools" ? [[data.school.name, `${data.school.city} · ${data.school.contactName}`, "نشط", "اليوم"]]
-    : view==="fleet" ? extraDrivers.map((driver)=>[`${driver.name} · ${driver.plate}`, `${driver.email || driver.phone} · ${driver.capacity ?? data.vehicle.capacity} مقعدًا`, driver.status, driver.saved ? "محفوظ" : "محلي"])
-    : view==="routes" ? routeRows.map((route)=>[route.name, `${route.direction} · ${route.stops}`, route.status, route.saved ? route.scheduledTime : "محلي"])
-    : view==="trips" ? (tripEvents.length ? tripEvents.map((event)=>[eventTypeLabel(event.eventType), event.note || `${data.student.name} · ${data.student.address}`, event.eventType === "pickup" ? "حضور" : event.eventType === "dropoff" ? "انصراف" : event.eventType === "emergency" ? "طارئ" : "تحديث", formatEventTime(event.createdAt)]) : noData ? [] : [[`رحلة ${data.route.name}`, `${data.student.name} · ${data.student.address}`, statusLabel(data.ride.status), data.ride.date]])
-    : view==="finance" ? []
-    : view==="reports" ? feedbackRows.map((item)=>[`${item.category} · ${item.rating}/5`, `${item.author} · ${item.message}`, item.status, formatEventTime(item.createdAt)])
-    : view==="audit" ? []
-    : studentRows.map((student)=>[student.name, `${student.grade} · ${student.parentName || "ولي الأمر"} · ${student.address}`, student.status, student.saved ? "محفوظ" : "محلي"]);
-  const canManage = role === "school" || role === "executive";
-  return <><div className="welcome"><div><p className="eyebrow">{roleNames[role]}</p><h1>{c.title}</h1><p>{c.subtitle}</p></div></div>{view==="trips"&&<section className="trip-summary-grid"><article className="panel mini-metric"><span>أحداث اليوم</span><strong>{tripEvents.length || simulation.approvedStops.length}</strong></article><article className="panel mini-metric"><span>حالة الطالب</span><strong>{studentStatusLabel[simulation.studentStatus]}</strong></article><article className="panel mini-metric"><span>آخر تحديث</span><strong>{tripEvents[0] ? formatEventTime(tripEvents[0].createdAt) : "—"}</strong></article></section>}{view==="fleet"&&canManage&&<AddDriverPanel onAdd={onAddDriver} authMode={authMode}/>} {view==="students"&&canManage&&<AddStudentPanel onAdd={onAddStudent} authMode={authMode}/>} {view==="routes"&&canManage&&(authMode==="authenticated" ? <p className="save-strip compact"><Route/><span>إنشاء المسارات ومحطاتها بالإحداثيات من صفحة «التشغيل اليومي».</span></p> : <AddRoutePanel onAdd={onAddRoute} authMode={authMode}/>)}<article className="panel data-panel"><div className="data-tools"><div className="search-box"><Search/><input aria-label="بحث" placeholder="ابحث بالاسم أو الرقم…"/></div><Button variant="outline">الحالة: الكل</Button></div><div className="data-table"><div className="table-head"><span>الاسم / البيان</span><span>التفاصيل</span><span>الحالة</span><span>آخر تحديث</span></div>{rows.length===0&&<div className="table-row table-empty"><span>لا توجد سجلات بعد.</span></div>}{rows.map((row,i)=><div className="table-row" key={i}><span><span className="row-icon"><Icon/></span><strong>{row[0]}</strong></span><span>{row[1]}</span><span><Badge className={"status-badge tone-"+(i%3)}>{row[2]}</Badge></span><span>{row[3]}</span></div>)}</div></article></>;
-}
 function EmptyState({ role }: { role: Role }) {
   const hint = role === "parent" ? "لم يُربط حسابك بأي طالب بعد. ستظهر الرحلة هنا بعد أن تربطك المدرسة بابنك."
     : role === "driver" ? "لا توجد رحلات مسندة إليك بعد. ستظهر رحلة اليوم بعد أن تسندك المدرسة إلى مسار."
     : "لا توجد بيانات تشغيل بعد. أضف مدرسة ثم الباصات والمسارات والطلاب لتظهر هنا.";
   return <article className="panel empty-state"><div className="brand-mark large"><School/></div><h2>لا توجد بيانات بعد</h2><p>{hint}</p></article>;
 }
-function LoginDialog({ onClose, onAuthenticated }: { onClose:()=>void; onAuthenticated: (session: Session) => Promise<void> }) {
-  const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
-  const login=async()=>{
-    setBusy(true); setMessage("");
-    const {data,error}=await supabase.auth.signInWithPassword({email,password});
-    if(error||!data.session){setBusy(false);setMessage("تعذر تسجيل الدخول. تحقق من البيانات.");return}
-    try {
-      await onAuthenticated(data.session);
-      setMessage("تم تسجيل الدخول بنجاح.");
-      setTimeout(onClose,500);
-    } catch {
-      setMessage("الحساب صحيح لكنه بانتظار التفعيل وربطه بدور معتمد من الإدارة.");
-      await supabase.auth.signOut({ scope: "local" });
-    } finally { setBusy(false); }
-  };
-  const [forgot,setForgot]=useState(false);
-  if(forgot) return <div className="login-backdrop"><div className="login-card"><button className="close-login" onClick={onClose}><X/></button><ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/></div></div>;
-  return <div className="login-backdrop"><div className="login-card"><button className="close-login" onClick={onClose}><X/></button><div className="brand-mark large"><BusFront/></div><p className="eyebrow">مرحبًا بك</p><h2>تسجيل الدخول إلى مساري</h2><p>استخدم الحساب المسجل لدى المدرسة أو شركة النقل.</p><label>البريد الإلكتروني<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label><label>كلمة المرور<input value={password} onChange={e=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>{message&&<p className="login-message">{message}</p>}<Button className="wide-action" onClick={login} disabled={busy||!email||!password}>{busy?"جارٍ الدخول…":"تسجيل الدخول"}</Button><button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button></div></div>;
-}
-function AuthPage({ onAuthenticated, initialMode = "login", initialRole = "parent", onBack }: { onAuthenticated: (session: Session) => Promise<void>; initialMode?: "login" | "signup"; initialRole?: Role; onBack?: () => void }) {
-  const [selectedRole, setSelectedRole] = useState<Role>(initialRole);
+function AuthPage({ onAuthenticated, initialMode = "login", initialRole, onBack }: { onAuthenticated: (session: Session) => Promise<void>; initialMode?: "login" | "signup"; initialRole?: SignupRole; onBack?: () => void }) {
+  // الدخول موحّد: البريد وكلمة المرور فقط، والنظام يعرف الدور من الخادم.
+  // التسجيل الجديد: يختار الدور، ثم يكمل طلبه (اختيار المدرسة) بعد إنشاء الحساب.
+  const [selectedRole, setSelectedRole] = useState<SignupRole | null>(initialRole ?? null);
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [forgot, setForgot] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const roleOptions: { role: Role; title: string; desc: string; icon: typeof Users }[] = [
-    { role: "parent", title: "ولي الأمر", desc: "متابعة الطالب والرحلة والتنبيهات", icon: Users },
-    { role: "school", title: "إدارة مدرسة", desc: "اطلب تفعيل مدرستك في مساري", icon: School },
-    { role: "executive", title: "الإدارة التنفيذية", desc: "التقارير وبرج المراقبة لكل العمليات", icon: ShieldCheck },
-    { role: "driver", title: "السائق", desc: "بدء الرحلة واعتماد المحطات", icon: BusFront },
-  ];
-  const SelectedIcon = roleOptions.find((item)=>item.role===selectedRole)?.icon ?? Users;
+  const signup = mode === "signup";
+  const phoneOk = /^\+?[0-9\s-]{9,20}$/.test(phone.trim());
+  const canSubmit = !!email.trim() && password.length >= (signup ? 8 : 6) && (!signup || (!!selectedRole && name.trim().length >= 3 && phoneOk && agreed));
   const submitAuth = async () => {
     setBusy(true); setMessage("");
     const credentials = { email: email.trim(), password };
-    const result = mode === "login"
+    const result = !signup
       ? await supabase.auth.signInWithPassword(credentials)
-      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name, requested_role: selectedRole } } });
+      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name.trim(), phone: phone.trim(), requested_role: selectedRole, privacy_version: PRIVACY_VERSION } } });
     setBusy(false);
     if (result.error) {
-      setMessage(mode === "login" ? "تعذر تسجيل الدخول. تأكد من البريد وكلمة المرور." : "تعذر إنشاء الحساب. قد يكون البريد مستخدمًا أو كلمة المرور قصيرة.");
+      setMessage(!signup ? "البريد أو كلمة المرور غير صحيحة." : /registered|exists/i.test(result.error.message) ? "هذا البريد مسجّل مسبقًا. سجّل الدخول به." : "تعذر إنشاء الحساب. تأكد من البريد وأن كلمة المرور 8 أحرف على الأقل.");
       return;
     }
     if (result.data.session) {
-      try {
-        await onAuthenticated(result.data.session);
-      } catch {
-        setMessage(mode === "login" ? "الحساب صحيح لكنه بانتظار التفعيل وربطه بدور معتمد من الإدارة." : "تم إنشاء الحساب بأمان، وهو الآن بانتظار اعتماد الإدارة وربطه بالدور المطلوب.");
-        await supabase.auth.signOut({ scope: "local" });
-      }
-    } else setMessage("تم إنشاء الحساب. فعّل البريد ثم انتظر اعتماد الإدارة قبل تسجيل الدخول.");
+      try { await onAuthenticated(result.data.session); }
+      catch { setMessage("تعذر فتح الحساب الآن. حاول مرة أخرى."); await supabase.auth.signOut({ scope: "local" }); }
+    } else setMessage("أنشأنا حسابك. افتح الرابط الذي أرسلناه إلى بريدك لتأكيده، ثم سجّل الدخول لإكمال طلبك واختيار المدرسة.");
   };
+  const roleInfo = SIGNUP_ROLES.find((r) => r.role === selectedRole);
   return <main dir="rtl" className="auth-page">
-    <section className="auth-hero">{onBack&&<button className="auth-back" onClick={onBack}>→ الصفحة الرئيسية</button>}<div className="brand-mark large"><BusFront/></div><p className="eyebrow">مساري</p><h1>تسجيل الدخول وإدارة النقل المدرسي</h1><p>ادخل بحسابك لمتابعة الرحلات وإدارة النقل المدرسي حسب دورك: المدرسة، ولي الأمر، السائق، أو الإدارة.</p></section>
+    <section className="auth-hero">{onBack&&<button className="auth-back" onClick={onBack}>→ الصفحة الرئيسية</button>}<div className="brand-mark large"><BusFront/></div><p className="eyebrow">مساري</p><h1>{signup ? "حساب جديد في مساري" : "تسجيل الدخول"}</h1><p>{signup ? "اختر دورك وأنشئ حسابك، ثم اختر المدرسة وأرسل طلبك. بعد اعتماده تدخل ببريدك وكلمة المرور فقط." : "ادخل ببريدك وكلمة المرور، وسيفتح لك النظام صفحتك حسب دورك: مدير النظام، الإدارة التعليمية، المدرسة، السائق، أو ولي الأمر."}</p></section>
     <section className="auth-shell">
-      <div className="auth-tabs"><button className={mode==="login"?"active":""} onClick={()=>setMode("login")}>تسجيل الدخول</button><button className={mode==="signup"?"active":""} onClick={()=>{setMode("signup");if(selectedRole==="executive")setSelectedRole("parent")}}>تسجيل جديد</button></div>
-      <div className="role-cards">{roleOptions.filter((item)=>mode==="login"||item.role!=="executive").map((item)=><button key={item.role} className={selectedRole===item.role?"active":""} onClick={()=>setSelectedRole(item.role)}><item.icon/><strong>{item.title}</strong><span>{item.desc}</span></button>)}</div>
-      <div className="auth-form-card">{forgot ? <ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/> : <><div className="auth-form-head"><SelectedIcon/><div><p className="eyebrow">{mode==="login"?"دخول":"إنشاء حساب"}</p><h2>{roleNames[selectedRole]}</h2></div></div>
-        <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label>
-        <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>
-        {mode==="signup"&&<label>الاسم<input value={name} onChange={(e)=>setName(e.target.value)} placeholder="الاسم الكامل"/></label>}
+      <div className="auth-tabs"><button className={!signup?"active":""} onClick={()=>{setMode("login");setMessage("")}}>تسجيل الدخول</button><button className={signup?"active":""} onClick={()=>{setMode("signup");setMessage("")}}>حساب جديد</button></div>
+      {signup && <div className="role-cards">{SIGNUP_ROLES.map((item)=><button key={item.role} className={selectedRole===item.role?"active":""} onClick={()=>setSelectedRole(item.role)}><item.icon/><strong>{item.title}</strong><span>{item.desc}</span></button>)}</div>}
+      <div className="auth-form-card">{forgot ? <ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/> : <>
+        {signup && <div className="auth-form-head">{roleInfo ? <roleInfo.icon/> : <Users/>}<div><p className="eyebrow">إنشاء حساب</p><h2>{roleInfo ? roleInfo.title : "اختر دورك أولًا"}</h2></div></div>}
+        {signup&&<label>الاسم الكامل<input value={name} onChange={(e)=>setName(e.target.value)} autoComplete="name"/></label>}
+        {signup&&<label>الجوال<input value={phone} onChange={(e)=>setPhone(e.target.value)} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" autoComplete="tel"/></label>}
+        <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" dir="ltr" placeholder="name@example.com" autoComplete="email"/></label>
+        <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••" autoComplete={signup?"new-password":"current-password"} onKeyDown={(e)=>{if(e.key==="Enter"&&canSubmit&&!busy)void submitAuth()}}/></label>
+        {signup&&<label className="consent-check" htmlFor="signup-consent"><input id="signup-consent" type="checkbox" checked={agreed} onChange={(e)=>setAgreed(e.target.checked)}/> أوافق على <a href={PRIVACY_URL} target="_blank" rel="noreferrer">سياسة الخصوصية</a></label>}
         {message&&<p className="auth-message">{message}</p>}
-        <Button className="wide-action" onClick={submitAuth} disabled={busy || !email.trim() || password.length < (mode==="signup" ? 8 : 6)}>{busy ? "جارٍ التحقق…" : mode==="login" ? "تسجيل الدخول" : "إنشاء حساب"}</Button>
-        {mode==="login" ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}
+        <Button className="wide-action" onClick={submitAuth} disabled={busy || !canSubmit}>{busy ? "جارٍ التحقق…" : !signup ? "دخول" : "إنشاء الحساب والمتابعة"}</Button>
+        {!signup ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}
       </>}</div>
     </section>
   </main>;
@@ -1003,22 +784,21 @@ function MoreButton({ active }: { active: boolean }) {
 }
 // رابط الاستعادة يُقرأ من العنوان في المتصفح فقط (لا يتعارض مع العرض على الخادم).
 const noopSubscribe = () => () => {};
+const subscribeHash = (cb: () => void) => { window.addEventListener("hashchange", cb); return () => window.removeEventListener("hashchange", cb); };
 export default function Home() {
-  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [login,setLogin]=useState(false); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [extraDrivers,setExtraDrivers]=useState<DriverRow[]>([]); const [studentRows,setStudentRows]=useState<StudentRow[]>([]); const [routeRows,setRouteRows]=useState<RouteRow[]>([]); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [accountEmail,setAccountEmail]=useState("");
-  const gpsWatchRef = useRef<number | null>(null);
+  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [accountEmail,setAccountEmail]=useState(""); const [needsConsent,setNeedsConsent]=useState(false); const privacyHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#privacy",()=>false);
+  const gpsWatchRef = useRef<(() => void) | null>(null);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
   const selectedChildRef = useRef<string | null>(null);
   const loadSeqRef = useRef(0);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
   const eventsChannelRef = useRef<RealtimeChannel | null>(null);
+  useEffect(()=>{installErrorReporter()},[]);
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
   useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{if(event==="PASSWORD_RECOVERY"){setRecoveryClosed(false);setRecoveryEvent(true)}void refresh()});return()=>{alive=false;subscription.unsubscribe()}},[]);
-  useEffect(()=>{let alive=true;loadDriverRows().then((rows)=>{if(alive)setExtraDrivers(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;loadStudentRows().then((rows)=>{if(alive)setStudentRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;loadRouteRows().then((rows)=>{if(alive)setRouteRows(rows)}).catch(()=>{});return()=>{alive=false}},[authMode]);
-  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
-  useEffect(()=>()=>{if(gpsWatchRef.current!==null) navigator.geolocation.clearWatch(gpsWatchRef.current); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
+  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
+  useEffect(()=>()=>{gpsWatchRef.current?.(); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
   const [dbNotes,setDbNotes]=useState<DbNotification[]>([]);
   useEffect(()=>{
     if(!entered||authMode!=="authenticated")return;
@@ -1037,91 +817,11 @@ export default function Home() {
   const nav=useMemo(()=>role==="executive"&&platformAdmin?platformNav:navByRole[role],[role,platformAdmin]); const notifications=useMemo(()=>authMode==="authenticated" ? dbNotes.map((n)=>({id:n.id,title:n.title,body:n.body??"",time:formatEventTime(n.created_at),tone:noteTone(n.type)})) : data.source==="empty" ? [] : buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[authMode, dbNotes, data, simulation, driverGps, tripEvents, feedbackRows]);
   const unreadCount = authMode==="authenticated" ? dbNotes.filter((n)=>!n.read_at).length : notifications.length;
   const toggleNotifications=()=>{const opening=!notificationsOpen;setNotificationsOpen(opening);if(opening&&authMode==="authenticated"&&dbNotes.some((n)=>!n.read_at)){const ids=dbNotes.filter((n)=>!n.read_at).map((n)=>n.id);const now=new Date().toISOString();setDbNotes((cur)=>cur.map((n)=>ids.includes(n.id)?{...n,read_at:now}:n));void supabase.from("notifications").update({read_at:now}).in("id",ids).then(()=>{})}};
-  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
-  const stopGpsTracking=()=>{if(gpsWatchRef.current!==null){navigator.geolocation.clearWatch(gpsWatchRef.current);gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
+  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
+  const stopGpsTracking=()=>{if(gpsWatchRef.current){gpsWatchRef.current();gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
   const stopRealtimeTracking=()=>{if(realtimeChannelRef.current){void supabase.removeChannel(realtimeChannelRef.current);realtimeChannelRef.current=null}};
   const stopEventsRealtime=()=>{if(eventsChannelRef.current){void supabase.removeChannel(eventsChannelRef.current);eventsChannelRef.current=null}};
   const signOut=async()=>{if(authMode==="authenticated") await supabase.auth.signOut();stopGpsTracking();stopRealtimeTracking();stopEventsRealtime();setAuthMode("demo");setAccountName("");setEntered(false);setView("dashboard");setSimulation(initialSimulation);setActiveTripContext(null);setTripSaveStatus("");setDriverGps(null);setTripEvents([]);setFeedbackRows([]);setNotificationsOpen(false)};
-  const addDriver=async(driver: DriverForm)=>{
-    const optimistic: DriverRow = { ...driver, status: authMode === "authenticated" ? "بانتظار تفعيل الحساب" : "قيد المراجعة", capacity: data.vehicle.capacity, saved: authMode === "authenticated" };
-    setExtraDrivers((current)=>[optimistic, ...current]);
-    if (authMode !== "authenticated") return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (!userId) { setExtraDrivers((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SESSION"); }
-    const { data: schoolRows } = await supabase.from("schools").select("id").eq("name", data.school.name).limit(1);
-    const schoolId = data.school.id ?? schoolRows?.[0]?.id;
-    if (!schoolId) { setExtraDrivers((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SCHOOL"); }
-    const { error } = await supabase.from("driver_onboarding_requests").insert({
-      school_id: schoolId,
-      created_by: userId,
-      driver_name: driver.name,
-      phone: driver.phone,
-      email: driver.email || null,
-      vehicle_plate: driver.plate,
-      vehicle_capacity: data.vehicle.capacity > 0 ? data.vehicle.capacity : null,
-      status: "pending",
-    });
-    const rows = await loadDriverRows().catch(()=>null);
-    if (rows) setExtraDrivers(rows);
-    if (error) throw error;
-  };
-  const addStudent=async(student: StudentForm)=>{
-    const optimistic: StudentRow = { ...student, status: authMode === "authenticated" ? "بانتظار حساب ولي الأمر" : "قيد المراجعة", saved: authMode === "authenticated" };
-    setStudentRows((current)=>[optimistic, ...current]);
-    if (authMode !== "authenticated") return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (!userId) { setStudentRows((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SESSION"); }
-    const { data: schoolRows } = await supabase.from("schools").select("id").eq("name", data.school.name).limit(1);
-    const schoolId = data.school.id ?? schoolRows?.[0]?.id;
-    if (!schoolId) { setStudentRows((current)=>current.filter((row)=>row!==optimistic)); throw new Error("NO_SCHOOL"); }
-    const { error } = await supabase.from("student_onboarding_requests").insert({
-      school_id: schoolId,
-      created_by: userId,
-      student_name: student.name,
-      grade: student.grade,
-      parent_name: student.parentName || null,
-      parent_phone: student.parentPhone,
-      parent_email: student.parentEmail || null,
-      home_address: student.address,
-      home_latitude: null,
-      home_longitude: null,
-      status: "pending_parent_account",
-    });
-    const rows = await loadStudentRows().catch(()=>null);
-    if (rows) setStudentRows(rows);
-    if (error) throw error;
-  };
-  const addRoute=async(route: RouteForm)=>{
-    const stops = route.stopsText.split("\n").map((line)=>line.trim()).filter(Boolean);
-    const optimistic: RouteRow = { name: route.name, direction: route.direction === "to_home" ? "إلى المنزل" : "إلى المدرسة", scheduledTime: route.scheduledTime, stops: stops.join(" ← "), status: authMode === "authenticated" ? "نشط" : "قيد الإعداد", saved: authMode === "authenticated" };
-    setRouteRows((current)=>[optimistic, ...current]);
-    if (authMode !== "authenticated") return;
-    const { data: schoolRows } = await supabase.from("schools").select("id").eq("name", data.school.name).limit(1);
-    const schoolId = data.school.id ?? schoolRows?.[0]?.id;
-    if (!schoolId) return;
-    const { data: routeInsert, error } = await supabase.from("routes").insert({
-      school_id: schoolId,
-      name: route.name,
-      direction: route.direction,
-      scheduled_time: route.scheduledTime,
-      estimated_duration_minutes: Math.max(stops.length * 12, 20),
-      is_active: true,
-    }).select("id").single();
-    if (error || !routeInsert?.id) return;
-    try {
-      await supabase.from("route_stops").insert(stops.map((label, index)=>({
-        route_id: routeInsert.id,
-        stop_type: route.direction === "to_home" ? "dropoff" : "pickup",
-        stop_order: index + 1,
-        label,
-        scheduled_time: route.scheduledTime,
-      }))).throwOnError();
-    } catch {}
-    const rows = await loadRouteRows().catch(()=>null);
-    if (rows) setRouteRows(rows);
-  };
   const submitFeedback=async(feedback: Omit<FeedbackItem, "id" | "createdAt" | "saved">)=>{
     const localId = `feedback-${Date.now()}`;
     const nextFeedback: FeedbackItem = { ...feedback, id: localId, createdAt: new Date().toISOString(), saved: authMode === "authenticated" };
@@ -1252,51 +952,31 @@ export default function Home() {
     const tripId = context?.tripId ?? activeTripContext?.tripId ?? (role === "driver" ? liveTripId : null);
     if (!tripId || Date.now() - lastGpsSaveRef.current < 10000) return;
     lastGpsSaveRef.current = Date.now();
-    const { error } = await supabase.from("vehicle_locations").insert({ trip_id: tripId, latitude: point.lat, longitude: point.lng, accuracy: point.accuracy ?? null });
+    const { error } = await supabase.from("vehicle_locations").insert({ trip_id: tripId, latitude: point.lat, longitude: point.lng, accuracy: point.accuracy ?? null, speed: point.speed ?? null });
     setGpsStatus(error ? "GPS يعمل على الشاشة، لكن تعذر حفظ الموقع." : "تم حفظ موقع الباص.");
   };
-  const handleGpsPosition=(position: GeolocationPosition, context?: TripContext | null)=>{
+  const handleGpsPosition=(fix: Fix, context?: TripContext | null)=>{
     const nextPoint: DriverGps = {
       label: "موقع السائق الحالي",
-      address: "GPS مباشر من جهاز السائق",
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-      accuracy: position.coords.accuracy,
+      address: isNativeApp() ? "GPS من تطبيق مساري (يعمل في الخلفية)" : "GPS مباشر من جهاز السائق",
+      lat: fix.lat,
+      lng: fix.lng,
+      accuracy: fix.accuracy,
+      speed: fix.speed,
       updatedAt: new Date().toISOString(),
     };
     setDriverGps(nextPoint);
-    setGpsStatus(`آخر تحديث GPS بدقة ${Math.round(position.coords.accuracy)} متر.`);
+    setGpsStatus(`آخر تحديث GPS بدقة ${Math.round(fix.accuracy)} متر.`);
     void persistGpsLocation(nextPoint, context);
   };
   const startGpsTracking=(context?: TripContext | null)=>{
-    if (!("geolocation" in navigator)) {
-      setGpsStatus("هذا الجهاز لا يدعم تحديد الموقع من المتصفح.");
-      return;
-    }
     setGpsStatus("نطلب إذن الموقع من الجهاز…");
-    if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current);
-    navigator.geolocation.getCurrentPosition(
-      (position)=>handleGpsPosition(position, context),
-      ()=>setGpsStatus("لم يتم السماح بالموقع. استخدم إعدادات المتصفح لتفعيل GPS."),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 },
-    );
-    gpsWatchRef.current = navigator.geolocation.watchPosition(
-      (position)=>handleGpsPosition(position, context),
-      ()=>setGpsStatus("تعذر تحديث GPS الآن. تحقق من إذن الموقع والإنترنت."),
-      { enableHighAccuracy: true, timeout: 18000, maximumAge: 15000 },
-    );
+    gpsWatchRef.current?.(); gpsWatchRef.current=null;
+    void watchLocation((fix)=>handleGpsPosition(fix, context), setGpsStatus).then((stop)=>{gpsWatchRef.current=stop;}).catch(()=>setGpsStatus("تعذر تشغيل تتبع الموقع."));
   };
   const refreshGpsNow=()=>{
-    if (!("geolocation" in navigator)) {
-      setGpsStatus("هذا الجهاز لا يدعم تحديد الموقع من المتصفح.");
-      return;
-    }
     setGpsStatus("جارٍ تحديث موقع GPS…");
-    navigator.geolocation.getCurrentPosition(
-      (position)=>handleGpsPosition(position, activeTripContext),
-      ()=>setGpsStatus("تعذر قراءة الموقع. اسمح للموقع باستخدام GPS من المتصفح."),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    );
+    void locateOnce().then((fix)=>handleGpsPosition(fix, activeTripContext)).catch(()=>setGpsStatus("تعذر قراءة الموقع. اسمح للموقع باستخدام GPS."));
   };
   const startTrip=()=>{
     if (authMode !== "authenticated") {
@@ -1410,12 +1090,14 @@ export default function Home() {
   const recheckPending=async()=>{const {data:sessionData}=await supabase.auth.getSession();if(!sessionData.session)return;await enterAuthenticated(sessionData.session);await reloadData().catch(()=>{})};
   const finishRecovery=async()=>{setRecoveryClosed(true);setRecoveryEvent(false);const {data:sessionData}=await supabase.auth.getSession();if(sessionData.session)await enterAuthenticated(sessionData.session)};
   const cancelRecovery=async()=>{await supabase.auth.signOut({ scope: "local" });if(typeof window!=="undefined")window.history.replaceState(null,"",window.location.pathname);setRecoveryClosed(true);setRecoveryEvent(false)};
+  if(privacyHash) return <PrivacyPolicy onBack={()=>{window.location.hash="";}}/>;
+  if(needsConsent) return <ConsentGate onAccepted={()=>setNeedsConsent(false)} onSignOut={()=>{setNeedsConsent(false);void supabase.auth.signOut({ scope: "local" }).then(()=>window.location.reload())}}/>;
   if(recovering) return <ResetPasswordPage onDone={()=>void finishRecovery()} onCancel={()=>void cancelRecovery()}/>;
-  if(pendingAccount) return <PendingAccount email={pendingAccount.email} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
+  if(pendingAccount) return <PendingAccount email={pendingAccount.email} name={pendingAccount.name} phone={pendingAccount.phone} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
   if(!entered && authView==="landing") return <Landing onLogin={()=>setAuthView("login")} onRegisterSchool={()=>setAuthView("school")} onFindSchool={()=>setAuthView("parent")}/>;
-  if(!entered) return <AuthPage key={authView} onAuthenticated={enterAuthenticated} initialMode={authView==="school"||authView==="parent"?"signup":"login"} initialRole={authView==="school"?"school":"parent"} onBack={()=>setAuthView("landing")}/>;
+  if(!entered) return <AuthPage key={authView} onAuthenticated={enterAuthenticated} initialMode={authView==="school"||authView==="parent"?"signup":"login"} initialRole={authView==="school"?"school":authView==="parent"?"parent":undefined} onBack={()=>setAuthView("landing")}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
-    <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><NavButton active={view===item.id} onSelect={()=>setView(item.id)} label={item.label} icon={item.icon}/></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</p></div><button onClick={()=>authMode==="authenticated"?void signOut():setLogin(true)}>{authMode==="authenticated"?"خروج":"دخول"}</button></div></SidebarFooter></Sidebar>
-    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Badge variant="outline" className="role-badge">{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</Badge><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={toggleNotifications}><Bell/>{unreadCount>0&&<span>{unreadCount}</span>}</button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{authMode==="authenticated"&&<PushToggle compact/>}{notifications.length===0&&<p className="muted-label notification-empty">لا توجد إشعارات بعد.</p>}{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{authMode==="authenticated" && role==="executive" ? (view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : view==="control" ? <LiveControl canHandleEmergencies={platformAdmin}/> : platformAdmin && view==="users" ? <UsersAdmin myEmail={accountEmail}/> : platformAdmin && view==="data" ? <DataManager/> : platformAdmin && view==="audit" ? <AuditLog/> : <RegionOverview region={accessRegion} platformAdmin={platformAdmin} onOpen={setView}/>) : authMode==="authenticated" && view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : authMode==="authenticated" && view==="control" && (role==="school"||role==="executive") ? <LiveControl canHandleEmergencies={role==="school"||platformAdmin}/> : view==="operations" ? (authMode==="authenticated" && data.school.id ? <SchoolOps schoolId={data.school.id}/> : <article className="panel empty-state"><h2>التشغيل اليومي</h2><p>هذه الصفحة تعمل بالحساب الفعلي لإدارة المدرسة فقط.</p></article>) : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <DataView data={data} view={view} role={role} simulation={simulation} extraDrivers={extraDrivers} studentRows={studentRows} routeRows={routeRows} tripEvents={tripEvents} feedbackRows={feedbackRows} onAddDriver={addDriver} onAddStudent={addStudent} onAddRoute={addRoute} authMode={authMode}/>}{authMode==="authenticated"&&role==="parent"&&view==="students"&&<section className="parent-add-child"><h2>تسجيل ابن آخر في النقل</h2><SchoolFinder email={accountEmail}/></section>}</main><nav className="mobile-nav">{(nav.length>5?nav.slice(0,3):nav).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}{nav.length>5&&<MoreButton active={!nav.slice(0,3).some((item)=>item.id===view)}/>}</nav></SidebarInset>
-  </SidebarProvider>{login&&<LoginDialog onClose={()=>setLogin(false)} onAuthenticated={enterAuthenticated}/>}</div>;
+    <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><NavButton active={view===item.id} onSelect={()=>setView(item.id)} label={item.label} icon={item.icon}/></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</p></div><button onClick={()=>void signOut()}>خروج</button></div></SidebarFooter></Sidebar>
+    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Badge variant="outline" className="role-badge">{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</Badge><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={toggleNotifications}><Bell/>{unreadCount>0&&<span>{unreadCount}</span>}</button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{authMode==="authenticated"&&<PushToggle compact/>}{notifications.length===0&&<p className="muted-label notification-empty">لا توجد إشعارات بعد.</p>}{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{authMode==="authenticated" && role==="executive" ? (view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : view==="control" ? <LiveControl canHandleEmergencies={platformAdmin}/> : platformAdmin && view==="users" ? <UsersAdmin myEmail={accountEmail}/> : platformAdmin && view==="billing" ? <AdminBilling/> : platformAdmin && view==="data" ? <DataManager/> : platformAdmin && view==="audit" ? <AuditLog/> : platformAdmin && view==="errors" ? <ErrorLog/> : <RegionOverview region={accessRegion} platformAdmin={platformAdmin} onOpen={setView}/>) : authMode==="authenticated" && view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : authMode==="authenticated" && view==="control" && (role==="school"||role==="executive") ? <LiveControl canHandleEmergencies={role==="school"||platformAdmin}/> : authMode==="authenticated" && role==="school" && OPS_VIEWS.includes(view) ? (data.school.id ? <SchoolOps schoolId={data.school.id} tab={view as OpsTab}/> : <EmptyState role={role}/>) : authMode==="authenticated" && role==="school" && view==="feedback" ? <FeedbackList/> : authMode==="authenticated" && role==="school" && view==="billing" && data.school.id ? <SchoolBilling schoolId={data.school.id} schoolName={data.school.name}/> : authMode==="authenticated" && role==="parent" && view==="children" ? <ParentChildren email={accountEmail}/> : authMode==="authenticated" && view==="history" && (role==="parent"||role==="driver") ? <TripHistory role={role}/> : authMode==="authenticated" && role==="parent" && view==="locations" ? <ParentHomeLocations/> : authMode==="authenticated" && role==="parent" && view==="pickup" ? <ParentGate/> : authMode==="authenticated" && role==="school" && view==="gate" && data.school.id ? <SchoolGate schoolId={data.school.id}/> : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent} onScanned={()=>void reloadData()}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <EmptyState role={role}/>}</main><nav className="mobile-nav">{(nav.length>5?nav.slice(0,3):nav).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}{nav.length>5&&<MoreButton active={!nav.slice(0,3).some((item)=>item.id===view)}/>}</nav></SidebarInset>
+  </SidebarProvider></div>;
 }

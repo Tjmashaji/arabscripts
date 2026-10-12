@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 type Msg = { text: string; ok: boolean } | null;
 const Flash = ({ msg }: { msg: Msg }) => msg && <p className={`save-strip ops-message ${msg.ok ? "" : "ops-error"}`}>{msg.ok ? <Check /> : <X />}<span>{msg.text}</span></p>;
 const errText = (m: string) => m.includes("FORBIDDEN") ? "هذا الإجراء غير مسموح لحسابك." : m.includes("CANNOT_CHANGE_SELF") ? "لا يمكنك تغيير صلاحيات حسابك بنفسك." : m.includes("REASON_REQUIRED") ? "اكتب السبب." : m.includes("REGION_REQUIRED") ? "حدد المنطقة." : m.includes("foreign key") || m.includes("violates") ? "لا يمكن: السجل مرتبط ببيانات أخرى أو القيمة غير مقبولة." : m.includes("Could not find the function") ? "هذه الميزة تحتاج تشغيل ملف SQL الأخير في Supabase." : m.includes("invalid input") ? "قيمة غير صحيحة لأحد الحقول." : "تعذر تنفيذ الطلب. حاول مرة أخرى.";
-const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString("ar-SA-u-ca-gregory", { dateStyle: "medium", timeStyle: "short" }) : "—";
+const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString("ar-SA-u-ca-gregory", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" }) : "—";
 
 // ───────── نظرة المنطقة ─────────
 type DirRow = { status: string; interest_count: number; open_claims: number };
@@ -296,3 +296,32 @@ export function AuditLog() {
   </>;
 }
 
+
+// ───────── الأعطال: أخطاء الواجهة عند المستخدمين، مجمّعة حسب الرسالة ─────────
+type ErrorRow = { message: string; occurrences: number; users: number; first_seen: string; last_seen: string; sample_url: string | null; sample_stack: string | null; sample_agent: string | null };
+
+export function ErrorLog() {
+  const [days, setDays] = useState(7);
+  const [rows, setRows] = useState<ErrorRow[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const { data } = await supabase.rpc("admin_error_summary", { p_days: days });
+      if (alive) setRows((data ?? []) as ErrorRow[]);
+    })().catch(() => setRows([]));
+    return () => { alive = false; };
+  }, [days]);
+  return <>
+    <div className="welcome"><div><p className="eyebrow">مدير النظام</p><h1>الأعطال</h1><p>الأخطاء التي ظهرت للمستخدمين في التطبيق، مجمّعة حسب الرسالة، مع عدد المرات والمتأثرين.</p></div></div>
+    <article className="panel ops-panel">
+      <div className="dir-filters">{[1, 7, 30].map((d) => <button key={d} className={days === d ? "active" : ""} onClick={() => setDays(d)}>{d === 1 ? "آخر يوم" : `آخر ${d} يومًا`}</button>)}</div>
+      {rows && rows.length === 0 && <p className="muted-label">لا أعطال مسجلة في هذه الفترة.</p>}
+      {rows?.map((r) => <div className="ops-row audit-row" key={r.message}>
+        <div><strong dir="auto">{r.message}</strong><p>{r.occurrences} مرة · {r.users} مستخدم · آخر ظهور {fmt(r.last_seen)}{r.sample_url ? ` · ${r.sample_url}` : ""}</p>
+          {open === r.message && <pre className="audit-json" dir="ltr">{[r.sample_agent, r.sample_stack].filter(Boolean).join("\n\n")}</pre>}</div>
+        {(r.sample_stack || r.sample_agent) && <Button size="sm" variant="outline" onClick={() => setOpen(open === r.message ? null : r.message)}>{open === r.message ? "إخفاء" : "التفاصيل"}</Button>}
+      </div>)}
+    </article>
+  </>;
+}

@@ -139,3 +139,79 @@
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .field-hint{font-size:11px;font-weight:400;color:#b42f2f}.field-title{margin:4px 0 0;font-size:13px;font-weight:600;color:#24364a}.claim-grid-single{display:grid;gap:5px;font-size:12px;font-weight:600;color:#24364a}.claim-grid-single textarea{height:72px;border:1px solid #d6e0e7;border-radius:10px;padding:8px 10px;font:inherit;font-weight:400;resize:vertical}
 .parent-add-child{margin-top:20px;display:grid;gap:10px}.parent-add-child>h2{font-size:18px;margin:0;color:#10394b}.req-badge{margin-inline-start:8px}
+.children-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:8px}.child-tile{display:grid;gap:8px;padding:16px}.child-tile-head{display:flex;align-items:center;gap:10px}.child-tile-head>div{flex:1;min-width:0}.child-tile-head p{margin:2px 0 0;color:#687587;font-size:12px}.child-route{margin:0;font-size:13px;color:#24364a}
+.rating-stars{display:inline-flex;gap:2px;color:#d6dde3}.rating-stars svg{width:15px;height:15px}.rating-stars svg.on{color:#e3a02b;fill:#e3a02b}
+/* بطاقة الطالب: مقاس بطاقة بنكية تقريبًا (85.6×54 مم) */
+.student-card{width:min(100%,340px);aspect-ratio:85.6/54;max-width:100%;background:#fff;border:1px solid #d6e0e7;border-radius:14px;padding:10px 12px;display:grid;grid-template-rows:auto 1fr auto;gap:4px;color:#10394b;box-shadow:0 4px 14px #10394b14;break-inside:avoid;overflow:hidden}
+.sc-head{display:flex;align-items:center;gap:8px;border-bottom:2px solid #2b8c95;padding-bottom:4px}.sc-head div{display:grid;line-height:1.2}.sc-head strong{font-size:13px}.sc-head span{font-size:9px;color:#687587}.sc-logo{width:22px;height:22px;border-radius:7px;background:#10394b;color:#9fe3df;display:grid;place-items:center}.sc-logo svg{width:14px;height:14px}
+.sc-body{display:flex;align-items:center;gap:10px;min-height:0}.sc-info{flex:1;display:grid;gap:1px;font-size:10px;color:#24364a;min-width:0}.sc-name{font-size:14px;color:#10394b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sc-no{font-size:9px;color:#687587;font-family:ui-monospace,monospace}
+.sc-qr{width:96px;height:96px;flex:none;image-rendering:pixelated}.sc-qr-loading{display:block;background:#f1f5f7;border-radius:6px}.sc-foot{margin:0;font-size:8px;color:#687587}
+.cards-sheet-overlay{display:grid;gap:12px}.cards-sheet-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.cards-sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;justify-items:center}
+.child-tile .student-card{margin-top:4px}
+@media print{body *{visibility:hidden}.print-area,.print-area *{visibility:visible}.print-area{position:absolute;inset:0 auto auto 0;width:100%;display:grid;grid-template-columns:repeat(2,85.6mm);gap:6mm;padding:8mm;justify-content:center}.print-area .student-card{width:85.6mm;height:54mm;box-shadow:none;border-color:#9aa9b5}.no-print{display:none!important}@page{size:A4;margin:0}}
+/* ماسح البطاقات */
+.scanner-overlay{position:fixed;inset:0;z-index:2000;background:#06161f;color:#fff;display:grid;grid-template-rows:auto 1fr auto;padding:calc(12px + env(safe-area-inset-top,0px)) 14px calc(14px + env(safe-area-inset-bottom,0px));gap:10px}
+.scanner-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}.scanner-bar button{background:#fff}
+.scanner-view{position:relative;border-radius:16px;overflow:hidden;background:#000;min-height:0}.scanner-view video{width:100%;height:100%;object-fit:cover}.scanner-frame{position:absolute;inset:18% 15%;border:3px solid #48b7b0;border-radius:18px;box-shadow:0 0 0 999px #0008}
+.scanner-error{align-self:center;text-align:center;background:#3d1c1c;padding:16px;border-radius:12px}
+.scanner-results{display:grid;gap:6px;max-height:30vh;overflow:auto}.scanner-results p{margin:0;padding:10px 12px;border-radius:10px;font-weight:600}.scanner-results .ok{background:#16402f}.scanner-results .bad{background:#4a1f1f}
+.scan-action{margin-bottom:10px}
+.metric-warn{border-color:#f0c27a!important;background:#fff8ec!important}.metric-warn strong{color:#a76d1c}
+.planner{display:grid;gap:10px}.planner-grid{align-items:end}.planner-check{display:flex!important;align-items:center;gap:8px;grid-column:1/-1}.planner-check input{width:auto!important;height:auto!important}
+.plan-map{height:340px;border-radius:14px;overflow:hidden;border:1px solid #d6e0e7}.plan-stop span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px #0005}.plan-school{font-size:22px;line-height:1}
+.planner-routes{display:grid;gap:8px}.planner-route{border:1px solid #e1e8ee;border-radius:12px;padding:10px 12px}.planner-route p{margin:4px 0 0;font-size:12px;color:#687587}.plan-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-inline-end:4px}
+.usage{display:grid;gap:4px;margin-top:10px}.usage-head{display:flex;justify-content:space-between;font-size:13px}.usage-bar{height:8px;border-radius:99px;background:#edf1f4;overflow:hidden}.usage-bar span{display:block;height:100%;background:#2b8c95;border-radius:99px}.usage-bar span.over{background:#b42f2f}
+.invoice{background:#fff;border:1px solid #d6e0e7;border-radius:14px;padding:24px;display:grid;gap:14px;max-width:760px;color:#10293a}.invoice header{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:2px solid #2b8c95;padding-bottom:12px}.invoice h2{margin:0;color:#10394b}.invoice header p{margin:4px 0 0;color:#687587}.inv-meta{display:grid;gap:2px;font-size:13px}
+.invoice table{width:100%;border-collapse:collapse;font-size:13px}.invoice th,.invoice td{padding:8px;border-bottom:1px solid #e1e8ee;text-align:right}.invoice thead th{background:#e9f3f5}.invoice tfoot td{border:0}.inv-status{color:#687587;font-size:13px}
+@media print{.print-area.invoice{position:absolute;inset:0;display:grid;grid-template-columns:1fr;border:0;max-width:none;padding:12mm}}
+.consent-check{display:flex!important;align-items:flex-start;gap:8px;font-size:13px;font-weight:500!important;color:#24364a;line-height:1.6}.consent-check input{width:18px!important;height:18px!important;margin-top:3px;flex:none}.consent-check a{color:#1f6274;text-decoration:underline}
+.privacy-page{min-height:100vh;background:#f4f7f9}.privacy-body{max-width:760px;margin:0 auto;padding:28px 18px 60px;display:grid;gap:14px;color:#24364a;line-height:1.85}.privacy-body h1{margin:0;color:#10394b}.privacy-body h2{margin:6px 0 0;font-size:18px;color:#10394b}.privacy-body p,.privacy-body ul{margin:0}.privacy-body ul{padding-inline-start:20px;display:grid;gap:4px}.privacy-body .lead{color:#5b6c7a}
+.lp-footer a{color:inherit;text-decoration:underline;margin-inline-start:auto}
+
+/* ───────── خريطة الرحلة (Leaflet) ───────── */
+.trip-map { position: relative; display: grid; gap: 8px; }
+.trip-map-canvas { height: 340px; border-radius: 18px; overflow: hidden; border: 1px solid #dbe7ea; z-index: 0; }
+.driver-map-panel .trip-map-canvas { height: 380px; }
+@media (max-width: 640px) { .trip-map-canvas { height: 300px; } .driver-map-panel .trip-map-canvas { height: 340px; } }
+.trip-map-tools { position: absolute; top: 10px; right: 10px; z-index: 500; display: flex; gap: 6px; flex-wrap: wrap; }
+.trip-map-tools button { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #cfdfe3; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #10394b; box-shadow: 0 2px 8px rgb(16 57 75 / .12); cursor: pointer; }
+.trip-map-tools button svg { width: 15px; height: 15px; }
+.trip-map-tools button.on { background: #1f8a93; color: #fff; border-color: #1f8a93; }
+.trip-map-note { font-size: 12px; color: #5a7280; margin: 0; }
+.trip-stop span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #10394b; color: #fff; font-weight: 700; font-size: 14px; border: 3px solid #fff; box-shadow: 0 2px 6px rgb(0 0 0 / .3); }
+.trip-stop.done span { background: #2f9e6e; }
+.trip-stop.next span { background: #e08a1e; transform: scale(1.18); }
+.trip-school span, .trip-home span, .trip-bus span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: #fff; border: 2px solid #10394b; font-size: 17px; box-shadow: 0 2px 6px rgb(0 0 0 / .25); }
+.trip-bus span { border-color: #e08a1e; font-size: 21px; }
+.leaflet-popup-content { direction: rtl; text-align: right; font-family: inherit; line-height: 1.6; }
+.nav-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.nav-link { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; border: 1px solid #cfdfe3; color: #10394b; font-weight: 600; text-decoration: none; background: #fff; }
+.nav-link svg { width: 18px; height: 18px; }
+.nav-link.primary { background: #1f8a93; border-color: #1f8a93; color: #fff; flex: 1 1 220px; justify-content: center; }
+.stop-nav { margin-inline-start: auto; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid #cfdfe3; color: #1f8a93; flex: none; }
+.stop-nav svg { width: 17px; height: 17px; }
+.map-gps-note { display: flex; gap: 6px; align-items: center; color: #9a5b00; font-size: 14px; margin: 8px 0 0; }
+.map-gps-note svg { width: 16px; height: 16px; }
+.scanner-photo { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px auto 0; max-width: 420px; padding: 12px 16px; border-radius: 12px; background: #fff; color: #10394b; font-weight: 700; cursor: pointer; }
+.scanner-photo svg { width: 18px; height: 18px; }
+.coords-input { display: flex; gap: 8px; margin-top: 10px; }
+.coords-input input { flex: 1; min-width: 0; border: 1px solid #cfdfe3; border-radius: 10px; padding: 9px 12px; font: inherit; }
+.coords-input button { border: 1px solid #1f8a93; color: #1f8a93; background: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.coords-input button:disabled { opacity: .45; cursor: default; }
+.coords-hint { margin-top: 4px; font-size: 12px; }
+.onboard-steps { list-style: none; margin: 0; padding: 14px 16px; display: grid; gap: 10px; background: #fff; border: 1px solid #dbe7ea; border-radius: 18px; }
+.onboard-steps li { display: flex; align-items: center; gap: 10px; color: #5a7280; font-weight: 600; }
+.onboard-steps li span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #eef4f5; color: #5a7280; font-size: 13px; flex: none; }
+.onboard-steps li span svg { width: 15px; height: 15px; }
+.onboard-steps li.done { color: #2f9e6e; } .onboard-steps li.done span { background: #2f9e6e; color: #fff; }
+.onboard-steps li.current { color: #10394b; } .onboard-steps li.current span { background: #1f8a93; color: #fff; }
+.switch-role { text-align: center; }
+.home-card .trip-map-canvas, .home-map .trip-map-canvas { height: 240px; }
+.home-req { display: grid; gap: 10px; padding-block: 10px; border-top: 1px solid #e3edf0; }
+.gate-kids { display: grid; gap: 10px; margin-top: 12px; }
+.gate-kid { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; padding: 12px 14px; border: 1px solid #e3edf0; border-radius: 14px; }
+.gate-call { font-size: 16px; padding-inline: 18px; }
+.gate-board .gate-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 14px; background: #fff7e8; border: 1px solid #f1d29b; margin-top: 10px; }
+.gate-board .gate-row strong { font-size: 20px; }
+.gate-board .gate-row p { margin: 2px 0 0; color: #5a7280; }
+.perm-list { margin-top: 14px; border-top: 1px solid #e3edf0; padding-top: 6px; }

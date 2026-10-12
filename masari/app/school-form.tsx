@@ -11,6 +11,15 @@ const KHARJ = { lat: 24.1556, lng: 47.3120 };
 
 type Point = { lat: number; lng: number };
 
+// يقبل الإحداثيات «24.15, 47.31» أو رابط خرائط Google يحتويها (…@24.15,47.31 أو ?q=24.15,47.31)
+export const parseCoords = (text: string): Point | null => {
+  const t = text.trim();
+  const m = t.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) ?? t.match(/[?&](?:q|query|destination|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) ?? t.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,،\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat: +lat.toFixed(6), lng: +lng.toFixed(6) } : null;
+};
+
 // خريطة تفاعلية (OpenStreetMap عبر Leaflet): الضغط أو سحب الدبوس يحدد الموقع.
 export function MapPicker({ value, onChange }: { value: Point | null; onChange: (p: Point) => void }) {
   const box = useRef<HTMLDivElement>(null);
@@ -19,6 +28,8 @@ export function MapPicker({ value, onChange }: { value: Point | null; onChange: 
   const onChangeRef = useRef(onChange);
   const [locating, setLocating] = useState(false);
   const [note, setNote] = useState("");
+  const [coords, setCoords] = useState("");
+  const coordsOk = parseCoords(coords);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
   useEffect(() => {
@@ -63,6 +74,9 @@ export function MapPicker({ value, onChange }: { value: Point | null; onChange: 
   return <div className="map-picker">
     <div ref={box} className="map-picker-canvas" role="application" aria-label="خريطة تحديد موقع المدرسة" />
     <button type="button" className="map-locate" onClick={locate} disabled={locating}><LocateFixed /> {locating ? "جارٍ التحديد…" : "الموقع الحالي"}</button>
+    <div className="coords-input"><input value={coords} onChange={(e) => setCoords(e.target.value)} dir="ltr" placeholder="24.1556, 47.3120" aria-label="الإحداثيات أو رابط خرائط Google" />
+      <button type="button" disabled={!coordsOk} onClick={() => { if (coordsOk) { onChangeRef.current(coordsOk); setCoords(""); } }}>استخدم الإحداثيات</button></div>
+    <p className="muted-label coords-hint">أو الصق الإحداثيات أو رابط موقع من خرائط Google.</p>
     {note && <p className="muted-label">{note}</p>}
   </div>;
 }
