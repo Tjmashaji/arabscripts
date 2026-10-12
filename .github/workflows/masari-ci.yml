@@ -1,0 +1,41 @@
+# فحوصات مساري التلقائية مع كل دفع أو طلب دمج يمس مجلد masari:
+# فحص الكود والأنواع، اختبارات الوحدة، بناء الموقع، واختبار دخان في متصفح حقيقي لكل دور.
+name: masari-ci
+
+on:
+  push:
+    paths: ["masari/**", ".github/workflows/masari-ci.yml"]
+  pull_request:
+    paths: ["masari/**", ".github/workflows/masari-ci.yml"]
+
+defaults:
+  run:
+    working-directory: masari
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: masari/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build (Vercel SPA)
+        run: npm run build:spa
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke test (all roles, mocked backend)
+        run: |
+          npx vite preview --config vite.spa.config.ts --port 4173 --host 127.0.0.1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ > /dev/null && break; sleep 1; done
+          npm run test:smoke
