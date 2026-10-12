@@ -12,7 +12,7 @@ import { DAYS, DaysPicker, RouteSheet, RouteStudents, mergeGroups, nearbyGroups,
 // بطاقة المسار في حساب المدرسة: تعديل الاسم والموعد والباص والسائق، وإضافة المحطات وحذفها وترتيبها وتعديل مواقعها،
 // وإنشاء مسار العودة، وحذف المسار (أو أرشفته إن كان له سجل رحلات) لمدير/مديرة المدرسة.
 
-export type EStop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null; scheduled_time?: string | null };
+export type EStop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null; scheduled_time?: string | null; radius_m?: number | null };
 export type ERoute = { id: string; name: string; direction: string; scheduled_time: string | null; estimated_duration_minutes?: number | null; is_active: boolean; archived_at?: string | null; days?: number[] | null; bus_id: string | null; driver_id: string | null; route_stops: EStop[] };
 type Act = (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>, ok: string) => Promise<boolean>;
 const stopType: Record<string, string> = { pickup: "صعود", dropoff: "نزول", school: "المدرسة" };
@@ -37,13 +37,16 @@ function StopEditor({ route, stop, index, count, studentsHere, editing, busy, ac
   return <div className={`ops-row ops-stop ${missing ? "ops-missing" : ""}`}>
     <div className="stop-main">
       {editing ? <input className="stop-label-input" value={label} onChange={(e) => setLabel(e.target.value)} aria-label={`اسم المحطة ${index + 1}`} /> : <strong>{index + 1}. {stop.label}</strong>}
-      <p>{stop.scheduled_time ? `${stop.scheduled_time.slice(0, 5)} · ` : ""}{stopType[stop.stop_type] ?? stop.stop_type}{studentsHere ? ` · ${studentsHere} طالب` : ""}{missing && " · بلا موقع — لن تبدأ الرحلة قبل تحديده"}</p>
+      <p>{stop.scheduled_time ? `${stop.scheduled_time.slice(0, 5)} · ` : ""}{stopType[stop.stop_type] ?? stop.stop_type}{stop.radius_m ? ` · نطاق ${stop.radius_m} م` : ""}{studentsHere ? ` · ${studentsHere} طالب` : ""}{missing && " · بلا موقع — لن تبدأ الرحلة قبل تحديده"}</p>
       {mapOpen && <div className="stop-map"><MapPicker value={point} onChange={setPoint} /></div>}
     </div>
     <div className="ops-actions">
       {editing && <>
         <button className="icon-btn" disabled={busy || index === 0} onClick={() => onMove(-1)} aria-label="تقديم المحطة"><ArrowUp /></button>
         <button className="icon-btn" disabled={busy || index === count - 1} onClick={() => onMove(1)} aria-label="تأخير المحطة"><ArrowDown /></button>
+        {stop.stop_type !== "school" && <select className="radius-select" aria-label={`نطاق الوصول لمحطة ${stop.label}`} value={stop.radius_m ?? ""} disabled={busy}
+          onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; void act(() => supabase.from("route_stops").update({ radius_m: v }).eq("id", stop.id), v ? `نطاق وصول ${stop.label}: ${v} متر.` : `نطاق ${stop.label} حسب إعداد المدرسة.`); }}>
+          <option value="">النطاق: تلقائي</option>{[100, 150, 250, 400, 600].map((m) => <option key={m} value={m}>النطاق {m} م</option>)}</select>}
         {label.trim() && label.trim() !== stop.label && <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.from("route_stops").update({ label: label.trim() }).eq("id", stop.id), "حُفظ اسم المحطة.")}>حفظ الاسم</Button>}
       </>}
       <Button size="sm" variant="outline" disabled={busy} onClick={() => setMapOpen((o) => !o)}><MapPin /> {mapOpen ? "إغلاق الخريطة" : missing ? "حدد الموقع" : "الموقع"}</Button>

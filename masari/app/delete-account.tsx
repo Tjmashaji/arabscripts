@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { getLang, setLang, type Lang } from "./i18n";
 
 // حذف الحساب كاملًا من داخل التطبيق (شرط متجر Apple): يكتب المستخدم بريده للتأكيد ثم يُحذف حسابه وبياناته الشخصية نهائيًا.
 
@@ -44,13 +45,24 @@ export function DeleteAccount({ email, onDeleted, compact = false }: { email: st
 export function AccountPage({ name, email, roleLabel, onDeleted, children }: { name: string; email: string; roleLabel: string; onDeleted: () => void; children?: React.ReactNode }) {
   return <>
     <div className="welcome"><div><p className="eyebrow">حسابي</p><h1>{name || "حسابي"}</h1><p>{roleLabel}</p></div></div>
-    <article className="panel">
+    <div className="account-stack"><article className="panel">
       <div className="panel-head"><div><p className="eyebrow">بيانات الدخول</p><h2><bdi dir="ltr">{email}</bdi></h2></div><UserRound className="title-icon" /></div>
       {children}
+      <p className="eyebrow">اللغة</p>
+      <LangToggle />
     </article>
     <article className="panel">
       <div className="panel-head"><div><p className="eyebrow">الخصوصية</p><h2>حذف الحساب</h2></div><Trash2 className="title-icon" /></div>
       <DeleteAccount email={email} onDeleted={onDeleted} />
-    </article>
+    </article></div>
   </>;
+}
+
+// اختيار لغة الواجهة (الإنجليزية موجهة للسائقين غير الناطقين بالعربية)
+export function LangToggle() {
+  const [lang, setL] = useState<Lang>(() => (typeof window === "undefined" ? "ar" : getLang()));
+  return <div className="lang-toggle" role="group" aria-label="اللغة">
+    <button type="button" className={lang === "ar" ? "on" : ""} onClick={() => { setL("ar"); setLang("ar"); }}>العربية</button>
+    <button type="button" className={lang === "en" ? "on" : ""} onClick={() => { setL("en"); setLang("en"); }}>English</button>
+  </div>;
 }
