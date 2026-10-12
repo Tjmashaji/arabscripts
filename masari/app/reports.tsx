@@ -13,7 +13,8 @@ const num = (v: number | string | null | undefined) => v == null ? "—" : Strin
 
 // ملف CSV بترميز UTF-8 مع BOM حتى يعرض Excel العربية صحيحة
 export function downloadCsv(name: string, sections: { title: string; head: string[]; rows: (string | number | null)[][] }[]) {
-  const esc = (v: string | number | null) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  // يمنع تنفيذ الصيغ في Excel (قيم تبدأ بـ = + - @)
+  const esc = (v: string | number | null) => { const raw = v == null ? "" : String(v); const s = typeof v === "string" && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw; return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const text = sections.map((s) => [s.title, s.head.map(esc).join(","), ...s.rows.map((r) => r.map(esc).join(","))].join("\r\n")).join("\r\n\r\n");
   const blob = new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${name}.csv`; a.click();

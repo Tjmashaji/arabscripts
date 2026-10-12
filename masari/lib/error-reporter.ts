@@ -15,7 +15,8 @@ export function installErrorReporter() {
     if (!msg || sent.has(msg) || IGNORE.some((r) => r.test(msg))) return;
     sent.add(msg);
     void supabase.rpc("log_client_error", {
-      p_message: msg, p_stack: stack?.slice(0, 4000) ?? null, p_url: window.location.pathname + window.location.hash,
+      p_message: msg, p_stack: stack?.slice(0, 4000) ?? null, // لا نرسل الـ hash: قد يحوي رموز الدخول (#access_token) أو رابط مشاركة
+      p_url: window.location.pathname,
       p_user_agent: navigator.userAgent.slice(0, 300), p_version: APP_VERSION,
     }).then(() => {}, () => {});
   };

@@ -988,7 +988,7 @@ export default function Home() {
     lastGpsSaveRef.current = Date.now();
     const row = { trip_id: tripId, latitude: point.lat, longitude: point.lng, accuracy: point.accuracy ?? null, speed: point.speed ?? null, recorded_at: point.updatedAt ?? new Date().toISOString() };
     const { error } = await supabase.from("vehicle_locations").insert(row);
-    if (error && isNetworkError(error)) { enqueue({ kind: "insert", table: "vehicle_locations", row }); setGpsStatus("لا يوجد إنترنت: يُحفظ الموقع على الجهاز ويُرسل عند عودة الاتصال."); return; }
+    if (error && isNetworkError(error)) { enqueue({ kind: "insert", table: "vehicle_locations", row }).catch(()=>{}); setGpsStatus("لا يوجد إنترنت: يُحفظ الموقع على الجهاز ويُرسل عند عودة الاتصال."); return; }
     setGpsStatus(error ? "GPS يعمل على الشاشة، لكن تعذر حفظ الموقع." : "تم حفظ موقع الباص.");
   };
   const handleGpsPosition=(fix: Fix, context?: TripContext | null)=>{
@@ -1015,6 +1015,13 @@ export default function Home() {
     void locateOnce().then((fix)=>handleGpsPosition(fix, activeTripContext)).catch(()=>setGpsStatus("تعذر قراءة الموقع. اسمح للموقع باستخدام GPS."));
   };
   const startTrip=()=>{
+    // إفصاح واضح قبل طلب إذن الموقع (سياسة Google Play وApple): لماذا ومتى يُجمع الموقع
+    let disclosed=false; try{disclosed=localStorage.getItem("masari-location-disclosure")==="1"}catch{/* محجوب */}
+    if(!disclosed){
+      const ok=window.confirm("يجمع مساري موقع جوالك أثناء الرحلة فقط — من بدء الرحلة حتى إنهائها، حتى لو كانت الشاشة مطفأة أو التطبيق في الخلفية — ليرى أولياء الأمور والمدرسة موقع الباص ويُعتمد الوصول للمحطات. يتوقف التتبع تلقائيًا عند إنهاء الرحلة ولا يُستخدم لأي غرض آخر. هل توافق؟");
+      if(!ok){showTripSaveStatus("لا يمكن بدء الرحلة دون مشاركة الموقع.");return}
+      try{localStorage.setItem("masari-location-disclosure","1")}catch{/* محجوب */}
+    }
     if (authMode !== "authenticated") {
       setSimulation({ active: true, currentStopIndex: 0, approvedStops: [], studentStatus: "approaching" });
       startGpsTracking(null);
@@ -1068,7 +1075,7 @@ export default function Home() {
     };
     const { error } = await supabase.rpc("record_attendance", args);
     if (error && isNetworkError(error)) {
-      enqueue({ kind: "rpc", name: "record_attendance", args });
+      void enqueue({ kind: "rpc", name: "record_attendance", args });
       setData((current)=>({ ...current, students: current.students?.map((st)=>st.id===studentId ? { ...st, status: event } : st) }));
       showTripSaveStatus(`${attendanceDoneText[event]} (محفوظ على الجهاز، يُرسل عند عودة الإنترنت)`);
       return;
@@ -1102,7 +1109,7 @@ export default function Home() {
       const { data: result, error } = await supabase.rpc("arrive_at_stop", arriveArgs);
       if(error&&isNetworkError(error)){
         if(distance>(stop.radius??STOP_RADIUS_METERS)+Math.min(driverGps.accuracy??0,100)){showTripSaveStatus(`أنت تبعد ${distance} متر عن ${stop.label}.`);return}
-        enqueue({ kind: "rpc", name: "arrive_at_stop", args: arriveArgs });
+        void enqueue({ kind: "rpc", name: "arrive_at_stop", args: arriveArgs });
         setData((current)=>({ ...current, route: { ...current.route, stops: current.route.stops.map((st, i)=>i===index ? { ...st, status: "arrived" } : st) } }));
         approveStop();
         showTripSaveStatus(`اعتُمدت ${stop.label} على الجهاز، وتُرسل عند عودة الإنترنت.`);

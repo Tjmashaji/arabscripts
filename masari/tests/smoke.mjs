@@ -49,7 +49,7 @@ for (const [role, access] of Object.entries(ROLES)) {
     const req = route.request(); const path = new URL(req.url()).pathname; const accept = req.headers().accept ?? "";
     const ok = (d) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
     if (path.endsWith("/auth/v1/user")) return ok(session(`${role}@example.com`).user);
-    if (path.endsWith("/rpc/my_access")) return ok({ ...access, full_name: role, privacy_version: "2026-10" });
+    if (path.endsWith("/rpc/my_access")) return ok({ ...access, full_name: role, privacy_version: "2026-10-b" });
     if (path.endsWith("/rest/v1/schools")) return ok(accept.includes("object") ? { id: "sch1", name: "مدرسة الاختبار", latitude: 24.15, longitude: 47.31 } : [{ id: "sch1", name: "مدرسة الاختبار", city: "الخرج", latitude: 24.15, longitude: 47.31 }]);
     if (accept.includes("object")) return route.fulfill({ status: 406, contentType: "application/json", body: "{}" });
     return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);

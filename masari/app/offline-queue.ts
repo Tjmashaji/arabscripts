@@ -7,20 +7,24 @@ import { supabase } from "@/lib/supabase";
 // يُحفظ على الجهاز ويُرسل بالترتيب عند عودة الاتصال. الأخطاء غير الشبكية (صلاحية، رحلة منتهية…) لا تُعاد.
 
 type NewItem = { kind: "rpc"; name: string; args: Record<string, unknown> } | { kind: "insert"; table: string; row: Record<string, unknown> };
-type Item = NewItem & { id: string; at: string };
+type Item = NewItem & { id: string; at: string; uid: string };
 const KEY = "masari-offline-queue-v1";
 const MAX = 600;
 const listeners = new Set<() => void>();
 
-const read = (): Item[] => { try { return JSON.parse(localStorage.getItem(KEY) ?? "[]") as Item[]; } catch { return []; } };
+const read = (): Item[] => { try { const v: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]"); return Array.isArray(v) ? v as Item[] : []; } catch { return []; } };
+const currentUid = async () => (await supabase.auth.getSession()).data.session?.user.id ?? null;
 const write = (items: Item[]) => { try { localStorage.setItem(KEY, JSON.stringify(items.slice(-MAX))); } catch { /* التخزين ممتلئ أو محجوب */ } listeners.forEach((l) => l()); };
 
 export const isNetworkError = (error: { message?: string } | null | undefined) =>
   (typeof navigator !== "undefined" && !navigator.onLine) || /failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(error?.message ?? "");
 
-export function enqueue(item: NewItem) {
-  write([...read(), { ...item, id: crypto.randomUUID?.() ?? String(Date.now() + Math.random()), at: new Date().toISOString() }]);
+// كل عنصر مربوط بحساب من سجّله؛ لا يُرسل أبدًا بجلسة حساب آخر على نفس الجهاز
+export async function enqueue(item: NewItem) {
+  const uid = await currentUid(); if (!uid) return;
+  write([...read(), { ...item, uid, id: crypto.randomUUID?.() ?? String(Date.now() + Math.random()), at: new Date().toISOString() }]);
 }
+export const clearQueue = () => write([]);
 export const pendingCount = () => read().length;
 
 let flushing = false;
@@ -29,6 +33,11 @@ export async function flushQueue(): Promise<{ sent: number; dropped: number }> {
   flushing = true;
   let sent = 0, dropped = 0;
   try {
+    const uid = await currentUid();
+    if (!uid) return { sent, dropped };
+    // ما سجّله حساب آخر يُحذف ولا يُرسل
+    const foreign = read().filter((x) => x.uid !== uid).length;
+    if (foreign) { write(read().filter((x) => x.uid === uid)); dropped += foreign; }
     for (;;) {
       const [item] = read();
       if (!item) break;

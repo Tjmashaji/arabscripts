@@ -5,6 +5,7 @@ import { Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { getLang, setLang, type Lang } from "./i18n";
+import { clearQueue } from "./offline-queue";
 
 // حذف الحساب كاملًا من داخل التطبيق (شرط متجر Apple): يكتب المستخدم بريده للتأكيد ثم يُحذف حسابه وبياناته الشخصية نهائيًا.
 
@@ -25,6 +26,7 @@ export function DeleteAccount({ email, onDeleted, compact = false }: { email: st
     const { error } = await supabase.rpc("delete_my_account", { p_confirm_email: confirm.trim() });
     setBusy(false);
     if (error) { setMsg(Object.entries(errText).find(([k]) => error.message.includes(k))?.[1] ?? "تعذر حذف الحساب. حاول لاحقًا أو تواصل مع إدارة مساري."); return; }
+    clearQueue();
     await supabase.auth.signOut().catch(() => {});
     onDeleted();
   };

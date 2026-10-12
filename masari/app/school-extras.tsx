@@ -272,7 +272,7 @@ export function DelayMap({ schoolId }: { schoolId?: string }) {
         layer.current = L.layerGroup().addTo(map.current);
       }
       const g = layer.current!; g.clearLayers();
-      const list = spots ?? [];
+      const list = (spots ?? []).filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng));
       const max = Math.max(1, ...list.map((s) => s.late_count + s.alerts));
       list.forEach((s) => {
         const w = (s.late_count + s.alerts) / max;

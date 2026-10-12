@@ -5,12 +5,12 @@ import { BusFront, Copy, Link2, Share2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { TripMap } from "./trip-map";
+import { PUBLIC_SITE } from "@/lib/site";
 
 // رابط تتبع مؤقت: ولي الأمر يرسل رابطًا لقريب (الجد، سائق خاص…) يرى فيه الباص وحالة رحلة اليوم فقط،
 // وينتهي تلقائيًا بعد المدة المختارة أو عند إيقافه.
 
 // تطبيق الجوال يعمل من localhost، فالرابط يجب أن يشير إلى الموقع العام
-const PUBLIC_SITE = "https://masari-tjmashajis-projects.vercel.app";
 const siteBase = () => {
   const { protocol, hostname, origin, pathname } = window.location;
   return (protocol === "https:" || protocol === "http:") && hostname !== "localhost" && hostname !== "127.0.0.1" ? `${origin}${pathname}` : `${PUBLIC_SITE}/`;
@@ -55,7 +55,7 @@ export function ShareLinks() {
     const { data, error } = await supabase.rpc("guardian_create_share", { p_student: student, p_hours: form.hours, p_label: form.label.trim() || null });
     if (error || !data) { setMsg(error?.message.includes("TOO_MANY_LINKS") ? "لديك 5 روابط فعّالة؛ أوقف أحدها أولًا." : "تعذر إنشاء الرابط."); return; }
     setForm({ ...form, label: "" }); await load();
-    await send(data as string, kids.find((k) => k.id === student)?.full_name.split(" ")[0] ?? "");
+    await send(data as string, (kids.find((k) => k.id === student)?.full_name ?? "").split(" ")[0]);
   };
   const revoke = async (id: string) => { await supabase.rpc("guardian_revoke_share", { p_id: id }); setMsg("أُوقف الرابط ولم يعد يعمل."); await load(); };
   if (!kids.length) return null;
@@ -69,7 +69,7 @@ export function ShareLinks() {
       <Button disabled={!student} onClick={() => void create()}><Link2 /> إنشاء وإرسال الرابط</Button>
     </div>
     {links.map((l) => <div className="ops-row" key={l.id}><div><strong>{l.label || "رابط"} · {kids.find((k) => k.id === l.student_id)?.full_name ?? ""}</strong><p>ينتهي {fmt(l.expires_at)}</p></div>
-      <div className="ops-actions"><Button size="sm" variant="outline" onClick={() => void send(l.token, kids.find((k) => k.id === l.student_id)?.full_name.split(" ")[0] ?? "")}><Copy /> إرسال</Button>
+      <div className="ops-actions"><Button size="sm" variant="outline" onClick={() => void send(l.token, (kids.find((k) => k.id === l.student_id)?.full_name ?? "").split(" ")[0])}><Copy /> إرسال</Button>
         <Button size="sm" variant="outline" onClick={() => void revoke(l.id)}><X /> إيقاف</Button></div></div>)}
     {msg && <p className="muted-label">{msg}</p>}
   </article>;
