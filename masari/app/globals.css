@@ -307,3 +307,5 @@
 .route-sheet td.tick { width: 34px; } .sheet-foot { font-size: 12px; color: #5a7280; margin-top: 10px; }
 .route-card .cards-sheet-overlay { position: fixed; inset: 0; z-index: 2000; background: #f3f7f8; overflow: auto; padding: 20px; align-content: start; }
 @media print { .print-area.route-sheet { display: block; grid-template-columns: none; padding: 10mm; max-width: none; } .route-card .cards-sheet-overlay { background: #fff; padding: 0; } @page { size: A4 landscape; } }
+.location-card .map-picker { margin-bottom: 12px; }
+.check-line { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 0.9rem; color: var(--muted-foreground, #555); }
