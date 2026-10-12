@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, GraduationCap, MessageSquareText, Star } from "lucide-react";
+import { CalendarDays, GraduationCap, IdCard, MessageSquareText, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { StudentCard } from "./student-card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { SchoolFinder } from "./school-directory";
@@ -17,15 +19,16 @@ const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("
 
 // ───────── أبنائي ─────────
 type Assignment = { status: string; routes: { name: string; direction: string; scheduled_time: string | null } | null; route_stops: { label: string } | null };
-type Child = { id: string; full_name: string; grade: string | null; service_status: string; schools: { name: string } | null; student_route_assignments: Assignment[] };
+type Child = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; schools: { name: string } | null; student_route_assignments: Assignment[] };
 
 export function ParentChildren({ email }: { email: string }) {
   const [children, setChildren] = useState<Child[] | null>(null);
+  const [cardFor, setCardFor] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     void (async () => {
       const { data } = await supabase.from("students")
-        .select("id,full_name,grade,service_status,schools(name),student_route_assignments(status,routes(name,direction,scheduled_time),route_stops(label))")
+        .select("id,full_name,grade,service_status,qr_token,schools(name),student_route_assignments(status,routes(name,direction,scheduled_time),route_stops(label))")
         .order("full_name");
       if (alive) setChildren(((data ?? []) as unknown as Child[]).map((c) => ({ ...c, schools: one(c.schools), student_route_assignments: (c.student_route_assignments ?? []).map((a) => ({ ...a, routes: one(a.routes), route_stops: one(a.route_stops) })) })));
     })().catch(() => setChildren([]));
@@ -41,6 +44,8 @@ export function ParentChildren({ email }: { email: string }) {
           <Badge className={`status-badge ${c.service_status === "active" ? "tone-0" : "tone-1"}`}>{c.service_status === "active" ? "مشترك في النقل" : "متوقف"}</Badge></div>
         {active.length === 0 ? <p className="muted-label">لم تحدد المدرسة مسار ابنك بعد.</p>
           : active.map((a, i) => <p className="child-route" key={i}><GraduationCap className="inline-icon" /> {directionText(a.routes?.direction)}: {a.routes?.name}{a.routes?.scheduled_time ? ` · ${a.routes.scheduled_time.slice(0, 5)}` : ""}{a.route_stops ? ` · محطة ${a.route_stops.label}` : ""}</p>)}
+        <Button size="sm" variant="outline" onClick={() => setCardFor(cardFor === c.id ? null : c.id)}><IdCard /> {cardFor === c.id ? "إخفاء البطاقة" : "بطاقة الطالب"}</Button>
+        {cardFor === c.id && <StudentCard student={{ id: c.id, full_name: c.full_name, grade: c.grade, qr_token: c.qr_token, route: active.find((a) => a.routes?.direction === "to_school")?.routes?.name ?? null, stop: active.find((a) => a.routes?.direction === "to_school")?.route_stops?.label ?? null }} schoolName={c.schools?.name ?? ""} />}
       </article>;
     })}</div>
     <section className="parent-add-child"><h2>تسجيل ابن آخر في النقل</h2><SchoolFinder email={email} /></section>

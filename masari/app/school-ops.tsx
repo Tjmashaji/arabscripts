@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Check, IdCard, Plus, Printer, X } from "lucide-react";
+import { CardsSheet, type CardStudent } from "./student-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
@@ -17,7 +18,7 @@ type Bus = { id: string; bus_number: string; plate_number: string; capacity: num
 type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null };
 type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; is_active: boolean; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
 type Assignment = { id: string; route_id: string; stop_id: string | null };
-type Student = { id: string; full_name: string; grade: string | null; service_status: string; student_route_assignments: Assignment[] };
+type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; student_route_assignments: Assignment[] };
 type Trip = { id: string; route_id: string; status: string };
 
 const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
@@ -55,6 +56,7 @@ const TAB_TITLES: Record<OpsTab, [string, string]> = {
 
 export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) {
   const [schoolPoint, setSchoolPoint] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
+  const [schoolName, setSchoolName] = useState("");
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [studentRequests, setStudentRequests] = useState<StudentRequest[]>([]);
@@ -67,16 +69,17 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
 
   const load = useCallback(async () => {
     const [sc, sr, dr, dv, bs, rt, st, tr] = await Promise.all([
-      supabase.from("schools").select("latitude,longitude").eq("id", schoolId).single(),
+      supabase.from("schools").select("name,latitude,longitude").eq("id", schoolId).single(),
       supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status,student_national_id,home_address,home_latitude,home_longitude,note,created_by").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
       supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
       supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
       supabase.from("routes").select("id,name,direction,scheduled_time,is_active,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
-      supabase.from("students").select("id,full_name,grade,service_status,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
+      supabase.from("students").select("id,full_name,grade,service_status,qr_token,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
       supabase.from("trips").select("id,route_id,status").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
     ]);
     setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null });
+    setSchoolName(sc.data?.name ?? "");
     setStudentRequests(sr.data ?? []);
     setDriverRequests(dr.data ?? []);
     setDrivers(dv.data ?? []);
@@ -112,7 +115,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
     {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
     {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} busy={busy} act={act} />}
-    {tab === "students" && <StudentsTab students={students} routes={routes} busy={busy} act={act} />}
+    {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
   </>;
 }
@@ -308,17 +311,30 @@ function NewRouteForm({ schoolId, schoolLat, schoolLng, busy, act }: { schoolId:
   </article>;
 }
 
-function StudentsTab({ students, routes, busy, act }: { students: Student[]; routes: RouteRow[]; busy: boolean; act: Act }) {
+function StudentsTab({ students, routes, schoolName, busy, act }: { students: Student[]; routes: RouteRow[]; schoolName: string; busy: boolean; act: Act }) {
   const routeName = (id: string) => routes.find((r) => r.id === id)?.name ?? "مسار";
   const stopName = (routeId: string, stopId: string | null) => routes.find((r) => r.id === routeId)?.route_stops.find((s) => s.id === stopId)?.label ?? "بلا محطة";
+  const [sheet, setSheet] = useState<CardStudent[] | null>(null);
+  const [confirmReissue, setConfirmReissue] = useState<string | null>(null);
+  const toCard = (st: Student): CardStudent => {
+    const a = st.student_route_assignments.find((x) => routes.find((r) => r.id === x.route_id)?.direction === "to_school") ?? st.student_route_assignments[0];
+    return { id: st.id, full_name: st.full_name, grade: st.grade, qr_token: st.qr_token, route: a ? routeName(a.route_id) : null, stop: a ? stopName(a.route_id, a.stop_id) : null };
+  };
+  if (sheet) return <CardsSheet students={sheet} schoolName={schoolName} onClose={() => setSheet(null)} />;
   return <article className="panel ops-panel">
-    <div className="panel-head"><div><p className="eyebrow">الطلاب</p><h2>إسناد الطلاب إلى المسارات</h2></div></div>
+    <div className="panel-head"><div><p className="eyebrow">الطلاب</p><h2>إسناد الطلاب إلى المسارات</h2></div>
+      {students.length > 0 && <Button size="sm" variant="outline" onClick={() => setSheet(students.map(toCard))}><Printer /> طباعة كل البطاقات</Button>}</div>
     {students.length === 0 && <p className="muted-label">لا يوجد طلاب معتمدون بعد. اعتمد طلبات الطلاب من تبويب «الطلبات».</p>}
     {students.map((student) => <div className="ops-row ops-student" key={student.id}>
       <div><strong>{student.full_name}</strong><p>{student.grade ?? "—"}</p>
         <div className="ops-chips">{student.student_route_assignments.map((a) => <span className="ops-chip" key={a.id}>{routeName(a.route_id)} · {stopName(a.route_id, a.stop_id)}<button aria-label="إلغاء الإسناد" disabled={busy} onClick={() => void act(() => supabase.from("student_route_assignments").delete().eq("id", a.id), "تم إلغاء الإسناد.")}><X /></button></span>)}</div>
       </div>
-      <AssignForm student={student} routes={routes} busy={busy} act={act} />
+      <div className="ops-actions">
+        <AssignForm student={student} routes={routes} busy={busy} act={act} />
+        <Button size="sm" variant="outline" onClick={() => setSheet([toCard(student)])}><IdCard /> البطاقة</Button>
+        {confirmReissue === student.id ? <><Button size="sm" className="danger-btn" disabled={busy} onClick={() => void act(() => supabase.rpc("reissue_student_card", { p_student: student.id }), `صدرت بطاقة جديدة لـ ${student.full_name}، والبطاقة القديمة لم تعد تعمل. اطبع الجديدة.`).then(() => setConfirmReissue(null))}>تأكيد: إيقاف القديمة</Button><Button size="sm" variant="outline" onClick={() => setConfirmReissue(null)}>إلغاء</Button></>
+          : <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmReissue(student.id)}>بطاقة مفقودة</Button>}
+      </div>
     </div>)}
   </article>;
 }

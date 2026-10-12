@@ -141,3 +141,18 @@
 .parent-add-child{margin-top:20px;display:grid;gap:10px}.parent-add-child>h2{font-size:18px;margin:0;color:#10394b}.req-badge{margin-inline-start:8px}
 .children-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:8px}.child-tile{display:grid;gap:8px;padding:16px}.child-tile-head{display:flex;align-items:center;gap:10px}.child-tile-head>div{flex:1;min-width:0}.child-tile-head p{margin:2px 0 0;color:#687587;font-size:12px}.child-route{margin:0;font-size:13px;color:#24364a}
 .rating-stars{display:inline-flex;gap:2px;color:#d6dde3}.rating-stars svg{width:15px;height:15px}.rating-stars svg.on{color:#e3a02b;fill:#e3a02b}
+/* بطاقة الطالب: مقاس بطاقة بنكية تقريبًا (85.6×54 مم) */
+.student-card{width:min(100%,340px);aspect-ratio:85.6/54;max-width:100%;background:#fff;border:1px solid #d6e0e7;border-radius:14px;padding:10px 12px;display:grid;grid-template-rows:auto 1fr auto;gap:4px;color:#10394b;box-shadow:0 4px 14px #10394b14;break-inside:avoid;overflow:hidden}
+.sc-head{display:flex;align-items:center;gap:8px;border-bottom:2px solid #2b8c95;padding-bottom:4px}.sc-head div{display:grid;line-height:1.2}.sc-head strong{font-size:13px}.sc-head span{font-size:9px;color:#687587}.sc-logo{width:22px;height:22px;border-radius:7px;background:#10394b;color:#9fe3df;display:grid;place-items:center}.sc-logo svg{width:14px;height:14px}
+.sc-body{display:flex;align-items:center;gap:10px;min-height:0}.sc-info{flex:1;display:grid;gap:1px;font-size:10px;color:#24364a;min-width:0}.sc-name{font-size:14px;color:#10394b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sc-no{font-size:9px;color:#687587;font-family:ui-monospace,monospace}
+.sc-qr{width:96px;height:96px;flex:none;image-rendering:pixelated}.sc-qr-loading{display:block;background:#f1f5f7;border-radius:6px}.sc-foot{margin:0;font-size:8px;color:#687587}
+.cards-sheet-overlay{display:grid;gap:12px}.cards-sheet-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.cards-sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;justify-items:center}
+.child-tile .student-card{margin-top:4px}
+@media print{body *{visibility:hidden}.print-area,.print-area *{visibility:visible}.print-area{position:absolute;inset:0 auto auto 0;width:100%;display:grid;grid-template-columns:repeat(2,85.6mm);gap:6mm;padding:8mm;justify-content:center}.print-area .student-card{width:85.6mm;height:54mm;box-shadow:none;border-color:#9aa9b5}.no-print{display:none!important}@page{size:A4;margin:0}}
+/* ماسح البطاقات */
+.scanner-overlay{position:fixed;inset:0;z-index:2000;background:#06161f;color:#fff;display:grid;grid-template-rows:auto 1fr auto;padding:calc(12px + env(safe-area-inset-top,0px)) 14px calc(14px + env(safe-area-inset-bottom,0px));gap:10px}
+.scanner-bar{display:flex;align-items:center;justify-content:space-between;gap:10px}.scanner-bar button{background:#fff}
+.scanner-view{position:relative;border-radius:16px;overflow:hidden;background:#000;min-height:0}.scanner-view video{width:100%;height:100%;object-fit:cover}.scanner-frame{position:absolute;inset:18% 15%;border:3px solid #48b7b0;border-radius:18px;box-shadow:0 0 0 999px #0008}
+.scanner-error{align-self:center;text-align:center;background:#3d1c1c;padding:16px;border-radius:12px}
+.scanner-results{display:grid;gap:6px;max-height:30vh;overflow:auto}.scanner-results p{margin:0;padding:10px 12px;border-radius:10px;font-weight:600}.scanner-results .ok{background:#16402f}.scanner-results .bad{background:#4a1f1f}
+.scan-action{margin-bottom:10px}
