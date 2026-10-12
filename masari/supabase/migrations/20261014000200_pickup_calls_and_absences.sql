@@ -141,3 +141,6 @@ begin
 end $$;
 create or replace trigger trip_students_apply_permissions before insert on public.trip_students
   for each row execute function private.apply_student_permissions();
+
+-- شاشة البوابة تتحدث لحظيًا
+alter publication supabase_realtime add table public.pickup_calls;
