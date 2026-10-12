@@ -1,0 +1,8 @@
+{
+  "appId": "sa.masari.app",
+  "appName": "مساري",
+  "webDir": "dist-spa",
+  "android": {
+    "allowMixedContent": false
+  }
+}

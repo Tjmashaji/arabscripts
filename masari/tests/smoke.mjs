@@ -33,7 +33,7 @@ const overflowX = (page) => page.evaluate(() => document.documentElement.scrollW
   await page.click(".lp-login");
   await page.fill("input[type=email]", "nobody@example.com"); await page.fill("input[type=password]", "wrong-pass");
   await page.click(".auth-form-card button.wide-action");
-  check(await page.locator(".auth-message").first().isVisible({ timeout: 8000 }).catch(() => false), "رسالة خطأ عند بيانات دخول خاطئة");
+  check(await page.locator(".auth-message").first().waitFor({ state: "visible", timeout: 10000 }).then(() => true, () => false), "رسالة خطأ عند بيانات دخول خاطئة");
   await page.click(".auth-tabs button:has-text('تسجيل جديد')");
   check(await page.locator(".auth-form-card button.wide-action").isDisabled(), "التسجيل معطل قبل الموافقة على الخصوصية");
   await page.goto(BASE + "#privacy", { waitUntil: "load" });

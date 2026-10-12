@@ -9,6 +9,7 @@ import {
 import { SchoolOps, type OpsTab } from "./school-ops";
 import { QrScanner } from "./student-card";
 import { installErrorReporter } from "@/lib/error-reporter";
+import { isNativeApp, locateOnce, watchLocation, type Fix } from "@/lib/location";
 import { ConsentGate, PRIVACY_URL, PRIVACY_VERSION, PrivacyPolicy } from "./privacy";
 import { PendingAccount } from "./onboarding";
 import { AdminDirectory } from "./school-directory";
@@ -54,7 +55,7 @@ type SimulationState = {
   studentStatus: "waiting" | "approaching" | "on_bus" | "arrived";
 };
 type TripContext = { tripId: string };
-type DriverGps = LocationPoint & { accuracy?: number | null; updatedAt?: string };
+type DriverGps = LocationPoint & { accuracy?: number | null; speed?: number | null; updatedAt?: string };
 type TripEventRow = { id?: string; eventType: string; note: string; createdAt: string; studentName?: string | null };
 type FeedbackItem = { id: string; author: string; role: "parent" | "school" | "driver" | "executive"; rating: number; category: string; message: string; status: string; createdAt: string; saved?: boolean };
 type NotificationItem = { id: string; title: string; body: string; time: string; tone: "green" | "blue" | "amber" | "red" };
@@ -806,7 +807,7 @@ const noopSubscribe = () => () => {};
 const subscribeHash = (cb: () => void) => { window.addEventListener("hashchange", cb); return () => window.removeEventListener("hashchange", cb); };
 export default function Home() {
   const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [accountEmail,setAccountEmail]=useState(""); const [needsConsent,setNeedsConsent]=useState(false); const privacyHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#privacy",()=>false);
-  const gpsWatchRef = useRef<number | null>(null);
+  const gpsWatchRef = useRef<(() => void) | null>(null);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
   const selectedChildRef = useRef<string | null>(null);
@@ -817,7 +818,7 @@ export default function Home() {
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
   useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{if(event==="PASSWORD_RECOVERY"){setRecoveryClosed(false);setRecoveryEvent(true)}void refresh()});return()=>{alive=false;subscription.unsubscribe()}},[]);
   useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
-  useEffect(()=>()=>{if(gpsWatchRef.current!==null) navigator.geolocation.clearWatch(gpsWatchRef.current); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
+  useEffect(()=>()=>{gpsWatchRef.current?.(); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
   const [dbNotes,setDbNotes]=useState<DbNotification[]>([]);
   useEffect(()=>{
     if(!entered||authMode!=="authenticated")return;
@@ -837,7 +838,7 @@ export default function Home() {
   const unreadCount = authMode==="authenticated" ? dbNotes.filter((n)=>!n.read_at).length : notifications.length;
   const toggleNotifications=()=>{const opening=!notificationsOpen;setNotificationsOpen(opening);if(opening&&authMode==="authenticated"&&dbNotes.some((n)=>!n.read_at)){const ids=dbNotes.filter((n)=>!n.read_at).map((n)=>n.id);const now=new Date().toISOString();setDbNotes((cur)=>cur.map((n)=>ids.includes(n.id)?{...n,read_at:now}:n));void supabase.from("notifications").update({read_at:now}).in("id",ids).then(()=>{})}};
   const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
-  const stopGpsTracking=()=>{if(gpsWatchRef.current!==null){navigator.geolocation.clearWatch(gpsWatchRef.current);gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
+  const stopGpsTracking=()=>{if(gpsWatchRef.current){gpsWatchRef.current();gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
   const stopRealtimeTracking=()=>{if(realtimeChannelRef.current){void supabase.removeChannel(realtimeChannelRef.current);realtimeChannelRef.current=null}};
   const stopEventsRealtime=()=>{if(eventsChannelRef.current){void supabase.removeChannel(eventsChannelRef.current);eventsChannelRef.current=null}};
   const signOut=async()=>{if(authMode==="authenticated") await supabase.auth.signOut();stopGpsTracking();stopRealtimeTracking();stopEventsRealtime();setAuthMode("demo");setAccountName("");setEntered(false);setView("dashboard");setSimulation(initialSimulation);setActiveTripContext(null);setTripSaveStatus("");setDriverGps(null);setTripEvents([]);setFeedbackRows([]);setNotificationsOpen(false)};
@@ -971,51 +972,31 @@ export default function Home() {
     const tripId = context?.tripId ?? activeTripContext?.tripId ?? (role === "driver" ? liveTripId : null);
     if (!tripId || Date.now() - lastGpsSaveRef.current < 10000) return;
     lastGpsSaveRef.current = Date.now();
-    const { error } = await supabase.from("vehicle_locations").insert({ trip_id: tripId, latitude: point.lat, longitude: point.lng, accuracy: point.accuracy ?? null });
+    const { error } = await supabase.from("vehicle_locations").insert({ trip_id: tripId, latitude: point.lat, longitude: point.lng, accuracy: point.accuracy ?? null, speed: point.speed ?? null });
     setGpsStatus(error ? "GPS يعمل على الشاشة، لكن تعذر حفظ الموقع." : "تم حفظ موقع الباص.");
   };
-  const handleGpsPosition=(position: GeolocationPosition, context?: TripContext | null)=>{
+  const handleGpsPosition=(fix: Fix, context?: TripContext | null)=>{
     const nextPoint: DriverGps = {
       label: "موقع السائق الحالي",
-      address: "GPS مباشر من جهاز السائق",
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-      accuracy: position.coords.accuracy,
+      address: isNativeApp() ? "GPS من تطبيق مساري (يعمل في الخلفية)" : "GPS مباشر من جهاز السائق",
+      lat: fix.lat,
+      lng: fix.lng,
+      accuracy: fix.accuracy,
+      speed: fix.speed,
       updatedAt: new Date().toISOString(),
     };
     setDriverGps(nextPoint);
-    setGpsStatus(`آخر تحديث GPS بدقة ${Math.round(position.coords.accuracy)} متر.`);
+    setGpsStatus(`آخر تحديث GPS بدقة ${Math.round(fix.accuracy)} متر.`);
     void persistGpsLocation(nextPoint, context);
   };
   const startGpsTracking=(context?: TripContext | null)=>{
-    if (!("geolocation" in navigator)) {
-      setGpsStatus("هذا الجهاز لا يدعم تحديد الموقع من المتصفح.");
-      return;
-    }
     setGpsStatus("نطلب إذن الموقع من الجهاز…");
-    if (gpsWatchRef.current !== null) navigator.geolocation.clearWatch(gpsWatchRef.current);
-    navigator.geolocation.getCurrentPosition(
-      (position)=>handleGpsPosition(position, context),
-      ()=>setGpsStatus("لم يتم السماح بالموقع. استخدم إعدادات المتصفح لتفعيل GPS."),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 },
-    );
-    gpsWatchRef.current = navigator.geolocation.watchPosition(
-      (position)=>handleGpsPosition(position, context),
-      ()=>setGpsStatus("تعذر تحديث GPS الآن. تحقق من إذن الموقع والإنترنت."),
-      { enableHighAccuracy: true, timeout: 18000, maximumAge: 15000 },
-    );
+    gpsWatchRef.current?.(); gpsWatchRef.current=null;
+    void watchLocation((fix)=>handleGpsPosition(fix, context), setGpsStatus).then((stop)=>{gpsWatchRef.current=stop;}).catch(()=>setGpsStatus("تعذر تشغيل تتبع الموقع."));
   };
   const refreshGpsNow=()=>{
-    if (!("geolocation" in navigator)) {
-      setGpsStatus("هذا الجهاز لا يدعم تحديد الموقع من المتصفح.");
-      return;
-    }
     setGpsStatus("جارٍ تحديث موقع GPS…");
-    navigator.geolocation.getCurrentPosition(
-      (position)=>handleGpsPosition(position, activeTripContext),
-      ()=>setGpsStatus("تعذر قراءة الموقع. اسمح للموقع باستخدام GPS من المتصفح."),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
-    );
+    void locateOnce().then((fix)=>handleGpsPosition(fix, activeTripContext)).catch(()=>setGpsStatus("تعذر قراءة الموقع. اسمح للموقع باستخدام GPS."));
   };
   const startTrip=()=>{
     if (authMode !== "authenticated") {
