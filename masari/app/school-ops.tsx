@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, IdCard, Plus, Printer, X } from "lucide-react";
 import { CardsSheet, type CardStudent } from "./student-card";
 import { RoutePlanner } from "./route-planner-ui";
+import { HomeLocationRequests } from "./home-location";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
@@ -114,6 +115,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
     <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>{TAB_TITLES[tab][0]}</h1><p>{TAB_TITLES[tab][1]}</p></div></div>
     {message && <p className={`save-strip ops-message ${message.ok ? "" : "ops-error"}`}>{message.ok ? <Check /> : <X />}<span>{message.text}</span></p>}
     {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
+    {tab === "requests" && <HomeLocationRequests schoolId={schoolId} onDone={(text) => setMessage({ text, ok: true })} />}
     {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
     {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}

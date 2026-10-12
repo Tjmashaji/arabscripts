@@ -194,3 +194,8 @@
 .map-gps-note svg { width: 16px; height: 16px; }
 .scanner-photo { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px auto 0; max-width: 420px; padding: 12px 16px; border-radius: 12px; background: #fff; color: #10394b; font-weight: 700; cursor: pointer; }
 .scanner-photo svg { width: 18px; height: 18px; }
+.coords-input { display: flex; gap: 8px; margin-top: 10px; }
+.coords-input input { flex: 1; min-width: 0; border: 1px solid #cfdfe3; border-radius: 10px; padding: 9px 12px; font: inherit; }
+.coords-input button { border: 1px solid #1f8a93; color: #1f8a93; background: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.coords-input button:disabled { opacity: .45; cursor: default; }
+.coords-hint { margin-top: 4px; font-size: 12px; }
