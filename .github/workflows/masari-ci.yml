@@ -56,7 +56,9 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      # Android SDK مثبت مسبقًا على ubuntu-latest (ANDROID_HOME)؛ نقبل التراخيص فقط
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - run: npm ci
       - name: Build web app and copy into Android
         run: npm run android:sync
