@@ -5,6 +5,7 @@ import { Check, IdCard, Plus, Printer, X } from "lucide-react";
 import { CardsSheet, type CardStudent } from "./student-card";
 import { RoutePlanner } from "./route-planner-ui";
 import { RouteCard } from "./route-editor";
+import { TripActual, riyadhWeekday } from "./route-tools";
 import { HomeLocationRequests } from "./home-location";
 import { TodayChecks } from "./safety";
 import { Button } from "@/components/ui/button";
@@ -19,8 +20,8 @@ type StudentRequest = { id: string; student_name: string; grade: string | null; 
 type DriverRequest = { id: string; driver_name: string; phone: string | null; email: string | null; vehicle_plate: string | null };
 type Driver = { id: string; full_name: string; status: string; user_id: string | null };
 type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null };
-type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null };
-type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; estimated_duration_minutes: number | null; is_active: boolean; archived_at: string | null; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
+type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null; scheduled_time: string | null };
+type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; estimated_duration_minutes: number | null; is_active: boolean; archived_at: string | null; days: number[] | null; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
 type Assignment = { id: string; route_id: string; stop_id: string | null };
 type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; home_latitude: number | null; home_longitude: number | null; student_route_assignments: Assignment[] };
 type Trip = { id: string; route_id: string; status: string; driver_id: string | null };
@@ -77,7 +78,7 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
       supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
       supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
-      supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
+      supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,days,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude,scheduled_time)").eq("school_id", schoolId).order("name"),
       supabase.from("students").select("id,full_name,grade,service_status,qr_token,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
       supabase.from("trips").select("id,route_id,status,driver_id").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
     ]);
@@ -118,7 +119,7 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
     {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "requests" && <HomeLocationRequests schoolId={schoolId} onDone={(text) => setMessage({ text, ok: true })} />}
     {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
-    {tab === "routes" && <RoutesTab isAdmin={isAdmin} schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
+    {tab === "routes" && <RoutesTab isAdmin={isAdmin} schoolName={schoolName} schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
     {tab === "trips" && <TodayChecks schoolId={schoolId} />}
@@ -240,7 +241,7 @@ function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; b
   </>;
 }
 
-function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, students, busy, act, isAdmin }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; students: Student[]; busy: boolean; act: Act; isAdmin: boolean }) {
+function RoutesTab({ schoolName, schoolId, schoolLat, schoolLng, routes, buses, drivers, students, busy, act, isAdmin }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; students: Student[]; busy: boolean; act: Act; isAdmin: boolean; schoolName: string }) {
   const [showArchived, setShowArchived] = useState(false);
   const live = routes.filter((r) => !r.archived_at);
   const archived = routes.filter((r) => r.archived_at);
@@ -252,10 +253,10 @@ function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, stu
   return <>
     <RoutePlanner schoolId={schoolId} school={schoolLat != null && schoolLng != null ? { lat: schoolLat, lng: schoolLng } : null} students={plannable} missingHome={unassigned.length - plannable.length} defaultCapacity={Math.max(0, ...buses.map((b) => b.capacity))} busy={busy} act={act} />
     {live.length === 0 && <article className="panel ops-panel"><p className="muted-label">لا توجد مسارات بعد. استخدم «اقتراح المسارات» أعلاه أو أنشئ مسارًا من النموذج أدناه.</p></article>}
-    {live.map((route) => <RouteCard key={route.id} route={route} routes={routes} buses={buses} drivers={drivers} studentCount={countOn(route.id)} studentsAtStop={atStop} isAdmin={isAdmin} busy={busy} act={act} />)}
+    {live.map((route) => <RouteCard key={route.id} route={route} routes={routes} buses={buses} drivers={drivers} students={students} schoolName={schoolName} studentCount={countOn(route.id)} studentsAtStop={atStop} isAdmin={isAdmin} busy={busy} act={act} />)}
     <NewRouteForm schoolId={schoolId} schoolLat={schoolLat} schoolLng={schoolLng} busy={busy} act={act} />
     {archived.length > 0 && <button className="text-link archived-toggle" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "إخفاء" : "عرض"} المسارات المؤرشفة ({archived.length})</button>}
-    {showArchived && archived.map((route) => <RouteCard key={route.id} route={route} routes={routes} buses={buses} drivers={drivers} studentCount={countOn(route.id)} studentsAtStop={atStop} isAdmin={isAdmin} busy={busy} act={act} />)}
+    {showArchived && archived.map((route) => <RouteCard key={route.id} route={route} routes={routes} buses={buses} drivers={drivers} students={students} schoolName={schoolName} studentCount={countOn(route.id)} studentsAtStop={atStop} isAdmin={isAdmin} busy={busy} act={act} />)}
   </>;
 }
 
@@ -340,11 +341,14 @@ function AssignForm({ student, routes, busy, act }: { student: Student; routes: 
 }
 
 function TripsTab({ schoolId, routes, trips, drivers, buses, students, busy, act, setMessage, reload }: { schoolId: string; routes: RouteRow[]; trips: Trip[]; drivers: Driver[]; buses: Bus[]; students: Student[]; busy: boolean; act: Act; setMessage: (m: { text: string; ok: boolean } | null) => void; reload: () => Promise<void> }) {
-  const active = routes.filter((r) => r.is_active);
+  const today = riyadhWeekday();
+  const runsToday = (r: RouteRow) => (r.days ?? [0, 1, 2, 3, 4]).includes(today);
+  const active = routes.filter((r) => r.is_active && !r.archived_at);
+  const [actualFor, setActualFor] = useState<string | null>(null);
   const tripFor = (routeId: string) => trips.find((t) => t.route_id === routeId);
   const studentsOn = (routeId: string) => students.filter((s) => s.student_route_assignments.some((a) => a.route_id === routeId)).length;
   // سبب عدم جاهزية المسار لإنشاء رحلة اليوم، أو null إن كان جاهزًا
-  const blocker = (r: RouteRow) => !r.driver_id ? "بلا سائق" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
+  const blocker = (r: RouteRow) => !runsToday(r) ? "لا يعمل اليوم" : !r.driver_id ? "بلا سائق" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
     : r.route_stops.some((s) => s.latitude == null || s.longitude == null) ? "محطة بلا موقع" : !studentsOn(r.id) ? "لا طلاب مسندين" : null;
   const ready = active.filter((r) => !tripFor(r.id) && !blocker(r));
   const createAll = async () => {
@@ -363,11 +367,13 @@ function TripsTab({ schoolId, routes, trips, drivers, buses, students, busy, act
         <div><strong>{r.name}</strong><p>{[directionLabel(r.direction), r.scheduled_time?.slice(0, 5), driver && `السائق ${driver}`, bus && `باص ${bus}`, `${studentsOn(r.id)} طالب`].filter(Boolean).join(" · ")}</p></div>
         <div className="ops-actions">
           {trip ? <Badge className="status-badge tone-0">{tripStatusLabel[trip.status] ?? trip.status}</Badge> : why ? <Badge className="status-badge tone-1">{why}</Badge> : <Badge className="status-badge tone-2">جاهز للإنشاء</Badge>}
+          {trip && trip.status !== "scheduled" && trip.status !== "ready" && trip.status !== "cancelled" && <Button size="sm" variant="outline" onClick={() => setActualFor(actualFor === trip.id ? null : trip.id)}>{actualFor === trip.id ? "إخفاء المسار الفعلي" : "المسار الفعلي"}</Button>}
           {trip && (trip.status === "scheduled" || trip.status === "ready") && <select className="sub-driver" aria-label={`سائق رحلة ${r.name} اليوم`} value={trip.driver_id ?? ""} disabled={busy}
             onChange={(e) => { const d = drivers.find((x) => x.id === e.target.value); if (d) void act(() => supabase.from("trips").update({ driver_id: d.id }).eq("id", trip.id), d.id === r.driver_id ? `عاد ${d.full_name} سائقًا لرحلة ${r.name}.` : `${d.full_name} سائق بديل لرحلة ${r.name} اليوم فقط، وأُبلغ بذلك.`); }}>
             {drivers.filter((d) => d.status === "active").map((d) => <option key={d.id} value={d.id}>{d.id === r.driver_id ? `${d.full_name} (الأساسي)` : `بديل: ${d.full_name}`}</option>)}</select>}
           {trip && (trip.status === "scheduled" || trip.status === "ready") && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (window.confirm(`إلغاء رحلة ${r.name} اليوم؟`)) void act(() => supabase.from("trips").update({ status: "cancelled" }).eq("id", trip.id), "تم إلغاء الرحلة."); }}>إلغاء</Button>}
         </div>
+        {trip && actualFor === trip.id && <TripActual tripId={trip.id} onClose={() => setActualFor(null)} />}
       </div>;
     })}
   </article>;

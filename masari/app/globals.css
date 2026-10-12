@@ -288,3 +288,22 @@
 .route-danger { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid #e3edf0; }
 .route-danger .inline-form input { border: 1px solid #cfdfe3; border-radius: 10px; padding: 6px 8px; }
 .archived-toggle { justify-self: start; margin: 4px 0 12px; }
+.route-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.days-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.days-picker label { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid #cfdfe3; border-radius: 999px; cursor: pointer; font-size: 14px; background: #fff; }
+.days-picker label.on { background: #1f8a93; border-color: #1f8a93; color: #fff; }
+.days-picker input { display: none; }
+.route-students { display: grid; gap: 10px; margin: 10px 0; padding: 12px; border: 1px solid #dbe7ea; border-radius: 14px; background: #f9fbfc; }
+.rs-stop { display: grid; gap: 6px; }
+.rs-student { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 10px; background: #fff; border-radius: 10px; border: 1px solid #e3edf0; }
+.ops-row:has(.trip-actual) { flex-wrap: wrap; }
+.trip-actual { flex: 1 1 100%; display: grid; gap: 10px; margin-top: 10px; }
+.report-table td.late { color: #c23b3b; font-weight: 700; }
+.route-sheet { background: #fff; padding: 24px; max-width: 1000px; margin: 0 auto; color: #10394b; }
+.route-sheet header h2 { margin: 0 0 4px; } .route-sheet header p { margin: 2px 0; color: #5a7280; }
+.route-sheet table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+.route-sheet th, .route-sheet td { border: 1px solid #cfdfe3; padding: 6px 8px; text-align: right; }
+.route-sheet th { background: #eef4f5; } .route-sheet tr.stop-only td { color: #5a7280; }
+.route-sheet td.tick { width: 34px; } .sheet-foot { font-size: 12px; color: #5a7280; margin-top: 10px; }
+.route-card .cards-sheet-overlay { position: fixed; inset: 0; z-index: 2000; background: #f3f7f8; overflow: auto; padding: 20px; align-content: start; }
+@media print { .print-area.route-sheet { display: block; grid-template-columns: none; padding: 10mm; max-width: none; } .route-card .cards-sheet-overlay { background: #fff; padding: 0; } @page { size: A4 landscape; } }
