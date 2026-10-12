@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, IdCard, Plus, Printer, X } from "lucide-react";
 import { CardsSheet, type CardStudent } from "./student-card";
 import { RoutePlanner } from "./route-planner-ui";
+import { RouteCard } from "./route-editor";
 import { HomeLocationRequests } from "./home-location";
 import { TodayChecks } from "./safety";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ type DriverRequest = { id: string; driver_name: string; phone: string | null; em
 type Driver = { id: string; full_name: string; status: string; user_id: string | null };
 type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null };
 type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null };
-type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; is_active: boolean; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
+type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; estimated_duration_minutes: number | null; is_active: boolean; archived_at: string | null; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
 type Assignment = { id: string; route_id: string; stop_id: string | null };
 type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; home_latitude: number | null; home_longitude: number | null; student_route_assignments: Assignment[] };
 type Trip = { id: string; route_id: string; status: string; driver_id: string | null };
@@ -47,7 +48,6 @@ const parseLatLng = (text: string): { lat: number; lng: number } | null => {
   const [lat, lng] = parts;
   return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat, lng } : null;
 };
-const formatLatLng = (stop: Pick<Stop, "latitude" | "longitude">) => stop.latitude != null && stop.longitude != null ? `${stop.latitude}, ${stop.longitude}` : "";
 
 const TAB_TITLES: Record<OpsTab, [string, string]> = {
   requests: ["الطلبات", "إضافة الطلاب والسائقين، واعتماد طلبات أولياء الأمور والسائقين."],
@@ -57,7 +57,7 @@ const TAB_TITLES: Record<OpsTab, [string, string]> = {
   trips: ["رحلات اليوم", "إنشاء رحلات اليوم لكل مسار جاهز ومتابعة حالتها."],
 };
 
-export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) {
+export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string; tab: OpsTab; isAdmin?: boolean }) {
   const [schoolPoint, setSchoolPoint] = useState<{ lat: number | null; lng: number | null }>({ lat: null, lng: null });
   const [schoolName, setSchoolName] = useState("");
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -77,7 +77,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
       supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
       supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
-      supabase.from("routes").select("id,name,direction,scheduled_time,is_active,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
+      supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
       supabase.from("students").select("id,full_name,grade,service_status,qr_token,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
       supabase.from("trips").select("id,route_id,status,driver_id").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
     ]);
@@ -118,7 +118,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
     {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "requests" && <HomeLocationRequests schoolId={schoolId} onDone={(text) => setMessage({ text, ok: true })} />}
     {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
-    {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
+    {tab === "routes" && <RoutesTab isAdmin={isAdmin} schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
     {tab === "trips" && <TodayChecks schoolId={schoolId} />}
@@ -240,46 +240,23 @@ function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; b
   </>;
 }
 
-function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, students, busy, act }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; students: Student[]; busy: boolean; act: Act }) {
-  const activeDrivers = drivers.filter((d) => d.status === "active");
-  const toSchool = new Set(routes.filter((r) => r.is_active && r.direction === "to_school").map((r) => r.id));
+function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, students, busy, act, isAdmin }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; students: Student[]; busy: boolean; act: Act; isAdmin: boolean }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const live = routes.filter((r) => !r.archived_at);
+  const archived = routes.filter((r) => r.archived_at);
+  const toSchool = new Set(live.filter((r) => r.is_active && r.direction === "to_school").map((r) => r.id));
   const unassigned = students.filter((st) => st.service_status === "active" && !st.student_route_assignments.some((a) => toSchool.has(a.route_id)));
   const plannable = unassigned.filter((st) => st.home_latitude != null && st.home_longitude != null).map((st) => ({ id: st.id, name: st.full_name, lat: st.home_latitude!, lng: st.home_longitude! }));
+  const countOn = (routeId: string) => students.filter((st) => st.student_route_assignments.some((a) => a.route_id === routeId)).length;
+  const atStop = (stopId: string) => students.filter((st) => st.student_route_assignments.some((a) => a.stop_id === stopId)).length;
   return <>
     <RoutePlanner schoolId={schoolId} school={schoolLat != null && schoolLng != null ? { lat: schoolLat, lng: schoolLng } : null} students={plannable} missingHome={unassigned.length - plannable.length} defaultCapacity={Math.max(0, ...buses.map((b) => b.capacity))} busy={busy} act={act} />
-    {routes.length === 0 && <article className="panel ops-panel"><p className="muted-label">لا توجد مسارات بعد. أنشئ أول مسار من النموذج أدناه.</p></article>}
-    {routes.map((route) => <article className="panel ops-panel" key={route.id}>
-      <div className="panel-head"><div><p className="eyebrow">{directionLabel(route.direction)} · {route.scheduled_time?.slice(0, 5) ?? "—"}</p><h2>{route.name}</h2></div>{!route.is_active && <Badge className="status-badge tone-1">متوقف</Badge>}</div>
-      <div className="driver-form">
-        <label>الباص<select value={route.bus_id ?? ""} disabled={busy} onChange={(e) => {
-          const bus = buses.find((b) => b.id === e.target.value);
-          // اختيار الباص يقترح سائقه تلقائيًا إن لم يكن للمسار سائق
-          const patch = { bus_id: e.target.value || null, ...(bus?.driver_id && !route.driver_id ? { driver_id: bus.driver_id } : {}) };
-          void act(() => supabase.from("routes").update(patch).eq("id", route.id), "تم تحديث باص المسار.");
-        }}><option value="">— بلا باص —</option>{buses.map((b) => <option key={b.id} value={b.id}>باص {b.bus_number} · {b.plate_number}</option>)}</select></label>
-        <label>السائق<select value={route.driver_id ?? ""} disabled={busy} onChange={(e) => void act(() => supabase.from("routes").update({ driver_id: e.target.value || null }).eq("id", route.id), "تم تحديث سائق المسار.")}>
-          <option value="">— بلا سائق —</option>{activeDrivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
-        </select></label>
-      </div>
-      <p className="eyebrow ops-subhead">المحطات بالترتيب</p>
-      {route.route_stops.map((stop) => <StopRow key={stop.id} stop={stop} busy={busy} act={act} />)}
-    </article>)}
+    {live.length === 0 && <article className="panel ops-panel"><p className="muted-label">لا توجد مسارات بعد. استخدم «اقتراح المسارات» أعلاه أو أنشئ مسارًا من النموذج أدناه.</p></article>}
+    {live.map((route) => <RouteCard key={route.id} route={route} routes={routes} buses={buses} drivers={drivers} studentCount={countOn(route.id)} studentsAtStop={atStop} isAdmin={isAdmin} busy={busy} act={act} />)}
     <NewRouteForm schoolId={schoolId} schoolLat={schoolLat} schoolLng={schoolLng} busy={busy} act={act} />
+    {archived.length > 0 && <button className="text-link archived-toggle" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "إخفاء" : "عرض"} المسارات المؤرشفة ({archived.length})</button>}
+    {showArchived && archived.map((route) => <RouteCard key={route.id} route={route} routes={routes} buses={buses} drivers={drivers} studentCount={countOn(route.id)} studentsAtStop={atStop} isAdmin={isAdmin} busy={busy} act={act} />)}
   </>;
-}
-
-function StopRow({ stop, busy, act }: { stop: Stop; busy: boolean; act: Act }) {
-  const [coords, setCoords] = useState(formatLatLng(stop));
-  const parsed = parseLatLng(coords);
-  const changed = coords !== formatLatLng(stop);
-  const missing = stop.latitude == null || stop.longitude == null;
-  return <div className={`ops-row ops-stop ${missing ? "ops-missing" : ""}`}>
-    <div><strong>{stop.stop_order}. {stop.label}</strong><p>{stop.stop_type === "school" ? "محطة المدرسة" : stop.stop_type === "dropoff" ? "محطة نزول" : "محطة صعود"}{missing && " · بلا موقع — لن تبدأ الرحلة قبل تحديده"}</p></div>
-    <div className="ops-actions">
-      <input className="ops-coords" value={coords} onChange={(e) => setCoords(e.target.value)} placeholder="24.7501, 46.8001" dir="ltr" aria-label={`إحداثيات ${stop.label}`} />
-      <Button size="sm" variant="outline" disabled={busy || !changed || !parsed} onClick={() => parsed && void act(() => supabase.from("route_stops").update({ latitude: parsed.lat, longitude: parsed.lng }).eq("id", stop.id), `تم حفظ موقع ${stop.label}.`)}>حفظ</Button>
-    </div>
-  </div>;
 }
 
 function NewRouteForm({ schoolId, schoolLat, schoolLng, busy, act }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; busy: boolean; act: Act }) {

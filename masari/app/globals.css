@@ -275,3 +275,16 @@
 .channels-toggles label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
 .channels-toggles svg { width: 16px; height: 16px; color: #1f8a93; }
 .channels small { color: #5a7280; }
+.route-card.archived { opacity: .75; }
+.route-card-map .trip-map-canvas { height: 260px; }
+.route-info-form { display: grid; gap: 10px; padding: 12px; border: 1px solid #dbe7ea; border-radius: 14px; background: #f5f9fa; margin-bottom: 12px; }
+.stop-main { flex: 1; min-width: 0; }
+.stop-label-input { border: 1px solid #cfdfe3; border-radius: 10px; padding: 7px 10px; font: inherit; font-weight: 700; width: min(100%, 320px); }
+.stop-map { margin-top: 8px; }
+.icon-btn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid #cfdfe3; background: #fff; color: #10394b; cursor: pointer; }
+.icon-btn:disabled { opacity: .35; cursor: default; } .icon-btn svg { width: 16px; height: 16px; }
+.icon-btn.danger { color: #c23b3b; border-color: #f0c4c4; }
+.add-stop { display: grid; gap: 10px; margin-top: 12px; padding: 12px; border: 1px dashed #b9cfd4; border-radius: 14px; }
+.route-danger { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid #e3edf0; }
+.route-danger .inline-form input { border: 1px solid #cfdfe3; border-radius: 10px; padding: 6px 8px; }
+.archived-toggle { justify-self: start; margin: 4px 0 12px; }
