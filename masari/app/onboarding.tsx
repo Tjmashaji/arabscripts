@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { SchoolFinder } from "./school-directory";
+import { DeleteAccount } from "./delete-account";
 
 // حساب مسجّل بلا دور معتمد بعد. كل دور يكمل طلبه هنا:
 // ولي الأمر يختار مدرسة ابنه ويرسل طلب التسجيل، والسائق يختار مدرسته ويرسل طلب الانضمام،
@@ -117,6 +118,7 @@ export function PendingAccount({ email, name, phone, requestedRole, suspended, o
         </article>
       </>}
       <button className="text-link" onClick={onSignOut}>تسجيل الخروج</button>
+      <DeleteAccount email={email} compact onDeleted={() => window.location.reload()} />
     </section>
   </main>;
 }

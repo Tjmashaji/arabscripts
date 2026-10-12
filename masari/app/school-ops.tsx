@@ -8,6 +8,7 @@ import { RouteCard } from "./route-editor";
 import { TripActual, riyadhWeekday } from "./route-tools";
 import { HomeLocationRequests } from "./home-location";
 import { TodayChecks } from "./safety";
+import { BusCare, DriverLicense, StudentAvatar, HolidaysPanel, StudentPhotoButton, blockerText, busDocsBadge, useHolidays, usePhotoUrls } from "./school-extras";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
@@ -18,12 +19,12 @@ import { supabase } from "@/lib/supabase";
 export type OpsTab = "requests" | "fleet" | "routes" | "students" | "trips";
 type StudentRequest = { id: string; student_name: string; grade: string | null; parent_name: string | null; parent_phone: string | null; parent_email: string | null; status: string; student_national_id: string | null; home_address: string | null; home_latitude: number | null; home_longitude: number | null; note: string | null; created_by: string | null };
 type DriverRequest = { id: string; driver_name: string; phone: string | null; email: string | null; vehicle_plate: string | null };
-type Driver = { id: string; full_name: string; status: string; user_id: string | null };
-type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null };
-type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null; scheduled_time: string | null };
+type Driver = { id: string; full_name: string; status: string; user_id: string | null; license_expiry?: string | null };
+type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null; status?: string; registration_expiry?: string | null; insurance_expiry?: string | null; inspection_expiry?: string | null; next_service_on?: string | null };
+type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null; scheduled_time: string | null; radius_m?: number | null };
 type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; estimated_duration_minutes: number | null; is_active: boolean; archived_at: string | null; days: number[] | null; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
 type Assignment = { id: string; route_id: string; stop_id: string | null };
-type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; home_latitude: number | null; home_longitude: number | null; student_route_assignments: Assignment[] };
+type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; photo_path?: string | null; home_latitude: number | null; home_longitude: number | null; student_route_assignments: Assignment[] };
 type Trip = { id: string; route_id: string; status: string; driver_id: string | null };
 
 const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
@@ -31,6 +32,8 @@ const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : 
 const tripStatusLabel: Record<string, string> = { scheduled: "مجدولة", ready: "جاهزة", in_progress: "جارية", paused: "متوقفة", completed: "انتهت", cancelled: "ملغاة", emergency: "طارئ" };
 const errorText = (error: { message?: string; code?: string } | null) => {
   const m = error?.message ?? "";
+  const blocker = Object.keys(blockerText).find((k) => m.includes(k));
+  if (blocker) return blockerText[blocker];
   if (m.includes("SCHOOL_NOT_ACTIVE")) return "المدرسة موقوفة أو غير مفعّلة، فلا يمكن تعديل تشغيلها. تواصل مع إدارة مساري.";
   if (m.includes("DUPLICATE_STUDENT")) return "الطالب مسجل مسبقًا.";
   if (m.includes("DUPLICATE_DRIVER")) return "السائق مسجل مسبقًا.";
@@ -76,10 +79,10 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
       supabase.from("schools").select("name,latitude,longitude").eq("id", schoolId).single(),
       supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status,student_national_id,home_address,home_latitude,home_longitude,note,created_by").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
       supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
-      supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
-      supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
-      supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,days,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude,scheduled_time)").eq("school_id", schoolId).order("name"),
-      supabase.from("students").select("id,full_name,grade,service_status,qr_token,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
+      supabase.from("drivers").select("id,full_name,status,user_id,license_expiry").eq("school_id", schoolId).order("full_name"),
+      supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id,status,registration_expiry,insurance_expiry,inspection_expiry,next_service_on").eq("school_id", schoolId).order("bus_number"),
+      supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,days,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude,scheduled_time,radius_m)").eq("school_id", schoolId).order("name"),
+      supabase.from("students").select("id,full_name,grade,service_status,qr_token,photo_path,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
       supabase.from("trips").select("id,route_id,status,driver_id").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
     ]);
     setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null });
@@ -118,11 +121,12 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
     {message && <p className={`save-strip ops-message ${message.ok ? "" : "ops-error"}`}>{message.ok ? <Check /> : <X />}<span>{message.text}</span></p>}
     {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "requests" && <HomeLocationRequests schoolId={schoolId} onDone={(text) => setMessage({ text, ok: true })} />}
-    {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
+    {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} reload={load} />}
     {tab === "routes" && <RoutesTab isAdmin={isAdmin} schoolName={schoolName} schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
-    {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
+    {tab === "students" && <StudentsTab schoolId={schoolId} setMessage={setMessage} reload={load} students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
     {tab === "trips" && <TodayChecks schoolId={schoolId} />}
+    {tab === "trips" && <HolidaysPanel schoolId={schoolId} canEdit onChange={() => void load()} />}
   </>;
 }
 
@@ -204,7 +208,8 @@ function RequestsTab({ schoolId, studentRequests, driverRequests, busy, act }: {
   </>;
 }
 
-function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act }) {
+function FleetTab({ schoolId, buses, drivers, busy, act, reload }: { schoolId: string; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act; reload: () => Promise<void> }) {
+  const [careFor, setCareFor] = useState<string | null>(null);
   const [form, setForm] = useState({ number: "", plate: "", capacity: "20" });
   const capacity = Number(form.capacity);
   const canAdd = form.number.trim() && form.plate.trim() && Number.isInteger(capacity) && capacity > 0;
@@ -217,12 +222,14 @@ function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; b
     <article className="panel ops-panel">
       <div className="panel-head"><div><p className="eyebrow">الأسطول</p><h2>الباصات وسائقوها</h2></div></div>
       {buses.length === 0 && <p className="muted-label">لا توجد باصات بعد.</p>}
-      {buses.map((bus) => <div className="ops-row" key={bus.id}>
-        <div><strong>باص {bus.bus_number}</strong><p>{bus.plate_number} · {bus.capacity} مقعدًا</p></div>
+      {buses.map((bus) => { const badge = busDocsBadge(bus); return <div className="ops-row ops-bus" key={bus.id}>
+        <div><strong>باص {bus.bus_number}</strong><p>{bus.plate_number} · {bus.capacity} مقعدًا</p>{badge && <Badge className={`status-badge ${badge.tone}`}>{badge.text}</Badge>}</div>
         <label className="ops-select">السائق<select value={bus.driver_id ?? ""} disabled={busy} onChange={(e) => void act(() => supabase.from("buses").update({ driver_id: e.target.value || null }).eq("id", bus.id), "تم تحديث سائق الباص.")}>
           <option value="">— بلا سائق —</option>{activeDrivers.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
         </select></label>
-      </div>)}
+        <Button size="sm" variant="outline" onClick={() => setCareFor(careFor === bus.id ? null : bus.id)}>{careFor === bus.id ? "إغلاق" : "الوثائق والصيانة"}</Button>
+        {careFor === bus.id && <BusCare bus={bus} schoolId={schoolId} canEdit onSaved={() => void reload()} />}
+      </div>; })}
     </article>
     <article className="panel ops-panel">
       <div className="panel-head"><div><p className="eyebrow">الأسطول</p><h2>إضافة باص</h2></div></div>
@@ -236,7 +243,7 @@ function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; b
     <article className="panel ops-panel">
       <div className="panel-head"><div><p className="eyebrow">السائقون</p><h2>سائقو المدرسة</h2></div></div>
       {drivers.length === 0 && <p className="muted-label">لا يوجد سائقون بعد. أضف سائقًا من «الأسطول والسائقون» ثم اعتمده من «الطلبات».</p>}
-      {drivers.map((d) => <div className="ops-row" key={d.id}><div><strong>{d.full_name}</strong><p>{d.user_id ? "الحساب مربوط" : "بانتظار تسجيل السائق بنفس البريد"}</p></div><Badge className="status-badge tone-2">{d.status === "active" ? "معتمد" : d.status === "pending" ? "قيد المراجعة" : "موقوف"}</Badge></div>)}
+      {drivers.map((d) => <div className="ops-row" key={d.id}><div><strong>{d.full_name}</strong><p>{d.user_id ? "الحساب مربوط" : "بانتظار تسجيل السائق بنفس البريد"}</p></div><DriverLicense driverId={d.id} value={d.license_expiry ?? null} canEdit onSaved={() => void reload()} /><Badge className="status-badge tone-2">{d.status === "active" ? "معتمد" : d.status === "pending" ? "قيد المراجعة" : "موقوف"}</Badge></div>)}
     </article>
   </>;
 }
@@ -298,7 +305,8 @@ function NewRouteForm({ schoolId, schoolLat, schoolLng, busy, act }: { schoolId:
   </article>;
 }
 
-function StudentsTab({ students, routes, schoolName, busy, act }: { students: Student[]; routes: RouteRow[]; schoolName: string; busy: boolean; act: Act }) {
+function StudentsTab({ schoolId, setMessage, reload, students, routes, schoolName, busy, act }: { schoolId: string; setMessage: (m: { text: string; ok: boolean } | null) => void; reload: () => Promise<void>; students: Student[]; routes: RouteRow[]; schoolName: string; busy: boolean; act: Act }) {
+  const photos = usePhotoUrls(students.map((st) => st.photo_path));
   const routeName = (id: string) => routes.find((r) => r.id === id)?.name ?? "مسار";
   const stopName = (routeId: string, stopId: string | null) => routes.find((r) => r.id === routeId)?.route_stops.find((s) => s.id === stopId)?.label ?? "بلا محطة";
   const [sheet, setSheet] = useState<CardStudent[] | null>(null);
@@ -313,12 +321,14 @@ function StudentsTab({ students, routes, schoolName, busy, act }: { students: St
       {students.length > 0 && <Button size="sm" variant="outline" onClick={() => setSheet(students.map(toCard))}><Printer /> طباعة كل البطاقات</Button>}</div>
     {students.length === 0 && <p className="muted-label">لا يوجد طلاب معتمدون بعد. اعتمد طلبات الطلاب من تبويب «الطلبات».</p>}
     {students.map((student) => <div className="ops-row ops-student" key={student.id}>
+      <StudentAvatar url={student.photo_path ? photos[student.photo_path] : null} name={student.full_name} />
       <div><strong>{student.full_name}</strong><p>{student.grade ?? "—"}</p>
         <div className="ops-chips">{student.student_route_assignments.map((a) => <span className="ops-chip" key={a.id}>{routeName(a.route_id)} · {stopName(a.route_id, a.stop_id)}<button aria-label="إلغاء الإسناد" disabled={busy} onClick={() => void act(() => supabase.from("student_route_assignments").delete().eq("id", a.id), "تم إلغاء الإسناد.")}><X /></button></span>)}</div>
       </div>
       <div className="ops-actions">
         <AssignForm student={student} routes={routes} busy={busy} act={act} />
         <Button size="sm" variant="outline" onClick={() => setSheet([toCard(student)])}><IdCard /> البطاقة</Button>
+        <StudentPhotoButton schoolId={schoolId} studentId={student.id} name={student.full_name} hasPhoto={Boolean(student.photo_path)} onSaved={(text) => { setMessage({ text, ok: !text.startsWith("تعذر") }); void reload(); }} />
         {confirmReissue === student.id ? <><Button size="sm" className="danger-btn" disabled={busy} onClick={() => void act(() => supabase.rpc("reissue_student_card", { p_student: student.id }), `صدرت بطاقة جديدة لـ ${student.full_name}، والبطاقة القديمة لم تعد تعمل. اطبع الجديدة.`).then(() => setConfirmReissue(null))}>تأكيد: إيقاف القديمة</Button><Button size="sm" variant="outline" onClick={() => setConfirmReissue(null)}>إلغاء</Button></>
           : <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmReissue(student.id)}>بطاقة مفقودة</Button>}
       </div>
@@ -342,13 +352,24 @@ function AssignForm({ student, routes, busy, act }: { student: Student; routes: 
 
 function TripsTab({ schoolId, routes, trips, drivers, buses, students, busy, act, setMessage, reload }: { schoolId: string; routes: RouteRow[]; trips: Trip[]; drivers: Driver[]; buses: Bus[]; students: Student[]; busy: boolean; act: Act; setMessage: (m: { text: string; ok: boolean } | null) => void; reload: () => Promise<void> }) {
   const today = riyadhWeekday();
+  const { todayHoliday } = useHolidays(schoolId);
+  const busById = (id: string | null) => buses.find((b) => b.id === id);
+  const todayStr = riyadhToday();
+  const fleetBlock = (r: RouteRow) => {
+    const b = busById(r.bus_id); const d = drivers.find((x) => x.id === r.driver_id);
+    if (b?.status === "maintenance") return "الباص في الصيانة";
+    if (b?.next_service_on && b.next_service_on < todayStr) return "صيانة الباص متأخرة";
+    if (b && [b.registration_expiry, b.insurance_expiry, b.inspection_expiry].some((x) => x && x < todayStr)) return "وثائق الباص منتهية";
+    if (d?.license_expiry && d.license_expiry < todayStr) return "رخصة السائق منتهية";
+    return null;
+  };
   const runsToday = (r: RouteRow) => (r.days ?? [0, 1, 2, 3, 4]).includes(today);
   const active = routes.filter((r) => r.is_active && !r.archived_at);
   const [actualFor, setActualFor] = useState<string | null>(null);
   const tripFor = (routeId: string) => trips.find((t) => t.route_id === routeId);
   const studentsOn = (routeId: string) => students.filter((s) => s.student_route_assignments.some((a) => a.route_id === routeId)).length;
   // سبب عدم جاهزية المسار لإنشاء رحلة اليوم، أو null إن كان جاهزًا
-  const blocker = (r: RouteRow) => !runsToday(r) ? "لا يعمل اليوم" : !r.driver_id ? "بلا سائق" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
+  const blocker = (r: RouteRow) => todayHoliday ? "إجازة" : !runsToday(r) ? "لا يعمل اليوم" : fleetBlock(r) ? fleetBlock(r) : !r.driver_id ? "بلا سائق" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
     : r.route_stops.some((s) => s.latitude == null || s.longitude == null) ? "محطة بلا موقع" : !studentsOn(r.id) ? "لا طلاب مسندين" : null;
   const ready = active.filter((r) => !tripFor(r.id) && !blocker(r));
   const createAll = async () => {
@@ -359,6 +380,7 @@ function TripsTab({ schoolId, routes, trips, drivers, buses, students, busy, act
   };
   return <article className="panel ops-panel">
     <div className="panel-head"><div><p className="eyebrow">{riyadhToday()}</p><h2>رحلات اليوم</h2></div><Button disabled={busy || ready.length === 0} onClick={() => void createAll()}><Plus /> إنشاء رحلات اليوم ({ready.length})</Button></div>
+    {todayHoliday && <p className="save-strip ops-message"><span>اليوم إجازة ({todayHoliday.title})؛ لا تُنشأ رحلات.</span></p>}
     {active.length === 0 && <p className="muted-label">لا توجد مسارات نشطة.</p>}
     {active.map((r) => {
       const trip = tripFor(r.id); const why = blocker(r);

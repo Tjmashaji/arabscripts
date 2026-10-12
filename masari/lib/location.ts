@@ -28,7 +28,7 @@ export async function watchLocation(onFix: (fix: Fix) => void, onError: (message
       requestPermissions: true, stale: false, distanceFilter: 10,
     }, (location, error) => {
       if (error) {
-        onError(error.code === "NOT_AUTHORIZED" ? "اسمح لمساري بالموقع «طوال الوقت» من إعدادات الجوال حتى يستمر التتبع والشاشة مطفأة." : "تعذر قراءة الموقع من الجوال.");
+        onError(error.code === "NOT_AUTHORIZED" ? "اسمح لمساري بالوصول إلى الموقع من إعدادات الجوال، ثم ابدأ الرحلة مرة أخرى." : "تعذر قراءة الموقع من الجوال.");
         if (error.code === "NOT_AUTHORIZED") void BackgroundGeolocation.openSettings().catch(() => {});
         return;
       }

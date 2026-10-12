@@ -307,3 +307,52 @@
 .route-sheet td.tick { width: 34px; } .sheet-foot { font-size: 12px; color: #5a7280; margin-top: 10px; }
 .route-card .cards-sheet-overlay { position: fixed; inset: 0; z-index: 2000; background: #f3f7f8; overflow: auto; padding: 20px; align-content: start; }
 @media print { .print-area.route-sheet { display: block; grid-template-columns: none; padding: 10mm; max-width: none; } .route-card .cards-sheet-overlay { background: #fff; padding: 0; } @page { size: A4 landscape; } }
+.location-card .map-picker { margin-bottom: 12px; }
+.check-line { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 0.9rem; color: var(--muted-foreground, #555); }
+.danger-outline { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d64545; color: #c03030; background: transparent; border-radius: 10px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.danger-outline svg, .danger-link svg { width: 16px; height: 16px; }
+.danger-link { color: #c03030 !important; display: inline-flex; align-items: center; gap: 4px; }
+.delete-account { display: grid; gap: 8px; border: 1px solid #f0c4c4; background: #fff6f6; border-radius: 12px; padding: 14px; text-align: start; }
+.delete-account p { margin: 0; font-size: 0.88rem; color: #6b4a4a; }
+.delete-account input { border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; }
+.delete-actions { display: flex; align-items: center; gap: 12px; }
+@media (prefers-color-scheme: dark) { .delete-account { background: #2a1717; border-color: #5a2a2a; } .delete-account p { color: #e3c3c3; } }
+/* الواجهة الإنجليزية: اتجاه من اليسار لليمين حتى داخل العناصر المعلّمة rtl */
+html[lang="en"] [dir="rtl"], html[lang="en"] body { direction: ltr; }
+.lang-toggle { display: inline-flex; gap: 6px; }
+.lang-toggle button { border: 1px solid var(--border, #ddd); border-radius: 999px; padding: 4px 12px; background: transparent; cursor: pointer; font-size: 0.85rem; }
+.lang-toggle button.on { background: #1f8a93; color: #fff; border-color: #1f8a93; }
+
+/* الإجازات والعناية بالباص والحضور ونقاط التأخير والمشاركة */
+.holiday-form, .maint-form, .share-form, .attendance-filters { align-items: end; }
+.ltr-inline { direction: ltr; unicode-bidi: isolate; text-align: start; }
+.ops-bus { flex-wrap: wrap; }
+.bus-care { flex-basis: 100%; display: grid; gap: 10px; border-top: 1px dashed var(--border, #ddd); padding-top: 10px; margin-top: 6px; }
+.bus-care-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.bus-care-docs label, .license-field { display: grid; gap: 4px; font-size: 0.85rem; }
+.bus-care-docs small, .license-field small { color: #64748b; }
+.bus-care-docs .soon small, .license-field.soon small { color: #b45309; font-weight: 600; }
+.bus-care-docs .expired small, .license-field.expired small { color: #b91c1c; font-weight: 700; }
+.maint-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 0.88rem; padding: 6px 0; border-bottom: 1px solid var(--border, #eee); }
+.maint-row p { flex-basis: 100%; margin: 0; color: #64748b; }
+.student-photo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid #e2e8f0; }
+.ops-student { align-items: center; }
+.att-bar { position: relative; width: 140px; height: 22px; background: #eef2f6; border-radius: 999px; overflow: hidden; flex-shrink: 0; }
+.att-bar span { position: absolute; inset-block: 0; inset-inline-start: 0; background: #16a34a; border-radius: 999px; }
+.att-bar span.low { background: #dc2626; }
+.att-bar b { position: relative; display: block; text-align: center; font-size: 0.78rem; line-height: 22px; }
+.delay-map { height: 360px; border-radius: 12px; overflow: hidden; margin: 10px 0; z-index: 0; }
+.radius-select { font-size: 0.8rem; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border, #ddd); }
+.offline-strip { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+.shared-trip { display: block; padding: 16px; }
+.shared-trip .auth-card { background: var(--card, #fff); border-radius: 16px; box-shadow: 0 8px 30px rgba(15,23,42,.08); max-width: 640px; width: 100%; margin: 24px auto; display: grid; gap: 10px; padding: 20px; }
+.shared-status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.shared-status span { background: #ecfdf5; color: #047857; border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; }
+.shared-map .trip-map-canvas { height: 320px; }
+@media (max-width: 640px) { .att-bar { width: 96px; } .delay-map { height: 280px; } }
+@media (prefers-color-scheme: dark) { .att-bar { background: #1e293b; } .offline-strip { background: #3b1d0a; color: #fdba74; } .shared-status span { background: #064e3b; color: #a7f3d0; } }
+.shared-trip .auth-brand { display: flex; align-items: center; gap: 10px; }
+.shared-trip .auth-brand span { display: block; font-size: 0.8rem; color: #64748b; }
+.shared-trip h1 { margin: 0; font-size: 1.4rem; }
+.check-line input[type="checkbox"] { width: 18px !important; height: 18px !important; min-height: 0 !important; padding: 0 !important; flex: none; }
+.account-stack { display: grid; gap: 16px; }

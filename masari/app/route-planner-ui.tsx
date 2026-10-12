@@ -31,7 +31,7 @@ function PreviewMap({ routes, school }: { routes: PlannedRoute[]; school: Point 
         L.polyline(pts, { color, weight: 4, opacity: 0.85 }).addTo(m);
         r.stops.forEach((s, j) => {
           L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "plan-stop", html: `<span style="background:${color}">${j + 1}</span>`, iconSize: [24, 24] }) })
-            .addTo(m).bindTooltip(`${s.label} · ${s.students.length} طالب`);
+            .addTo(m).bindTooltip(`${s.label.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)} · ${s.students.length} طالب`);
           bounds.extend([s.lat, s.lng]);
         });
       });
