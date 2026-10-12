@@ -156,3 +156,4 @@
 .scanner-error{align-self:center;text-align:center;background:#3d1c1c;padding:16px;border-radius:12px}
 .scanner-results{display:grid;gap:6px;max-height:30vh;overflow:auto}.scanner-results p{margin:0;padding:10px 12px;border-radius:10px;font-weight:600}.scanner-results .ok{background:#16402f}.scanner-results .bad{background:#4a1f1f}
 .scan-action{margin-bottom:10px}
+.metric-warn{border-color:#f0c27a!important;background:#fff8ec!important}.metric-warn strong{color:#a76d1c}
