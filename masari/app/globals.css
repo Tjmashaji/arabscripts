@@ -167,3 +167,30 @@
 .consent-check{display:flex!important;align-items:flex-start;gap:8px;font-size:13px;font-weight:500!important;color:#24364a;line-height:1.6}.consent-check input{width:18px!important;height:18px!important;margin-top:3px;flex:none}.consent-check a{color:#1f6274;text-decoration:underline}
 .privacy-page{min-height:100vh;background:#f4f7f9}.privacy-body{max-width:760px;margin:0 auto;padding:28px 18px 60px;display:grid;gap:14px;color:#24364a;line-height:1.85}.privacy-body h1{margin:0;color:#10394b}.privacy-body h2{margin:6px 0 0;font-size:18px;color:#10394b}.privacy-body p,.privacy-body ul{margin:0}.privacy-body ul{padding-inline-start:20px;display:grid;gap:4px}.privacy-body .lead{color:#5b6c7a}
 .lp-footer a{color:inherit;text-decoration:underline;margin-inline-start:auto}
+
+/* ───────── خريطة الرحلة (Leaflet) ───────── */
+.trip-map { position: relative; display: grid; gap: 8px; }
+.trip-map-canvas { height: 340px; border-radius: 18px; overflow: hidden; border: 1px solid #dbe7ea; z-index: 0; }
+.driver-map-panel .trip-map-canvas { height: 380px; }
+@media (max-width: 640px) { .trip-map-canvas { height: 300px; } .driver-map-panel .trip-map-canvas { height: 340px; } }
+.trip-map-tools { position: absolute; top: 10px; right: 10px; z-index: 500; display: flex; gap: 6px; flex-wrap: wrap; }
+.trip-map-tools button { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #cfdfe3; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; color: #10394b; box-shadow: 0 2px 8px rgb(16 57 75 / .12); cursor: pointer; }
+.trip-map-tools button svg { width: 15px; height: 15px; }
+.trip-map-tools button.on { background: #1f8a93; color: #fff; border-color: #1f8a93; }
+.trip-map-note { font-size: 12px; color: #5a7280; margin: 0; }
+.trip-stop span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #10394b; color: #fff; font-weight: 700; font-size: 14px; border: 3px solid #fff; box-shadow: 0 2px 6px rgb(0 0 0 / .3); }
+.trip-stop.done span { background: #2f9e6e; }
+.trip-stop.next span { background: #e08a1e; transform: scale(1.18); }
+.trip-school span, .trip-home span, .trip-bus span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: #fff; border: 2px solid #10394b; font-size: 17px; box-shadow: 0 2px 6px rgb(0 0 0 / .25); }
+.trip-bus span { border-color: #e08a1e; font-size: 21px; }
+.leaflet-popup-content { direction: rtl; text-align: right; font-family: inherit; line-height: 1.6; }
+.nav-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.nav-link { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 12px; border: 1px solid #cfdfe3; color: #10394b; font-weight: 600; text-decoration: none; background: #fff; }
+.nav-link svg { width: 18px; height: 18px; }
+.nav-link.primary { background: #1f8a93; border-color: #1f8a93; color: #fff; flex: 1 1 220px; justify-content: center; }
+.stop-nav { margin-inline-start: auto; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; border: 1px solid #cfdfe3; color: #1f8a93; flex: none; }
+.stop-nav svg { width: 17px; height: 17px; }
+.map-gps-note { display: flex; gap: 6px; align-items: center; color: #9a5b00; font-size: 14px; margin: 8px 0 0; }
+.map-gps-note svg { width: 16px; height: 16px; }
+.scanner-photo { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px auto 0; max-width: 420px; padding: 12px 16px; border-radius: 12px; background: #fff; color: #10394b; font-weight: 700; cursor: pointer; }
+.scanner-photo svg { width: 18px; height: 18px; }

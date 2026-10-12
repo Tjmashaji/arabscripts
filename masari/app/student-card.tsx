@@ -56,6 +56,25 @@ type ScanResult = { id: number; ok: boolean; text: string };
 const eventText: Record<string, string> = { boarded: "صعد الباص", arrived_school: "وصل المدرسة", boarded_return: "صعد للعودة", dropped_home: "نزل عند المنزل" };
 const scanError = (m: string) => m.includes("QR_INVALID") ? "هذا الرمز ليس بطاقة مساري." : m.includes("QR_NOT_IN_TRIP") ? "الطالب ليس في هذه الرحلة، أو البطاقة موقوفة." : m.includes("ALREADY_RECORDED") ? "سُجّل هذا الطالب مسبقًا." : m.includes("STOP_NOT_REACHED") ? "اعتمد وصولك لمحطة الطالب أولًا." : m.includes("TRIP_NOT_ACTIVE") ? "الرحلة لم تبدأ أو انتهت." : "تعذر التسجيل. حاول مرة أخرى.";
 
+// قراءة رمز QR من صورة ملتقطة (بديل عندما لا تعمل الكاميرا المباشرة)
+async function decodeImage(file: File): Promise<string | null> {
+  const jsQR = (await import("jsqr")).default;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise<void>((ok, bad) => { img.onload = () => ok(); img.onerror = () => bad(new Error("IMG")); img.src = url; });
+    for (const max of [1600, 1000, 700]) {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      const ctx = c.getContext("2d"); if (!ctx) return null;
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const code = jsQR(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: "attemptBoth" });
+      if (code?.data) return code.data;
+    }
+    return null;
+  } finally { URL.revokeObjectURL(url); }
+}
+
 export function QrScanner({ tripId, names, gps, onClose, onRecorded }: { tripId: string; names: Record<string, string>; gps: { lat: number; lng: number } | null; onClose: () => void; onRecorded: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -67,14 +86,44 @@ export function QrScanner({ tripId, names, gps, onClose, onRecorded }: { tripId:
   const namesRef = useRef(names);
   const onRecordedRef = useRef(onRecorded);
   useEffect(() => { gpsRef.current = gps; namesRef.current = names; onRecordedRef.current = onRecorded; }, [gps, names, onRecorded]);
+  const push = (r: Omit<ScanResult, "id">) => setResults((cur) => [{ ...r, id: Date.now() + Math.random() }, ...cur].slice(0, 6));
+  const submit = async (code: string) => {
+    busy.current = true;
+    const g = gpsRef.current;
+    const { data, error: err } = await supabase.rpc("record_attendance_qr", { p_trip: tripId, p_qr: code, p_lat: g?.lat ?? null, p_lng: g?.lng ?? null, p_device: navigator.userAgent.slice(0, 120) });
+    busy.current = false;
+    if (err) { push({ ok: false, text: scanError(err.message) }); navigator.vibrate?.([80, 60, 80]); return; }
+    const r = data as { student_id: string; to: string };
+    push({ ok: true, text: `${namesRef.current[r.student_id] ?? "الطالب"}: ${eventText[r.to] ?? r.to}` });
+    navigator.vibrate?.(120);
+    onRecordedRef.current();
+  };
+  const submitRef = useRef(submit);
+  useEffect(() => { submitRef.current = submit; });
+  const [reading, setReading] = useState(false);
+  const fromPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setReading(true);
+    const code = await decodeImage(file).catch(() => null);
+    setReading(false);
+    if (!code) { push({ ok: false, text: "لم نقرأ رمزًا في الصورة. صوّر البطاقة قريبًا وبإضاءة جيدة." }); return; }
+    await submit(code);
+  };
 
   useEffect(() => {
     let stream: MediaStream | null = null; let timer: number | null = null; let stopped = false;
-    const push = (r: Omit<ScanResult, "id">) => setResults((cur) => [{ ...r, id: Date.now() }, ...cur].slice(0, 6));
     const start = async () => {
-      if (!navigator.mediaDevices?.getUserMedia) { setError("المتصفح لا يدعم الكاميرا. سجّل الحضور يدويًا."); return; }
-      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false }); }
-      catch { setError("اسمح لمساري باستخدام الكاميرا من إعدادات المتصفح، ثم أعد المحاولة."); return; }
+      if (!window.isSecureContext) { setError("الكاميرا المباشرة تعمل على رابط آمن (https) فقط. استخدم «تصوير البطاقة» بالأسفل."); return; }
+      if (!navigator.mediaDevices?.getUserMedia) { setError("هذا المتصفح لا يدعم الكاميرا المباشرة. استخدم «تصوير البطاقة» بالأسفل."); return; }
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }); }
+      catch (e) {
+        const name = (e as { name?: string })?.name;
+        setError(name === "NotAllowedError" ? "رُفض إذن الكاميرا. اسمح لمساري بالكاميرا من إعدادات المتصفح أو الجوال، أو استخدم «تصوير البطاقة» بالأسفل."
+          : name === "NotFoundError" ? "لم نجد كاميرا في هذا الجهاز. استخدم «تصوير البطاقة» بالأسفل."
+          : name === "NotReadableError" ? "الكاميرا مستخدمة في تطبيق آخر. أغلقه ثم أعد المحاولة، أو استخدم «تصوير البطاقة»."
+          : "تعذر تشغيل الكاميرا. استخدم «تصوير البطاقة» بالأسفل.");
+        return;
+      }
       if (stopped || !video.current) { stream.getTracks().forEach((t) => t.stop()); return; }
       video.current.srcObject = stream; await video.current.play().catch(() => {});
       const jsQR = (await import("jsqr")).default;
@@ -89,17 +138,7 @@ export function QrScanner({ tripId, names, gps, onClose, onRecorded }: { tripId:
         const now = Date.now();
         if (code.data === last.current.code && now - last.current.at < 4000) return;
         last.current = { code: code.data, at: now };
-        busy.current = true;
-        void (async () => {
-          const g = gpsRef.current;
-          const { data, error: err } = await supabase.rpc("record_attendance_qr", { p_trip: tripId, p_qr: code.data, p_lat: g?.lat ?? null, p_lng: g?.lng ?? null, p_device: navigator.userAgent.slice(0, 120) });
-          busy.current = false;
-          if (err) { push({ ok: false, text: scanError(err.message) }); navigator.vibrate?.([80, 60, 80]); return; }
-          const r = data as { student_id: string; to: string };
-          push({ ok: true, text: `${namesRef.current[r.student_id] ?? "الطالب"}: ${eventText[r.to] ?? r.to}` });
-          navigator.vibrate?.(120);
-          onRecordedRef.current();
-        })();
+        void submitRef.current(code.data);
       }, 300);
     };
     void start();
@@ -110,6 +149,7 @@ export function QrScanner({ tripId, names, gps, onClose, onRecorded }: { tripId:
     <div className="scanner-bar"><strong><Camera className="inline-icon" /> وجّه الكاميرا إلى بطاقة الطالب</strong><Button variant="outline" onClick={onClose}><X /> إنهاء المسح</Button></div>
     {error ? <p className="scanner-error">{error}</p> : <div className="scanner-view"><video ref={video} playsInline muted /><span className="scanner-frame" /></div>}
     <canvas ref={canvas} hidden />
+    <label className="scanner-photo"><Camera /> {reading ? "جارٍ قراءة الصورة…" : "تصوير البطاقة بدل الكاميرا المباشرة"}<input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { void fromPhoto(e.target.files?.[0]); e.target.value = ""; }} /></label>
     <div className="scanner-results">{results.map((r) => <p key={r.id} className={r.ok ? "ok" : "bad"}>{r.ok ? "✓" : "✕"} {r.text}</p>)}</div>
   </div>;
 }

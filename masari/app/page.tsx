@@ -11,6 +11,7 @@ import { QrScanner } from "./student-card";
 import { installErrorReporter } from "@/lib/error-reporter";
 import { isNativeApp, locateOnce, watchLocation, type Fix } from "@/lib/location";
 import { ConsentGate, PRIVACY_URL, PRIVACY_VERSION, PrivacyPolicy } from "./privacy";
+import { TripMap, navigateUrl, fullRouteUrl } from "./trip-map";
 import { PendingAccount } from "./onboarding";
 import { AdminDirectory } from "./school-directory";
 import { FeedbackList, ParentChildren, TripHistory } from "./role-pages";
@@ -39,7 +40,7 @@ type MasariData = {
   school: { id?: string; located?: boolean; name: string; city: string; contactName: string; phone: string; location: LocationPoint };
   vehicle: { number: string; plate: string; capacity: number };
   driver: { name: string; email: string };
-  route: { name: string; scheduledTime: string; estimatedMinutes: number; stops: { id?: string; status?: string; label: string; time: string; lat: number; lng: number; studentName?: string | null }[] };
+  route: { name: string; scheduledTime: string; estimatedMinutes: number; stops: { id?: string; status?: string; label: string; time: string; lat: number; lng: number; studentName?: string | null; students?: string[] }[] };
   student: { id?: string; name: string; grade: string; address: string; status: string; location: LocationPoint };
   parent: { name: string; email: string; phone: string };
   ride: { date: string; status: string; studentStatus: string };
@@ -146,15 +147,6 @@ const ensureSchoolDestination = (route: MasariData["route"], school: MasariData[
     ...route,
     stops: [...route.stops, { label: school.name, time: addMinutes(lastTime, 15), lat: school.location.lat, lng: school.location.lng }],
   };
-};
-const buildMapUrl = (points: LocationPoint[], marker: LocationPoint) => {
-  const lats = points.map((point) => point.lat);
-  const lngs = points.map((point) => point.lng);
-  const south = Math.min(...lats) - 0.025;
-  const north = Math.max(...lats) + 0.025;
-  const west = Math.min(...lngs) - 0.035;
-  const east = Math.max(...lngs) + 0.035;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${west}%2C${south}%2C${east}%2C${north}&layer=mapnik&marker=${marker.lat}%2C${marker.lng}`;
 };
 const initialSimulation: SimulationState = { active: false, currentStopIndex: 0, approvedStops: [], studentStatus: "waiting" };
 const studentStatusLabel: Record<SimulationState["studentStatus"], string> = {
@@ -349,6 +341,14 @@ async function loadDriverData(userId: string): Promise<MasariData | null> {
     next.students = (assigned ?? []).flatMap((row) => { const st = one(row.students as StudentJoin); return st ? [{ id: st.id, name: st.full_name, grade: st.grade ?? "—", status: "not_boarded" }] : []; });
   }
   if (next.students[0]) next.student = { ...next.student, id: next.students[0].id, name: next.students[0].name, grade: next.students[0].grade, status: tripStudentLabel[next.students[0].status] ?? next.students[0].status };
+  // أسماء الطلاب عند كل محطة (للخريطة وقائمة المحطات)
+  const [{ data: rStops }, { data: assigns }] = await Promise.all([
+    supabase.from("route_stops").select("id,stop_order").eq("route_id", trip.route_id).order("stop_order"),
+    supabase.from("student_route_assignments").select("stop_id,students(full_name)").eq("route_id", trip.route_id).eq("status", "active"),
+  ]);
+  const byStop = new Map<string, string[]>();
+  for (const a of assigns ?? []) { const st = one(a.students as StudentJoin); if (st && a.stop_id) byStop.set(a.stop_id, [...(byStop.get(a.stop_id) ?? []), st.full_name]); }
+  (rStops ?? []).forEach((rs, i) => { if (next.route.stops[i]) next.route.stops[i].students = byStop.get(rs.id) ?? []; });
   return next;
 }
 
@@ -525,40 +525,13 @@ function Stat({ icon: Icon, label, value, detail, accent }: { icon: typeof Users
 }
 function LiveRoute({ data, simulation, driverGps, parent = false }: { data: MasariData; simulation: SimulationState; driverGps?: DriverGps | null; parent?: boolean }) {
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
-  const currentPoint = driverGps ?? data.student.location;
-  const routePoints = data.route.stops.map((stop) => ({ label: stop.label, address: stop.label, lat: stop.lat, lng: stop.lng }));
-  const allMapPoints = [data.school.location, data.student.location, ...routePoints, currentPoint];
-  const lats = allMapPoints.map((point)=>point.lat);
-  const lngs = allMapPoints.map((point)=>point.lng);
-  const bounds = { south: Math.min(...lats) - .025, north: Math.max(...lats) + .025, west: Math.min(...lngs) - .035, east: Math.max(...lngs) + .035 };
-  const position = (point: Pick<LocationPoint, "lat" | "lng">) => ({
-    left: ((point.lng - bounds.west) / (bounds.east - bounds.west)) * 100,
-    top: ((bounds.north - point.lat) / (bounds.north - bounds.south)) * 100,
-  });
-  const routeSvgPoints = routePoints.map((point)=>{const p=position(point);return `${p.left},${p.top}`}).join(" ");
-  const busPosition = position(currentPoint);
-  const mapUrl = buildMapUrl(allMapPoints, currentPoint);
   return <article className="panel map-panel">
     <div className="panel-head"><div><p className="eyebrow">تتبع مباشر</p><h2>{parent ? `رحلة ${data.student.name} إلى المدرسة` : `${data.route.name} — ${data.school.city}`}</h2></div><Badge className="live-badge"><span /> {simulation.active ? driverGps ? "GPS مباشر" : "بانتظار GPS" : "بانتظار بدء الرحلة"}</Badge></div>
-    <div className="route-map real-map" aria-label="خريطة حقيقية لمسار الباص في شرق الرياض">
-      <iframe
-        title="خريطة مسار أووك ورد العالمية"
-        src={mapUrl}
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-      />
-      <svg className="map-route-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points={routeSvgPoints}/></svg>
-      <div className="map-stops" aria-label="نقاط التوقف">
-        {data.route.stops.map((stop, index) => {const stopPosition=position(stop);return <div className="map-stop" style={{left:`${stopPosition.left}%`,top:`${stopPosition.top}%`}} key={stop.label}>
-          <strong>{simulation.approvedStops.includes(index) ? "✓" : index + 1}</strong><span>{stop.label}</span>
-        </div>})}
-      </div>
-      {(!simulation.active || driverGps) ? <div className={`bus-marker ${simulation.active ? "gps-lock moving" : ""}`} style={{left:`${busPosition.left}%`,top:`${busPosition.top}%`}}><BusFront /><span>{driverGps && simulation.active ? "GPS مباشر" : `الباص ${data.vehicle.number}`}</span></div> : <div className="map-gps-warning"><AlertTriangle/> موقع الباص غير متاح</div>}
-      <div className="eta-card"><strong>{simulation.active ? currentStop?.time : data.route.scheduledTime}</strong><span>{simulation.active && driverGps ? "موقع الجهاز" : simulation.active ? "بانتظار GPS" : "وقت البداية"}</span></div>
-    </div>
+    <TripMap stops={data.route.stops.map((st,i)=>({lat:st.lat,lng:st.lng,label:st.label,done:simulation.approvedStops.includes(i)}))} school={{...data.school.location,label:data.school.name}} home={parent?{...data.student.location,label:`بيت ${data.student.name}`}:null} bus={simulation.active&&driverGps?{lat:driverGps.lat,lng:driverGps.lng}:null} nextIndex={simulation.active?simulation.currentStopIndex:undefined}/>
+    {simulation.active&&!driverGps&&<p className="map-gps-note"><AlertTriangle/> موقع الباص غير متاح الآن</p>}
     <div className="route-summary">
       <div><span className="summary-dot done"/><p>موعد البداية</p><strong>{data.route.scheduledTime}</strong></div><ChevronLeft />
-      <div><span className="summary-dot active"/><p>{driverGps && simulation.active ? "آخر موقع" : simulation.active ? "حالة الموقع" : "المحطة الأولى"}</p><strong>{driverGps && simulation.active ? `${driverGps.lat.toFixed(5)}, ${driverGps.lng.toFixed(5)}` : simulation.active ? "غير متاح" : currentStop?.label ?? data.student.address}</strong></div><ChevronLeft />
+      <div><span className="summary-dot active"/><p>{simulation.active ? "المحطة التالية" : "المحطة الأولى"}</p><strong>{currentStop?.label ?? data.student.address}</strong></div><ChevronLeft />
       <div><span className="summary-dot"/><p>حالة الطالب</p><strong>{studentStatusLabel[simulation.studentStatus]}</strong></div>
     </div>
   </article>;
@@ -638,16 +611,21 @@ function DriverDashboard({ data, simulation, tripSaveStatus, driverGps, gpsStatu
       {driverGps && <div className="gps-coords"><MapPin/><span>{driverGps.lat.toFixed(5)}, {driverGps.lng.toFixed(5)}</span><small>دقة {Math.round(driverGps.accuracy ?? 0)}م</small></div>}
       <Button variant="outline" onClick={onRefreshGps}><Navigation/> تحديث GPS الآن</Button>
     </article>
+    {data.route.stops.length>0&&<article className="panel driver-map-panel">
+      <div className="panel-head"><div><p className="eyebrow">خريطة المسار</p><h2>{finished ? `الوجهة: ${data.school.name}` : `المحطة التالية: ${currentStop?.label ?? "—"}`}</h2>{!finished&&currentStop?.students?.length ? <p className="muted-label">{currentStop.students.join("، ")}</p> : null}</div></div>
+      <TripMap stops={data.route.stops.map((st,i)=>({lat:st.lat,lng:st.lng,label:st.label,done:simulation.approvedStops.includes(i),students:st.students}))} school={{...data.school.location,label:data.school.name}} bus={driverGps?{lat:driverGps.lat,lng:driverGps.lng}:null} nextIndex={finished?undefined:simulation.currentStopIndex} follow={simulation.active}/>
+      <div className="nav-actions">{!finished&&currentStop&&<a className="nav-link primary" href={navigateUrl(currentStop)} target="_blank" rel="noreferrer"><Navigation/> الملاحة إلى المحطة التالية</a>}<a className="nav-link" href={fullRouteUrl([...data.route.stops.filter((_,i)=>!simulation.approvedStops.includes(i)),data.school.location])} target="_blank" rel="noreferrer"><Route/> المسار كاملًا في خرائط Google</a></div>
+    </article>}
     <section className="driver-grid"><article className="panel stops">
       <div className="panel-head"><div><p className="eyebrow">{finished ? "اكتملت الرحلة" : "المحطة الحالية"}</p><h2>{finished ? data.school.name : currentStop?.label}</h2></div><div className="eta-pill">{finished ? "تم" : currentStop?.time}</div></div>
       <div className="stop-progress"><Progress value={data.route.stops.length ? (simulation.approvedStops.length / data.route.stops.length) * 100 : 0}/><span>{simulation.approvedStops.length} من {data.route.stops.length} محطات معتمدة</span></div>
-      {data.trip?.status==="in_progress"&&students.length>0&&<Button className="wide-action scan-action" onClick={()=>setScanning(true)}><ScanLine/> مسح بطاقة طالب</Button>}
+      {data.trip&&students.length>0&&!tripDone&&<Button className="wide-action scan-action" disabled={data.trip.status!=="in_progress"} onClick={()=>setScanning(true)}><ScanLine/> {data.trip.status==="in_progress"?"مسح بطاقة طالب":"ابدأ الرحلة لتفعيل مسح البطاقات"}</Button>}
       {scanning&&data.trip&&<QrScanner tripId={data.trip.id} names={Object.fromEntries((data.students??[]).map((st)=>[st.id,st.name]))} gps={driverGps?{lat:driverGps.lat,lng:driverGps.lng}:null} onClose={()=>setScanning(false)} onRecorded={onScanned}/>}
       <div className="student-checklist">{students.length===0&&<p className="muted-label">لا يوجد طلاب في هذه الرحلة.</p>}{students.map((student)=><div key={student.id || student.name} className={"check-row "+(student.checked?"checked":"")}><span className="student-avatar">{student.name.charAt(0)}</span><div><strong>{student.name}</strong><p>{student.grade} · {student.status}</p></div>{student.actions.length ? <span className="student-actions">{student.actions.map((action)=><Button key={action.event} size="sm" variant="outline" onClick={()=>onStudentEvent(student.id, action.event)}>{action.label}</Button>)}</span> : <span className="check-box">{student.checked && <Check/>}</span>}</div>)}</div>
       {!finished && <p className={`geofence-status ${withinStopRadius ? "ready" : "blocked"}`}><MapPin/>{distanceToStop === null ? "لا يمكن الاعتماد دون موقع GPS فعلي" : withinStopRadius ? `داخل نطاق المحطة · ${distanceToStop} متر` : `اقترب حتى 250 متر من ${currentStop?.label}`}</p>}
       <Button className="wide-action" disabled={!canApprove} onClick={onApproveStop}><Check/> {approveLabel}</Button>
     </article><article className="panel compact-route"><div className="panel-head"><div><p className="eyebrow">تسلسل الرحلة</p><h2>نقاط التوقف</h2></div></div>
-      {data.route.stops.map((stop,i)=><div className={"timeline-row "+(simulation.approvedStops.includes(i)?"passed":i===simulation.currentStopIndex?"current":"")} key={stop.id ?? `${stop.label}-${i}`}><span>{simulation.approvedStops.includes(i)?<Check/>:i+1}</span><div><strong>{stop.label}</strong><p>{stop.time}</p></div></div>)}
+      {data.route.stops.map((stop,i)=><div className={"timeline-row "+(simulation.approvedStops.includes(i)?"passed":i===simulation.currentStopIndex?"current":"")} key={stop.id ?? `${stop.label}-${i}`}><span>{simulation.approvedStops.includes(i)?<Check/>:i+1}</span><div><strong>{stop.label}</strong><p>{[stop.time,stop.students?.length?stop.students.join("، "):""].filter(Boolean).join(" · ")}</p></div><a className="stop-nav" href={navigateUrl(stop)} target="_blank" rel="noreferrer" aria-label={`الملاحة إلى ${stop.label}`}><Navigation/></a></div>)}
       <Button variant="outline" className="report-btn" disabled={!simulation.active} onClick={onReportIssue}><AlertTriangle/> إرسال بلاغ طارئ</Button>
     </article></section>
   </>;
