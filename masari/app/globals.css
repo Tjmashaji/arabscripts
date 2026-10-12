@@ -157,3 +157,6 @@
 .scanner-results{display:grid;gap:6px;max-height:30vh;overflow:auto}.scanner-results p{margin:0;padding:10px 12px;border-radius:10px;font-weight:600}.scanner-results .ok{background:#16402f}.scanner-results .bad{background:#4a1f1f}
 .scan-action{margin-bottom:10px}
 .metric-warn{border-color:#f0c27a!important;background:#fff8ec!important}.metric-warn strong{color:#a76d1c}
+.planner{display:grid;gap:10px}.planner-grid{align-items:end}.planner-check{display:flex!important;align-items:center;gap:8px;grid-column:1/-1}.planner-check input{width:auto!important;height:auto!important}
+.plan-map{height:340px;border-radius:14px;overflow:hidden;border:1px solid #d6e0e7}.plan-stop span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px #0005}.plan-school{font-size:22px;line-height:1}
+.planner-routes{display:grid;gap:8px}.planner-route{border:1px solid #e1e8ee;border-radius:12px;padding:10px 12px}.planner-route p{margin:4px 0 0;font-size:12px;color:#687587}.plan-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-inline-end:4px}

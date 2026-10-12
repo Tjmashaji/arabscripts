@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Check, IdCard, Plus, Printer, X } from "lucide-react";
 import { CardsSheet, type CardStudent } from "./student-card";
+import { RoutePlanner } from "./route-planner-ui";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
@@ -18,7 +19,7 @@ type Bus = { id: string; bus_number: string; plate_number: string; capacity: num
 type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null };
 type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; is_active: boolean; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
 type Assignment = { id: string; route_id: string; stop_id: string | null };
-type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; student_route_assignments: Assignment[] };
+type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; home_latitude: number | null; home_longitude: number | null; student_route_assignments: Assignment[] };
 type Trip = { id: string; route_id: string; status: string };
 
 const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
@@ -75,7 +76,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
       supabase.from("drivers").select("id,full_name,status,user_id").eq("school_id", schoolId).order("full_name"),
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
       supabase.from("routes").select("id,name,direction,scheduled_time,is_active,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
-      supabase.from("students").select("id,full_name,grade,service_status,qr_token,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
+      supabase.from("students").select("id,full_name,grade,service_status,qr_token,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
       supabase.from("trips").select("id,route_id,status").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
     ]);
     setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null });
@@ -114,7 +115,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
     {message && <p className={`save-strip ops-message ${message.ok ? "" : "ops-error"}`}>{message.ok ? <Check /> : <X />}<span>{message.text}</span></p>}
     {tab === "requests" && <RequestsTab schoolId={schoolId} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} />}
-    {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} busy={busy} act={act} />}
+    {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
   </>;
@@ -235,9 +236,13 @@ function FleetTab({ schoolId, buses, drivers, busy, act }: { schoolId: string; b
   </>;
 }
 
-function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, busy, act }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act }) {
+function RoutesTab({ schoolId, schoolLat, schoolLng, routes, buses, drivers, students, busy, act }: { schoolId: string; schoolLat: number | null; schoolLng: number | null; routes: RouteRow[]; buses: Bus[]; drivers: Driver[]; students: Student[]; busy: boolean; act: Act }) {
   const activeDrivers = drivers.filter((d) => d.status === "active");
+  const toSchool = new Set(routes.filter((r) => r.is_active && r.direction === "to_school").map((r) => r.id));
+  const unassigned = students.filter((st) => st.service_status === "active" && !st.student_route_assignments.some((a) => toSchool.has(a.route_id)));
+  const plannable = unassigned.filter((st) => st.home_latitude != null && st.home_longitude != null).map((st) => ({ id: st.id, name: st.full_name, lat: st.home_latitude!, lng: st.home_longitude! }));
   return <>
+    <RoutePlanner schoolId={schoolId} school={schoolLat != null && schoolLng != null ? { lat: schoolLat, lng: schoolLng } : null} students={plannable} missingHome={unassigned.length - plannable.length} defaultCapacity={Math.max(0, ...buses.map((b) => b.capacity))} busy={busy} act={act} />
     {routes.length === 0 && <article className="panel ops-panel"><p className="muted-label">لا توجد مسارات بعد. أنشئ أول مسار من النموذج أدناه.</p></article>}
     {routes.map((route) => <article className="panel ops-panel" key={route.id}>
       <div className="panel-head"><div><p className="eyebrow">{directionLabel(route.direction)} · {route.scheduled_time?.slice(0, 5) ?? "—"}</p><h2>{route.name}</h2></div>{!route.is_active && <Badge className="status-badge tone-1">متوقف</Badge>}</div>
