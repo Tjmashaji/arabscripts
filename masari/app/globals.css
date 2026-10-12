@@ -215,3 +215,21 @@
 .gate-board .gate-row strong { font-size: 20px; }
 .gate-board .gate-row p { margin: 2px 0 0; color: #5a7280; }
 .perm-list { margin-top: 14px; border-top: 1px solid #e3edf0; padding-top: 6px; }
+.users-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.users-filters input { flex: 1 1 220px; min-width: 0; border: 1px solid #cfdfe3; border-radius: 10px; padding: 9px 12px; font: inherit; }
+.users-filters select { border: 1px solid #cfdfe3; border-radius: 10px; padding: 8px 10px; font: inherit; background: #fff; }
+.user-row { border-top: 1px solid #e3edf0; }
+.user-row > .ops-row { border-top: 0; }
+.user-panel { display: grid; gap: 10px; margin: 0 0 14px; padding: 14px; border-radius: 14px; background: #f5f9fa; border: 1px solid #dbe7ea; }
+.user-panel label { display: grid; gap: 6px; font-weight: 600; }
+.user-panel input, .user-panel select { border: 1px solid #cfdfe3; border-radius: 10px; padding: 9px 12px; font: inherit; background: #fff; }
+.danger-panel { background: #fff4f4; border-color: #f0c4c4; }
+.danger-outline { color: #c23b3b; border-color: #f0c4c4; }
+.role-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 6px 5px 12px; border-radius: 999px; background: #fff; border: 1px solid #cfdfe3; font-size: 14px; }
+.role-chip button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 0; background: #fbe9e9; color: #c23b3b; cursor: pointer; }
+.role-chip button svg { width: 13px; height: 13px; }
+.school-pick { display: grid; gap: 6px; }
+.school-pick-row { text-align: right; padding: 9px 12px; border: 1px solid #e3edf0; border-radius: 10px; background: #fff; cursor: pointer; font: inherit; }
+.school-pick-row:hover { border-color: #1f8a93; }
+.picked-school { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
