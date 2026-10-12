@@ -36,7 +36,8 @@ export function SchoolReport({ schoolId }: { schoolId: string }) {
     setErr("");
     const { data, error } = await supabase.rpc("school_monthly_report", { p_school: schoolId, p_month: `${m}-01` });
     if (error) { setErr("تعذر تحميل التقرير."); setR(null); return; }
-    setR(data as Report);
+    const rep = data as Report | null;
+    setR(rep && rep.totals ? { ...rep, routes: rep.routes ?? [], drivers: rep.drivers ?? [], days: rep.days ?? [] } : null);
   }, [schoolId]);
   useEffect(() => { let alive = true; void (async () => { if (alive) await load(month).catch(() => {}); })(); return () => { alive = false; }; }, [load, month]);
   const exportIt = () => r && downloadCsv(`مساري-تقرير-${r.school}-${r.month}`, [
