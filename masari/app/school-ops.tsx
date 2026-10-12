@@ -5,6 +5,7 @@ import { Check, IdCard, Plus, Printer, X } from "lucide-react";
 import { CardsSheet, type CardStudent } from "./student-card";
 import { RoutePlanner } from "./route-planner-ui";
 import { HomeLocationRequests } from "./home-location";
+import { TodayChecks } from "./safety";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
@@ -21,7 +22,7 @@ type Stop = { id: string; stop_order: number; label: string; stop_type: string; 
 type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; is_active: boolean; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
 type Assignment = { id: string; route_id: string; stop_id: string | null };
 type Student = { id: string; full_name: string; grade: string | null; service_status: string; qr_token: string; home_latitude: number | null; home_longitude: number | null; student_route_assignments: Assignment[] };
-type Trip = { id: string; route_id: string; status: string };
+type Trip = { id: string; route_id: string; status: string; driver_id: string | null };
 
 const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
 const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : "إلى المدرسة";
@@ -78,7 +79,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id").eq("school_id", schoolId).order("bus_number"),
       supabase.from("routes").select("id,name,direction,scheduled_time,is_active,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude)").eq("school_id", schoolId).order("name"),
       supabase.from("students").select("id,full_name,grade,service_status,qr_token,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
-      supabase.from("trips").select("id,route_id,status").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
+      supabase.from("trips").select("id,route_id,status,driver_id").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
     ]);
     setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null });
     setSchoolName(sc.data?.name ?? "");
@@ -120,6 +121,7 @@ export function SchoolOps({ schoolId, tab }: { schoolId: string; tab: OpsTab }) 
     {tab === "routes" && <RoutesTab schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} setMessage={setMessage} reload={load} />}
+    {tab === "trips" && <TodayChecks schoolId={schoolId} />}
   </>;
 }
 
@@ -384,6 +386,9 @@ function TripsTab({ schoolId, routes, trips, drivers, buses, students, busy, act
         <div><strong>{r.name}</strong><p>{[directionLabel(r.direction), r.scheduled_time?.slice(0, 5), driver && `السائق ${driver}`, bus && `باص ${bus}`, `${studentsOn(r.id)} طالب`].filter(Boolean).join(" · ")}</p></div>
         <div className="ops-actions">
           {trip ? <Badge className="status-badge tone-0">{tripStatusLabel[trip.status] ?? trip.status}</Badge> : why ? <Badge className="status-badge tone-1">{why}</Badge> : <Badge className="status-badge tone-2">جاهز للإنشاء</Badge>}
+          {trip && (trip.status === "scheduled" || trip.status === "ready") && <select className="sub-driver" aria-label={`سائق رحلة ${r.name} اليوم`} value={trip.driver_id ?? ""} disabled={busy}
+            onChange={(e) => { const d = drivers.find((x) => x.id === e.target.value); if (d) void act(() => supabase.from("trips").update({ driver_id: d.id }).eq("id", trip.id), d.id === r.driver_id ? `عاد ${d.full_name} سائقًا لرحلة ${r.name}.` : `${d.full_name} سائق بديل لرحلة ${r.name} اليوم فقط، وأُبلغ بذلك.`); }}>
+            {drivers.filter((d) => d.status === "active").map((d) => <option key={d.id} value={d.id}>{d.id === r.driver_id ? `${d.full_name} (الأساسي)` : `بديل: ${d.full_name}`}</option>)}</select>}
           {trip && (trip.status === "scheduled" || trip.status === "ready") && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (window.confirm(`إلغاء رحلة ${r.name} اليوم؟`)) void act(() => supabase.from("trips").update({ status: "cancelled" }).eq("id", trip.id), "تم إلغاء الرحلة."); }}>إلغاء</Button>}
         </div>
       </div>;

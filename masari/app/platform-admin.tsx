@@ -71,10 +71,11 @@ type UserRow = { user_id: string; email: string; full_name: string | null; phone
   platform_roles: { role: string; region: string | null }[]; schools: { school_id: string; school_name: string; role: string; status: string }[];
   driver: { school_id: string; school_name: string; status: string } | null; guardian_schools: { school_id: string; school_name: string }[] };
 const userStatus: Record<string, string> = { active: "مفعّل", pending: "بانتظار التفعيل", suspended: "موقوف" };
-const memberRole: Record<string, string> = { school_admin: "مدير مدرسة", operations: "تشغيل" };
+const memberRole: Record<string, string> = { school_admin: "مدير مدرسة", operations: "تشغيل", supervisor: "مشرف نقل", gate: "موظف بوابة", control_tower: "برج مراقبة" };
 const ROLE_OPTIONS: { value: string; label: string; needs: "none" | "region" | "school" }[] = [
   { value: "guardian", label: "ولي أمر", needs: "school" }, { value: "driver", label: "سائق", needs: "school" },
-  { value: "school_admin", label: "مدير مدرسة", needs: "school" }, { value: "operations", label: "تشغيل مدرسة", needs: "school" },
+  { value: "school_admin", label: "مدير مدرسة", needs: "school" }, { value: "supervisor", label: "مشرف نقل", needs: "school" },
+  { value: "operations", label: "تشغيل مدرسة", needs: "school" }, { value: "gate", label: "موظف بوابة", needs: "school" },
   { value: "executive", label: "إدارة تنفيذية (منطقة)", needs: "region" }, { value: "super_admin", label: "مدير النظام", needs: "none" },
 ];
 const SUSPEND_FOR: { value: string; label: string; hours: number | null }[] = [

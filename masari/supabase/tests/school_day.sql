@@ -73,7 +73,7 @@ begin
   reset role;
 
   perform set_config('request.jwt.claims', json_build_object('sub',dr,'role','authenticated')::text, true); set local role authenticated;
-  begin v := public.start_trip(trip); out := array_append(out,'PASS 10 بدء الرحلة'); exception when others then out := array_append(out,'FAIL 10 '||sqlerrm); end;
+  begin perform public.submit_vehicle_check(trip, '{"الإطارات":true}'::jsonb); v := public.start_trip(trip); out := array_append(out,'PASS 10 بدء الرحلة'); exception when others then out := array_append(out,'FAIL 10 '||sqlerrm); end;
   select id into ts1 from public.trip_stops where trip_id=trip and stop_order=1; select id into ts2 from public.trip_stops where trip_id=trip and stop_order=2;
   begin perform public.record_attendance(trip, stu, 'boarded','manual',24.17,47.29,null,null); out := array_append(out,'FAIL 11a صعود قبل الوصول');
   exception when others then out := array_append(out,'PASS 11a منع الصعود قبل اعتماد المحطة'); end;

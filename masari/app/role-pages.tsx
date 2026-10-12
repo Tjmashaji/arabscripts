@@ -1,5 +1,6 @@
 "use client";
 
+import { ParentDriverRating } from "./reports";
 import { useEffect, useState } from "react";
 import { CalendarDays, GraduationCap, IdCard, MessageSquareText, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export function ParentChildren({ email }: { email: string }) {
         {cardFor === c.id && <StudentCard student={{ id: c.id, full_name: c.full_name, grade: c.grade, qr_token: c.qr_token, route: active.find((a) => a.routes?.direction === "to_school")?.routes?.name ?? null, stop: active.find((a) => a.routes?.direction === "to_school")?.route_stops?.label ?? null }} schoolName={c.schools?.name ?? ""} />}
       </article>;
     })}</div>
+    <ParentDriverRating />
     <section className="parent-add-child"><h2>تسجيل ابن آخر في النقل</h2><SchoolFinder email={email} /></section>
   </>;
 }
