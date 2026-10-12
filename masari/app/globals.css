@@ -233,3 +233,4 @@
 .school-pick-row { text-align: right; padding: 9px 12px; border: 1px solid #e3edf0; border-radius: 10px; background: #fff; cursor: pointer; font: inherit; }
 .school-pick-row:hover { border-color: #1f8a93; }
 .picked-school { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
+.sub-driver { border: 1px solid #cfdfe3; border-radius: 10px; padding: 6px 10px; font: inherit; background: #fff; max-width: 220px; }
