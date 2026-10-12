@@ -234,3 +234,21 @@
 .school-pick-row:hover { border-color: #1f8a93; }
 .picked-school { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
 .sub-driver { border: 1px solid #cfdfe3; border-radius: 10px; padding: 6px 10px; font: inherit; background: #fff; max-width: 220px; }
+.report-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.report-actions input { border: 1px solid #cfdfe3; border-radius: 10px; padding: 8px 10px; font: inherit; background: #fff; }
+.report-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.report-tile { background: #fff; border: 1px solid #dbe7ea; border-radius: 16px; padding: 14px 16px; display: grid; gap: 4px; }
+.report-tile span { color: #5a7280; font-size: 13px; }
+.report-tile strong { font-size: 24px; color: #10394b; font-variant-numeric: tabular-nums; }
+.report-tile.good { border-color: #b7e2cd; background: #f1fbf6; } .report-tile.warn { border-color: #f1d29b; background: #fff8ea; } .report-tile.bad { border-color: #f0c4c4; background: #fff4f4; }
+.table-wrap { overflow-x: auto; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.report-table th, .report-table td { padding: 10px 12px; border-bottom: 1px solid #e3edf0; text-align: right; white-space: nowrap; }
+.report-table td.wrap { white-space: normal; min-width: 200px; }
+.report-table th { color: #5a7280; font-weight: 600; background: #f5f9fa; }
+.rate-driver { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid #e3edf0; }
+.rate-driver > div:first-child { flex: 1 1 180px; } .rate-driver p { margin: 2px 0 0; color: #5a7280; font-size: 13px; }
+.rate-driver input { flex: 1 1 200px; min-width: 0; border: 1px solid #cfdfe3; border-radius: 10px; padding: 8px 12px; font: inherit; }
+.stars { display: flex; gap: 2px; direction: ltr; }
+.stars button { border: 0; background: none; padding: 2px; cursor: pointer; color: #cfdfe3; }
+.stars button svg { width: 26px; height: 26px; } .stars button.on { color: #e0a21e; } .stars button.on svg { fill: currentColor; }
