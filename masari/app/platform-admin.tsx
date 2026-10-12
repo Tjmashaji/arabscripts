@@ -67,74 +67,143 @@ export function RegionOverview({ region, platformAdmin, onOpen }: { region: stri
 }
 
 // ───────── المستخدمون ─────────
-type UserRow = { user_id: string; email: string; full_name: string | null; phone: string | null; status: string; email_confirmed: boolean; created_at: string; last_sign_in_at: string | null; platform_roles: { role: string; region: string | null }[]; schools: { school_name: string; role: string; status: string }[]; is_driver: boolean; is_guardian: boolean };
+type UserRow = { user_id: string; email: string; full_name: string | null; phone: string | null; status: string; suspended_until: string | null; email_confirmed: boolean; created_at: string; last_sign_in_at: string | null;
+  platform_roles: { role: string; region: string | null }[]; schools: { school_id: string; school_name: string; role: string; status: string }[];
+  driver: { school_id: string; school_name: string; status: string } | null; guardian_schools: { school_id: string; school_name: string }[] };
 const userStatus: Record<string, string> = { active: "مفعّل", pending: "بانتظار التفعيل", suspended: "موقوف" };
 const memberRole: Record<string, string> = { school_admin: "مدير مدرسة", operations: "تشغيل" };
+const ROLE_OPTIONS: { value: string; label: string; needs: "none" | "region" | "school" }[] = [
+  { value: "guardian", label: "ولي أمر", needs: "school" }, { value: "driver", label: "سائق", needs: "school" },
+  { value: "school_admin", label: "مدير مدرسة", needs: "school" }, { value: "operations", label: "تشغيل مدرسة", needs: "school" },
+  { value: "executive", label: "إدارة تنفيذية (منطقة)", needs: "region" }, { value: "super_admin", label: "مدير النظام", needs: "none" },
+];
+const SUSPEND_FOR: { value: string; label: string; hours: number | null }[] = [
+  { value: "1d", label: "يوم واحد", hours: 24 }, { value: "3d", label: "3 أيام", hours: 72 }, { value: "7d", label: "أسبوع", hours: 168 },
+  { value: "30d", label: "شهر", hours: 720 }, { value: "forever", label: "حتى أعيد تفعيله", hours: null },
+];
+const userErr = (m: string) => m.includes("CONFIRM_MISMATCH") ? "البريد المكتوب لا يطابق بريد الحساب." : m.includes("CANNOT_DELETE_ADMIN") ? "أزل دور «مدير النظام» من الحساب أولًا ثم احذفه." : m.includes("SCHOOL_REQUIRED") ? "اختر المدرسة." : m.includes("drivers_user_id_key") ? "الحساب سائق في مدرسة أخرى." : m.includes("Could not find the function") ? "هذه الميزة تحتاج تشغيل ملف SQL الأخير في Supabase." : errText(m);
+
+type RoleChip = { key: string; label: string; role: string; school?: string };
+const rolesOf = (u: UserRow): RoleChip[] => [
+  ...u.platform_roles.map((r) => ({ key: r.role, role: r.role, label: r.role === "super_admin" ? "مدير النظام" : `إدارة تنفيذية · ${r.region ?? "بلا منطقة"}` })),
+  ...u.schools.map((m) => ({ key: `m-${m.school_id}`, role: m.role, school: m.school_id, label: `${memberRole[m.role] ?? m.role} · ${m.school_name}` })),
+  ...(u.driver ? [{ key: "driver", role: "driver", school: u.driver.school_id, label: `سائق · ${u.driver.school_name}` }] : []),
+  ...u.guardian_schools.map((g) => ({ key: `g-${g.school_id}`, role: "guardian", school: g.school_id, label: `ولي أمر · ${g.school_name}` })),
+];
+
+function SchoolPick({ value, onChange }: { value: { id: string; name: string } | null; onChange: (s: { id: string; name: string } | null) => void }) {
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState<{ id: string; name: string; city: string | null }[]>([]);
+  const search = async () => { const { data } = await supabase.rpc("admin_school_directory", { p_status: "active", p_query: q.trim() || null }); setRes(((data ?? []) as { id: string; name: string; city: string | null }[]).slice(0, 8)); };
+  if (value) return <p className="picked-school"><School className="inline-icon" /> {value.name} <button className="text-link" onClick={() => onChange(null)}>تغيير</button></p>;
+  return <div className="school-pick"><div className="finder-search"><input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void search(); } }} placeholder="ابحث عن مدرسة مفعّلة" aria-label="البحث عن مدرسة" /><Button size="sm" variant="outline" onClick={() => void search()}><Search /> بحث</Button></div>
+    {res.map((s) => <button key={s.id} className="school-pick-row" onClick={() => onChange({ id: s.id, name: s.name })}>{s.name}{s.city ? ` · ${s.city}` : ""}</button>)}</div>;
+}
+
+function UserPanel({ u, mode, busy, onAct, onClose }: { u: UserRow; mode: "role" | "suspend" | "delete"; busy: boolean; onAct: (fn: () => PromiseLike<{ error: { message: string } | null }>, ok: string) => Promise<void>; onClose: () => void }) {
+  const [role, setRole] = useState("guardian");
+  const [school, setSchool] = useState<{ id: string; name: string } | null>(null);
+  const [region, setRegion] = useState("الخرج");
+  const [period, setPeriod] = useState("1d");
+  const [reason, setReason] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const needs = ROLE_OPTIONS.find((r) => r.value === role)?.needs ?? "none";
+  if (mode === "role") return <div className="user-panel">
+    <p className="field-title">أدوار الحساب الحالية</p>
+    {rolesOf(u).length === 0 ? <p className="muted-label">بلا دور.</p> : <div className="role-chips">{rolesOf(u).map((r) => <span className="role-chip" key={r.key}>{r.label}
+      <button aria-label={`إزالة ${r.label}`} disabled={busy} onClick={() => void onAct(() => supabase.rpc("admin_set_user_role", { p_user: u.user_id, p_role: r.role, p_grant: false, p_school: r.school ?? null, p_region: null }), `أُزيل دور «${r.label}» من ${u.email}.`)}><X /></button></span>)}</div>}
+    <p className="field-title">إضافة دور</p>
+    <div className="claim-grid">
+      <label htmlFor={`role-${u.user_id}`}>الدور<select id={`role-${u.user_id}`} value={role} onChange={(e) => setRole(e.target.value)}>{ROLE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
+      {needs === "region" && <label htmlFor={`region-${u.user_id}`}>المنطقة (المحافظة)<input id={`region-${u.user_id}`} value={region} onChange={(e) => setRegion(e.target.value)} /></label>}
+    </div>
+    {needs === "school" && <SchoolPick value={school} onChange={setSchool} />}
+    {role === "super_admin" && <p className="muted-label">مدير النظام يملك كل الصلاحيات. امنحه لمن تثق به فقط.</p>}
+    <div className="ops-actions"><Button size="sm" disabled={busy || (needs === "school" && !school) || (needs === "region" && !region.trim())}
+      onClick={() => void onAct(() => supabase.rpc("admin_set_user_role", { p_user: u.user_id, p_role: role, p_grant: true, p_school: needs === "school" ? school?.id ?? null : null, p_region: needs === "region" ? region.trim() : null }), `أُضيف دور «${ROLE_OPTIONS.find((r) => r.value === role)?.label}» إلى ${u.email}.`)}><Check /> إضافة الدور</Button>
+      <Button size="sm" variant="outline" onClick={onClose}>إغلاق</Button></div>
+  </div>;
+  if (mode === "suspend") return <div className="user-panel">
+    <div className="claim-grid">
+      <label htmlFor={`period-${u.user_id}`}>مدة الإيقاف<select id={`period-${u.user_id}`} value={period} onChange={(e) => setPeriod(e.target.value)}>{SUSPEND_FOR.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></label>
+      <label htmlFor={`reason-${u.user_id}`}>السبب<input id={`reason-${u.user_id}`} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+    </div>
+    <p className="muted-label">لا يستطيع صاحب الحساب الدخول أثناء الإيقاف. الإيقاف المؤقت يُرفع تلقائيًا عند انتهاء المدة.</p>
+    <div className="ops-actions"><Button size="sm" disabled={busy || !reason.trim()} onClick={() => { const h = SUSPEND_FOR.find((p) => p.value === period)?.hours ?? null; void onAct(() => supabase.rpc("admin_suspend_user", { p_user: u.user_id, p_until: h ? new Date(Date.now() + h * 3600000).toISOString() : null, p_note: reason.trim() }), `تم إيقاف ${u.email} ${h ? `لمدة ${SUSPEND_FOR.find((p) => p.value === period)?.label}` : "حتى إعادة تفعيله"}.`); }}>إيقاف</Button>
+      <Button size="sm" variant="outline" onClick={onClose}>إلغاء</Button></div>
+  </div>;
+  return <div className="user-panel danger-panel">
+    <p><strong>حذف الحساب نهائيًا لا يمكن التراجع عنه.</strong> يُحذف الحساب وإشعاراته وطلباته، وتبقى سجلات المدرسة (الطلاب والرحلات) دون ربط بالحساب.</p>
+    <label htmlFor={`confirm-${u.user_id}`}>للتأكيد اكتب البريد: <span dir="ltr">{u.email}</span><input id={`confirm-${u.user_id}`} dir="ltr" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" /></label>
+    <div className="ops-actions"><Button size="sm" className="danger-action" disabled={busy || confirm.trim().toLowerCase() !== u.email.toLowerCase()} onClick={() => void onAct(() => supabase.rpc("admin_delete_user", { p_user: u.user_id, p_confirm_email: confirm.trim() }), `حُذف الحساب ${u.email}.`)}><Trash2 /> حذف نهائي</Button>
+      <Button size="sm" variant="outline" onClick={onClose}>إلغاء</Button></div>
+  </div>;
+}
 
 export function UsersAdmin({ myEmail }: { myEmail: string }) {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [query, setQuery] = useState("");
+  const [statusF, setStatusF] = useState("");
+  const [roleF, setRoleF] = useState("");
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
-  const [execFor, setExecFor] = useState<string | null>(null);
-  const [region, setRegion] = useState("الخرج");
-  const [reasonFor, setReasonFor] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
-  const load = useCallback(async (q: string) => {
-    const { data, error } = await supabase.rpc("admin_list_users", { p_query: q.trim() || null });
-    if (error) { setMsg({ text: errText(error.message), ok: false }); return; }
+  const [open, setOpen] = useState<{ id: string; mode: "role" | "suspend" | "delete" } | null>(null);
+  const load = useCallback(async (q: string, st: string, rl: string) => {
+    const { data, error } = await supabase.rpc("admin_users", { p_query: q.trim() || null, p_status: st || null, p_role: rl || null });
+    if (error) { setMsg({ text: userErr(error.message), ok: false }); return; }
     setRows((data ?? []) as UserRow[]);
   }, []);
   useEffect(() => {
     let alive = true;
-    const run = async () => { if (alive) await load("").catch(() => {}); };
+    const run = async () => { if (alive) await load("", "", "").catch(() => {}); };
     void run();
     return () => { alive = false; };
   }, [load]);
-
+  const reload = () => load(query, statusF, roleF);
   const act = async (fn: () => PromiseLike<{ error: { message: string } | null }>, okText: string) => {
     setBusy(true); setMsg(null);
     const { error } = await fn();
     setBusy(false);
-    if (error) { setMsg({ text: errText(error.message), ok: false }); return; }
-    setMsg({ text: okText, ok: true }); setExecFor(null); setReasonFor(null); setReason("");
-    await load(query);
+    if (error) { setMsg({ text: userErr(error.message), ok: false }); return; }
+    setMsg({ text: okText, ok: true });
+    if (okText.startsWith("حُذف") || okText.startsWith("تم إيقاف")) setOpen(null);
+    await reload();
   };
-  const roleText = (u: UserRow) => {
-    const parts = u.platform_roles.map((r) => r.role === "super_admin" ? "مدير النظام" : `إدارة تنفيذية · ${r.region ?? "بلا منطقة"}`);
-    u.schools.forEach((s) => parts.push(`${memberRole[s.role] ?? s.role} · ${s.school_name}`));
-    if (u.is_driver) parts.push("سائق"); if (u.is_guardian) parts.push("ولي أمر");
-    return parts.length ? parts.join(" — ") : "بلا دور";
-  };
+  const counts = useMemo(() => ({ all: rows.length, suspended: rows.filter((r) => r.status === "suspended").length, pending: rows.filter((r) => r.status === "pending").length }), [rows]);
 
   return <>
-    <div className="welcome"><div><p className="eyebrow">مدير النظام</p><h1>المستخدمون والصلاحيات</h1><p>كل الحسابات المسجلة. من هنا تعيّن الإدارة التنفيذية لمنطقتها، وتوقف الحسابات أو تعيد تفعيلها.</p></div></div>
+    <div className="welcome"><div><p className="eyebrow">مدير النظام</p><h1>المستخدمون والصلاحيات</h1><p>كل الحسابات المسجلة: غيّر دور أي حساب، أو أوقفه مؤقتًا أو دائمًا، أو احذفه نهائيًا.</p></div></div>
     <Flash msg={msg} />
     <article className="panel ops-panel">
-      <form className="finder-search" onSubmit={(e) => { e.preventDefault(); void load(query); }}><input id="users-q" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="البريد أو الاسم" aria-label="بحث في المستخدمين" /><Button type="submit" variant="outline"><Search /> بحث</Button></form>
+      <form className="users-filters" onSubmit={(e) => { e.preventDefault(); void reload(); }}>
+        <input id="users-q" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="البريد أو الاسم أو الجوال" aria-label="بحث في المستخدمين" />
+        <select aria-label="الحالة" value={statusF} onChange={(e) => { setStatusF(e.target.value); void load(query, e.target.value, roleF); }}><option value="">كل الحالات</option><option value="active">مفعّل</option><option value="pending">بانتظار التفعيل</option><option value="suspended">موقوف</option></select>
+        <select aria-label="الدور" value={roleF} onChange={(e) => { setRoleF(e.target.value); void load(query, statusF, e.target.value); }}><option value="">كل الأدوار</option><option value="guardian">أولياء الأمور</option><option value="driver">السائقون</option><option value="school">إدارات المدارس</option><option value="executive">الإدارة التنفيذية</option><option value="super_admin">مدير النظام</option><option value="none">بلا دور</option></select>
+        <Button type="submit" variant="outline"><Search /> بحث</Button>
+      </form>
+      <p className="muted-label">{counts.all} حساب · {counts.pending} بانتظار التفعيل · {counts.suspended} موقوف</p>
       {rows.map((u) => {
         const self = u.email.toLowerCase() === myEmail.toLowerCase();
-        const exec = u.platform_roles.find((r) => r.role === "executive");
-        return <div className="ops-row" key={u.user_id}>
-          <div><strong dir="ltr">{u.email}</strong>{u.full_name && <span className="muted-inline"> · {u.full_name}</span>}
-            <p>{roleText(u)}</p>
-            <p>سجّل {fmt(u.created_at)} · آخر دخول {fmt(u.last_sign_in_at)}{u.email_confirmed ? "" : " · البريد غير مؤكد"}</p>
-            {execFor === u.user_id && <div className="inline-form"><label htmlFor={`region-${u.user_id}`}>المنطقة (المحافظة)</label><input id={`region-${u.user_id}`} value={region} onChange={(e) => setRegion(e.target.value)} />
-              <Button size="sm" disabled={busy || !region.trim()} onClick={() => void act(() => supabase.rpc("admin_set_platform_role", { p_user: u.user_id, p_role: "executive", p_grant: true, p_region: region.trim() }), `أصبح ${u.email} إدارة تنفيذية لمنطقة ${region.trim()}.`)}>حفظ</Button>
-              <Button size="sm" variant="outline" onClick={() => setExecFor(null)}>إلغاء</Button></div>}
-            {reasonFor === u.user_id && <div className="inline-form"><label htmlFor={`reason-${u.user_id}`}>سبب الإيقاف</label><input id={`reason-${u.user_id}`} value={reason} onChange={(e) => setReason(e.target.value)} />
-              <Button size="sm" disabled={busy || !reason.trim()} onClick={() => void act(() => supabase.rpc("admin_set_user_status", { p_user: u.user_id, p_status: "suspended", p_note: reason.trim() }), `تم إيقاف ${u.email}.`)}>إيقاف</Button>
-              <Button size="sm" variant="outline" onClick={() => setReasonFor(null)}>إلغاء</Button></div>}
+        const chips = rolesOf(u);
+        const isOpen = open?.id === u.user_id;
+        return <div className="user-row" key={u.user_id}>
+          <div className="ops-row">
+            <div><strong dir="ltr">{u.email}</strong>{u.full_name && <span className="muted-inline"> · {u.full_name}</span>}{u.phone && <span className="muted-inline"> · <bdi>{u.phone}</bdi></span>}
+              <p>{chips.length ? chips.map((c) => c.label).join(" — ") : "بلا دور"}</p>
+              <p>سجّل {fmt(u.created_at)} · آخر دخول {fmt(u.last_sign_in_at)}{u.email_confirmed ? "" : " · البريد غير مؤكد"}{u.status === "suspended" ? ` · ${u.suspended_until ? `موقوف حتى ${fmt(u.suspended_until)}` : "موقوف حتى إعادة التفعيل"}` : ""}</p>
+            </div>
+            <div className="ops-actions">
+              <Badge className={`status-badge ${u.status === "active" ? "tone-0" : u.status === "suspended" ? "tone-2" : "tone-1"}`}>{userStatus[u.status] ?? u.status}</Badge>
+              {self ? <span className="muted-inline">حسابك</span> : <>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => setOpen(isOpen && open?.mode === "role" ? null : { id: u.user_id, mode: "role" })}><ShieldCheck /> الدور</Button>
+                {u.status === "suspended" ? <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("admin_set_user_status", { p_user: u.user_id, p_status: "active", p_note: null }), `أُعيد تفعيل ${u.email}.`)}>إعادة تفعيل</Button>
+                  : <Button size="sm" variant="outline" disabled={busy} onClick={() => setOpen(isOpen && open?.mode === "suspend" ? null : { id: u.user_id, mode: "suspend" })}>إيقاف</Button>}
+                {u.status === "pending" && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => supabase.rpc("admin_set_user_status", { p_user: u.user_id, p_status: "active", p_note: null }), `تم تفعيل ${u.email}.`)}><Check /> تفعيل</Button>}
+                <Button size="sm" variant="outline" className="danger-outline" disabled={busy} aria-label={`حذف ${u.email}`} onClick={() => setOpen(isOpen && open?.mode === "delete" ? null : { id: u.user_id, mode: "delete" })}><Trash2 /></Button>
+              </>}
+            </div>
           </div>
-          <div className="ops-actions">
-            <Badge className={`status-badge ${u.status === "active" ? "tone-0" : "tone-1"}`}>{userStatus[u.status] ?? u.status}</Badge>
-            {self ? <span className="muted-inline">حسابك</span> : <>
-              {exec ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => supabase.rpc("admin_set_platform_role", { p_user: u.user_id, p_role: "executive", p_grant: false, p_region: null }), `أُزيلت صلاحية الإدارة التنفيذية من ${u.email}.`)}>إزالة الإدارة التنفيذية</Button>
-                : <Button size="sm" variant="outline" disabled={busy} onClick={() => { setReasonFor(null); setExecFor(u.user_id); }}><ShieldCheck /> إدارة تنفيذية</Button>}
-              {u.status === "suspended" ? <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("admin_set_user_status", { p_user: u.user_id, p_status: "active", p_note: null }), `أُعيد تفعيل ${u.email}.`)}>إعادة تفعيل</Button>
-                : <Button size="sm" variant="outline" disabled={busy} onClick={() => { setExecFor(null); setReasonFor(u.user_id); }}>إيقاف</Button>}
-            </>}
-          </div>
+          {isOpen && open && <UserPanel key={open.mode} u={u} mode={open.mode} busy={busy} onAct={act} onClose={() => setOpen(null)} />}
         </div>;
       })}
       {rows.length === 0 && <p className="muted-label">لا توجد حسابات مطابقة.</p>}
