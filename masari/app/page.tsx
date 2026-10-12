@@ -13,7 +13,7 @@ import { isNativeApp, locateOnce, watchLocation, type Fix } from "@/lib/location
 import { ConsentGate, PRIVACY_URL, PRIVACY_VERSION, PrivacyPolicy } from "./privacy";
 import { TripMap, navigateUrl, fullRouteUrl } from "./trip-map";
 import { ParentHomeLocations } from "./home-location";
-import { PendingAccount } from "./onboarding";
+import { PendingAccount, SIGNUP_ROLES, type SignupRole } from "./onboarding";
 import { AdminDirectory } from "./school-directory";
 import { FeedbackList, ParentChildren, TripHistory } from "./role-pages";
 import { AdminBilling, SchoolBilling } from "./billing";
@@ -509,7 +509,7 @@ function roleFromAccess(access: MyAccess | null): Role | null {
   if (access.guardian.some((g) => g.status === "active")) return "parent";
   return null;
 }
-type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string; region?: string | null; privacyOk?: boolean };
+type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string; phone?: string; region?: string | null; privacyOk?: boolean };
 async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const email = session.user.email ?? "";
   await supabase.rpc("claim_my_invites");
@@ -517,8 +517,9 @@ async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const access = data as MyAccess | null;
   const name = access?.full_name || email.split("@")[0] || "مستخدم";
   const requestedRole = typeof session.user.user_metadata?.requested_role === "string" ? session.user.user_metadata.requested_role : undefined;
-  if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole };
-  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, region: access?.region ?? null, privacyOk: access?.privacy_version === PRIVACY_VERSION };
+  const phone = typeof session.user.user_metadata?.phone === "string" ? session.user.user_metadata.phone : undefined;
+  if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole, phone };
+  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, phone, region: access?.region ?? null, privacyOk: access?.privacy_version === PRIVACY_VERSION };
 }
 
 function Stat({ icon: Icon, label, value, detail, accent }: { icon: typeof Users; label: string; value: string; detail: string; accent: string }) {
@@ -718,56 +719,54 @@ function EmptyState({ role }: { role: Role }) {
     : "لا توجد بيانات تشغيل بعد. أضف مدرسة ثم الباصات والمسارات والطلاب لتظهر هنا.";
   return <article className="panel empty-state"><div className="brand-mark large"><School/></div><h2>لا توجد بيانات بعد</h2><p>{hint}</p></article>;
 }
-function AuthPage({ onAuthenticated, initialMode = "login", initialRole = "parent", onBack }: { onAuthenticated: (session: Session) => Promise<void>; initialMode?: "login" | "signup"; initialRole?: Role; onBack?: () => void }) {
-  const [selectedRole, setSelectedRole] = useState<Role>(initialRole);
+function AuthPage({ onAuthenticated, initialMode = "login", initialRole, onBack }: { onAuthenticated: (session: Session) => Promise<void>; initialMode?: "login" | "signup"; initialRole?: SignupRole; onBack?: () => void }) {
+  // الدخول موحّد: البريد وكلمة المرور فقط، والنظام يعرف الدور من الخادم.
+  // التسجيل الجديد: يختار الدور، ثم يكمل طلبه (اختيار المدرسة) بعد إنشاء الحساب.
+  const [selectedRole, setSelectedRole] = useState<SignupRole | null>(initialRole ?? null);
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [forgot, setForgot] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const roleOptions: { role: Role; title: string; desc: string; icon: typeof Users }[] = [
-    { role: "parent", title: "ولي الأمر", desc: "متابعة الطالب والرحلة والتنبيهات", icon: Users },
-    { role: "school", title: "إدارة مدرسة", desc: "اطلب تفعيل مدرستك في مساري", icon: School },
-    { role: "executive", title: "الإدارة التنفيذية", desc: "التقارير وبرج المراقبة لكل العمليات", icon: ShieldCheck },
-    { role: "driver", title: "السائق", desc: "بدء الرحلة واعتماد المحطات", icon: BusFront },
-  ];
-  const SelectedIcon = roleOptions.find((item)=>item.role===selectedRole)?.icon ?? Users;
+  const signup = mode === "signup";
+  const phoneOk = /^\+?[0-9\s-]{9,20}$/.test(phone.trim());
+  const canSubmit = !!email.trim() && password.length >= (signup ? 8 : 6) && (!signup || (!!selectedRole && name.trim().length >= 3 && phoneOk && agreed));
   const submitAuth = async () => {
     setBusy(true); setMessage("");
     const credentials = { email: email.trim(), password };
-    const result = mode === "login"
+    const result = !signup
       ? await supabase.auth.signInWithPassword(credentials)
-      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name, requested_role: selectedRole, privacy_version: PRIVACY_VERSION } } });
+      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name.trim(), phone: phone.trim(), requested_role: selectedRole, privacy_version: PRIVACY_VERSION } } });
     setBusy(false);
     if (result.error) {
-      setMessage(mode === "login" ? "تعذر تسجيل الدخول. تأكد من البريد وكلمة المرور." : "تعذر إنشاء الحساب. قد يكون البريد مستخدمًا أو كلمة المرور قصيرة.");
+      setMessage(!signup ? "البريد أو كلمة المرور غير صحيحة." : /registered|exists/i.test(result.error.message) ? "هذا البريد مسجّل مسبقًا. سجّل الدخول به." : "تعذر إنشاء الحساب. تأكد من البريد وأن كلمة المرور 8 أحرف على الأقل.");
       return;
     }
     if (result.data.session) {
-      try {
-        await onAuthenticated(result.data.session);
-      } catch {
-        setMessage(mode === "login" ? "الحساب صحيح لكنه بانتظار التفعيل وربطه بدور معتمد من الإدارة." : "تم إنشاء الحساب بأمان، وهو الآن بانتظار اعتماد الإدارة وربطه بالدور المطلوب.");
-        await supabase.auth.signOut({ scope: "local" });
-      }
-    } else setMessage("تم إنشاء الحساب. فعّل البريد ثم انتظر اعتماد الإدارة قبل تسجيل الدخول.");
+      try { await onAuthenticated(result.data.session); }
+      catch { setMessage("تعذر فتح الحساب الآن. حاول مرة أخرى."); await supabase.auth.signOut({ scope: "local" }); }
+    } else setMessage("أنشأنا حسابك. افتح الرابط الذي أرسلناه إلى بريدك لتأكيده، ثم سجّل الدخول لإكمال طلبك واختيار المدرسة.");
   };
+  const roleInfo = SIGNUP_ROLES.find((r) => r.role === selectedRole);
   return <main dir="rtl" className="auth-page">
-    <section className="auth-hero">{onBack&&<button className="auth-back" onClick={onBack}>→ الصفحة الرئيسية</button>}<div className="brand-mark large"><BusFront/></div><p className="eyebrow">مساري</p><h1>تسجيل الدخول وإدارة النقل المدرسي</h1><p>ادخل بحسابك لمتابعة الرحلات وإدارة النقل المدرسي حسب دورك: المدرسة، ولي الأمر، السائق، أو الإدارة.</p></section>
+    <section className="auth-hero">{onBack&&<button className="auth-back" onClick={onBack}>→ الصفحة الرئيسية</button>}<div className="brand-mark large"><BusFront/></div><p className="eyebrow">مساري</p><h1>{signup ? "حساب جديد في مساري" : "تسجيل الدخول"}</h1><p>{signup ? "اختر دورك وأنشئ حسابك، ثم اختر المدرسة وأرسل طلبك. بعد اعتماده تدخل ببريدك وكلمة المرور فقط." : "ادخل ببريدك وكلمة المرور، وسيفتح لك النظام صفحتك حسب دورك: مدير النظام، الإدارة التعليمية، المدرسة، السائق، أو ولي الأمر."}</p></section>
     <section className="auth-shell">
-      <div className="auth-tabs"><button className={mode==="login"?"active":""} onClick={()=>setMode("login")}>تسجيل الدخول</button><button className={mode==="signup"?"active":""} onClick={()=>{setMode("signup");if(selectedRole==="executive")setSelectedRole("parent")}}>تسجيل جديد</button></div>
-      <div className="role-cards">{roleOptions.filter((item)=>mode==="login"||item.role!=="executive").map((item)=><button key={item.role} className={selectedRole===item.role?"active":""} onClick={()=>setSelectedRole(item.role)}><item.icon/><strong>{item.title}</strong><span>{item.desc}</span></button>)}</div>
-      <div className="auth-form-card">{forgot ? <ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/> : <><div className="auth-form-head"><SelectedIcon/><div><p className="eyebrow">{mode==="login"?"دخول":"إنشاء حساب"}</p><h2>{roleNames[selectedRole]}</h2></div></div>
-        <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label>
-        <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>
-        {mode==="signup"&&<label>الاسم<input value={name} onChange={(e)=>setName(e.target.value)} placeholder="الاسم الكامل"/></label>}
-        {mode==="signup"&&<label className="consent-check" htmlFor="signup-consent"><input id="signup-consent" type="checkbox" checked={agreed} onChange={(e)=>setAgreed(e.target.checked)}/> أوافق على <a href={PRIVACY_URL} target="_blank" rel="noreferrer">سياسة الخصوصية</a></label>}
+      <div className="auth-tabs"><button className={!signup?"active":""} onClick={()=>{setMode("login");setMessage("")}}>تسجيل الدخول</button><button className={signup?"active":""} onClick={()=>{setMode("signup");setMessage("")}}>حساب جديد</button></div>
+      {signup && <div className="role-cards">{SIGNUP_ROLES.map((item)=><button key={item.role} className={selectedRole===item.role?"active":""} onClick={()=>setSelectedRole(item.role)}><item.icon/><strong>{item.title}</strong><span>{item.desc}</span></button>)}</div>}
+      <div className="auth-form-card">{forgot ? <ForgotPassword initialEmail={email} onBack={()=>setForgot(false)}/> : <>
+        {signup && <div className="auth-form-head">{roleInfo ? <roleInfo.icon/> : <Users/>}<div><p className="eyebrow">إنشاء حساب</p><h2>{roleInfo ? roleInfo.title : "اختر دورك أولًا"}</h2></div></div>}
+        {signup&&<label>الاسم الكامل<input value={name} onChange={(e)=>setName(e.target.value)} autoComplete="name"/></label>}
+        {signup&&<label>الجوال<input value={phone} onChange={(e)=>setPhone(e.target.value)} dir="ltr" inputMode="tel" placeholder="05xxxxxxxx" autoComplete="tel"/></label>}
+        <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" dir="ltr" placeholder="name@example.com" autoComplete="email"/></label>
+        <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••" autoComplete={signup?"new-password":"current-password"} onKeyDown={(e)=>{if(e.key==="Enter"&&canSubmit&&!busy)void submitAuth()}}/></label>
+        {signup&&<label className="consent-check" htmlFor="signup-consent"><input id="signup-consent" type="checkbox" checked={agreed} onChange={(e)=>setAgreed(e.target.checked)}/> أوافق على <a href={PRIVACY_URL} target="_blank" rel="noreferrer">سياسة الخصوصية</a></label>}
         {message&&<p className="auth-message">{message}</p>}
-        <Button className="wide-action" onClick={submitAuth} disabled={busy || !email.trim() || password.length < (mode==="signup" ? 8 : 6) || (mode==="signup" && !agreed)}>{busy ? "جارٍ التحقق…" : mode==="login" ? "تسجيل الدخول" : "إنشاء حساب"}</Button>
-        {mode==="login" ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}
+        <Button className="wide-action" onClick={submitAuth} disabled={busy || !canSubmit}>{busy ? "جارٍ التحقق…" : !signup ? "دخول" : "إنشاء الحساب والمتابعة"}</Button>
+        {!signup ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}
       </>}</div>
     </section>
   </main>;
@@ -1093,9 +1092,9 @@ export default function Home() {
   if(privacyHash) return <PrivacyPolicy onBack={()=>{window.location.hash="";}}/>;
   if(needsConsent) return <ConsentGate onAccepted={()=>setNeedsConsent(false)} onSignOut={()=>{setNeedsConsent(false);void supabase.auth.signOut({ scope: "local" }).then(()=>window.location.reload())}}/>;
   if(recovering) return <ResetPasswordPage onDone={()=>void finishRecovery()} onCancel={()=>void cancelRecovery()}/>;
-  if(pendingAccount) return <PendingAccount email={pendingAccount.email} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
+  if(pendingAccount) return <PendingAccount email={pendingAccount.email} name={pendingAccount.name} phone={pendingAccount.phone} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
   if(!entered && authView==="landing") return <Landing onLogin={()=>setAuthView("login")} onRegisterSchool={()=>setAuthView("school")} onFindSchool={()=>setAuthView("parent")}/>;
-  if(!entered) return <AuthPage key={authView} onAuthenticated={enterAuthenticated} initialMode={authView==="school"||authView==="parent"?"signup":"login"} initialRole={authView==="school"?"school":"parent"} onBack={()=>setAuthView("landing")}/>;
+  if(!entered) return <AuthPage key={authView} onAuthenticated={enterAuthenticated} initialMode={authView==="school"||authView==="parent"?"signup":"login"} initialRole={authView==="school"?"school":authView==="parent"?"parent":undefined} onBack={()=>setAuthView("landing")}/>;
   return <div dir="rtl" className="masari-app">{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
     <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><NavButton active={view===item.id} onSelect={()=>setView(item.id)} label={item.label} icon={item.icon}/></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</p></div><button onClick={()=>void signOut()}>خروج</button></div></SidebarFooter></Sidebar>
     <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Badge variant="outline" className="role-badge">{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</Badge><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={toggleNotifications}><Bell/>{unreadCount>0&&<span>{unreadCount}</span>}</button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{authMode==="authenticated"&&<PushToggle compact/>}{notifications.length===0&&<p className="muted-label notification-empty">لا توجد إشعارات بعد.</p>}{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{authMode==="authenticated" && role==="executive" ? (view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : view==="control" ? <LiveControl canHandleEmergencies={platformAdmin}/> : platformAdmin && view==="users" ? <UsersAdmin myEmail={accountEmail}/> : platformAdmin && view==="billing" ? <AdminBilling/> : platformAdmin && view==="data" ? <DataManager/> : platformAdmin && view==="audit" ? <AuditLog/> : platformAdmin && view==="errors" ? <ErrorLog/> : <RegionOverview region={accessRegion} platformAdmin={platformAdmin} onOpen={setView}/>) : authMode==="authenticated" && view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : authMode==="authenticated" && view==="control" && (role==="school"||role==="executive") ? <LiveControl canHandleEmergencies={role==="school"||platformAdmin}/> : authMode==="authenticated" && role==="school" && OPS_VIEWS.includes(view) ? (data.school.id ? <SchoolOps schoolId={data.school.id} tab={view as OpsTab}/> : <EmptyState role={role}/>) : authMode==="authenticated" && role==="school" && view==="feedback" ? <FeedbackList/> : authMode==="authenticated" && role==="school" && view==="billing" && data.school.id ? <SchoolBilling schoolId={data.school.id} schoolName={data.school.name}/> : authMode==="authenticated" && role==="parent" && view==="children" ? <ParentChildren email={accountEmail}/> : authMode==="authenticated" && view==="history" && (role==="parent"||role==="driver") ? <TripHistory role={role}/> : authMode==="authenticated" && role==="parent" && view==="locations" ? <ParentHomeLocations/> : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent} onScanned={()=>void reloadData()}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <EmptyState role={role}/>}</main><nav className="mobile-nav">{(nav.length>5?nav.slice(0,3):nav).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}{nav.length>5&&<MoreButton active={!nav.slice(0,3).some((item)=>item.id===view)}/>}</nav></SidebarInset>

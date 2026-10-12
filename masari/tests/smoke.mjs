@@ -34,7 +34,7 @@ const overflowX = (page) => page.evaluate(() => document.documentElement.scrollW
   await page.fill("input[type=email]", "nobody@example.com"); await page.fill("input[type=password]", "wrong-pass");
   await page.click(".auth-form-card button.wide-action");
   check(await page.locator(".auth-message").first().waitFor({ state: "visible", timeout: 10000 }).then(() => true, () => false), "رسالة خطأ عند بيانات دخول خاطئة");
-  await page.click(".auth-tabs button:has-text('تسجيل جديد')");
+  await page.click(".auth-tabs button:has-text('حساب جديد')");
   check(await page.locator(".auth-form-card button.wide-action").isDisabled(), "التسجيل معطل قبل الموافقة على الخصوصية");
   await page.goto(BASE + "#privacy", { waitUntil: "load" });
   check((await page.locator(".privacy-body h2").count()) >= 8, "صفحة سياسة الخصوصية");

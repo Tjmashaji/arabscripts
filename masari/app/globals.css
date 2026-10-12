@@ -199,3 +199,12 @@
 .coords-input button { border: 1px solid #1f8a93; color: #1f8a93; background: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .coords-input button:disabled { opacity: .45; cursor: default; }
 .coords-hint { margin-top: 4px; font-size: 12px; }
+.onboard-steps { list-style: none; margin: 0; padding: 14px 16px; display: grid; gap: 10px; background: #fff; border: 1px solid #dbe7ea; border-radius: 18px; }
+.onboard-steps li { display: flex; align-items: center; gap: 10px; color: #5a7280; font-weight: 600; }
+.onboard-steps li span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #eef4f5; color: #5a7280; font-size: 13px; flex: none; }
+.onboard-steps li span svg { width: 15px; height: 15px; }
+.onboard-steps li.done { color: #2f9e6e; } .onboard-steps li.done span { background: #2f9e6e; color: #fff; }
+.onboard-steps li.current { color: #10394b; } .onboard-steps li.current span { background: #1f8a93; color: #fff; }
+.switch-role { text-align: center; }
+.home-card .trip-map-canvas, .home-map .trip-map-canvas { height: 240px; }
+.home-req { display: grid; gap: 10px; padding-block: 10px; border-top: 1px solid #e3edf0; }
