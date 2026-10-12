@@ -40,9 +40,9 @@ export const fullRouteUrl = (stops: MapPoint[]) => {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] ?? c));
 
-export function TripMap({ stops, school, bus, nextIndex, home, previous, follow = false, className = "" }: {
+export function TripMap({ stops, school, bus, nextIndex, home, previous, actual, follow = false, className = "" }: {
   stops: MapStop[]; school?: MapPoint & { label?: string } | null; bus?: MapPoint | null; nextIndex?: number;
-  home?: MapPoint & { label?: string } | null; previous?: MapPoint & { label?: string } | null; follow?: boolean; className?: string;
+  home?: MapPoint & { label?: string } | null; previous?: MapPoint & { label?: string } | null; actual?: MapPoint[]; follow?: boolean; className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -69,7 +69,7 @@ export function TripMap({ stops, school, bus, nextIndex, home, previous, follow 
     return () => { cancelled = true; map.current?.remove(); map.current = null; layer.current = null; busMarker.current = null; roadLine.current = null; };
   }, []);
 
-  const stopsKey = JSON.stringify([stops.map((s) => [s.lat, s.lng, s.label, s.done, s.students]), school && [school.lat, school.lng], home && [home.lat, home.lng], previous && [previous.lat, previous.lng], nextIndex]);
+  const stopsKey = JSON.stringify([stops.map((s) => [s.lat, s.lng, s.label, s.done, s.students]), school && [school.lat, school.lng], home && [home.lat, home.lng], previous && [previous.lat, previous.lng], actual?.length, nextIndex]);
 
   const fit = () => {
     const lib = L.current, m = map.current; if (!lib || !m) return;
@@ -77,6 +77,7 @@ export function TripMap({ stops, school, bus, nextIndex, home, previous, follow 
     if (school) pts.push([school.lat, school.lng]);
     if (home) pts.push([home.lat, home.lng]);
     if (previous) pts.push([previous.lat, previous.lng]);
+    if (actual?.length) actual.forEach((p) => pts.push([p.lat, p.lng]));
     if (bus) pts.push([bus.lat, bus.lng]);
     if (pts.length === 1) m.setView(pts[0], 16); else if (pts.length) m.fitBounds(lib.latLngBounds(pts), { padding: [28, 28], maxZoom: 16 });
   };
@@ -98,6 +99,7 @@ export function TripMap({ stops, school, bus, nextIndex, home, previous, follow 
     });
     if (school && !lastIsSchool) lib.marker([school.lat, school.lng], { icon: lib.divIcon({ className: "trip-school", html: "<span>🏫</span>", iconSize: [32, 32], iconAnchor: [16, 16] }) }).addTo(g).bindPopup(esc(school.label ?? "المدرسة"));
     if (home) lib.marker([home.lat, home.lng], { icon: lib.divIcon({ className: "trip-home", html: "<span>🏠</span>", iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(g).bindPopup(esc(home.label ?? "البيت"));
+    if (actual && actual.length > 1) { lib.polyline(actual.map((p) => [p.lat, p.lng] as [number, number]), { color: "#e08a1e", weight: 4, opacity: 0.9 }).addTo(g); }
     if (previous) lib.marker([previous.lat, previous.lng], { icon: lib.divIcon({ className: "trip-prev", html: "<span>📍</span>", iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(g).bindPopup(esc(previous.label ?? "الموقع السابق"));
     fit();
     let alive = true;
