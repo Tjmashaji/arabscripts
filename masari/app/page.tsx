@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { SchoolOps, type OpsTab } from "./school-ops";
 import { QrScanner } from "./student-card";
+import { ConsentGate, PRIVACY_URL, PRIVACY_VERSION, PrivacyPolicy } from "./privacy";
 import { PendingAccount } from "./onboarding";
 import { AdminDirectory } from "./school-directory";
 import { FeedbackList, ParentChildren, TripHistory } from "./role-pages";
@@ -491,7 +492,7 @@ async function loadMasariData(childId?: string | null): Promise<MasariData> {
 }
 
 type MyAccess = {
-  status: string; full_name: string | null; platform_roles: string[]; region?: string | null;
+  status: string; full_name: string | null; platform_roles: string[]; region?: string | null; privacy_version?: string | null;
   schools: { role: string; status: string; school_status: string }[];
   driver: { status: string } | null;
   guardian: { status: string }[];
@@ -505,7 +506,7 @@ function roleFromAccess(access: MyAccess | null): Role | null {
   if (access.guardian.some((g) => g.status === "active")) return "parent";
   return null;
 }
-type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string; region?: string | null };
+type UserAccess = { role: Role | null; name: string; email: string; suspended: boolean; platformAdmin: boolean; requestedRole?: string; region?: string | null; privacyOk?: boolean };
 async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const email = session.user.email ?? "";
   await supabase.rpc("claim_my_invites");
@@ -514,7 +515,7 @@ async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const name = access?.full_name || email.split("@")[0] || "مستخدم";
   const requestedRole = typeof session.user.user_metadata?.requested_role === "string" ? session.user.user_metadata.requested_role : undefined;
   if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole };
-  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, region: access?.region ?? null };
+  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, region: access?.region ?? null, privacyOk: access?.privacy_version === PRIVACY_VERSION };
 }
 
 function Stat({ icon: Icon, label, value, detail, accent }: { icon: typeof Users; label: string; value: string; detail: string; accent: string }) {
@@ -742,6 +743,7 @@ function AuthPage({ onAuthenticated, initialMode = "login", initialRole = "paren
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const roleOptions: { role: Role; title: string; desc: string; icon: typeof Users }[] = [
@@ -756,7 +758,7 @@ function AuthPage({ onAuthenticated, initialMode = "login", initialRole = "paren
     const credentials = { email: email.trim(), password };
     const result = mode === "login"
       ? await supabase.auth.signInWithPassword(credentials)
-      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name, requested_role: selectedRole } } });
+      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name, requested_role: selectedRole, privacy_version: PRIVACY_VERSION } } });
     setBusy(false);
     if (result.error) {
       setMessage(mode === "login" ? "تعذر تسجيل الدخول. تأكد من البريد وكلمة المرور." : "تعذر إنشاء الحساب. قد يكون البريد مستخدمًا أو كلمة المرور قصيرة.");
@@ -780,8 +782,9 @@ function AuthPage({ onAuthenticated, initialMode = "login", initialRole = "paren
         <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" placeholder="name@example.com"/></label>
         <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••"/></label>
         {mode==="signup"&&<label>الاسم<input value={name} onChange={(e)=>setName(e.target.value)} placeholder="الاسم الكامل"/></label>}
+        {mode==="signup"&&<label className="consent-check" htmlFor="signup-consent"><input id="signup-consent" type="checkbox" checked={agreed} onChange={(e)=>setAgreed(e.target.checked)}/> أوافق على <a href={PRIVACY_URL} target="_blank" rel="noreferrer">سياسة الخصوصية</a></label>}
         {message&&<p className="auth-message">{message}</p>}
-        <Button className="wide-action" onClick={submitAuth} disabled={busy || !email.trim() || password.length < (mode==="signup" ? 8 : 6)}>{busy ? "جارٍ التحقق…" : mode==="login" ? "تسجيل الدخول" : "إنشاء حساب"}</Button>
+        <Button className="wide-action" onClick={submitAuth} disabled={busy || !email.trim() || password.length < (mode==="signup" ? 8 : 6) || (mode==="signup" && !agreed)}>{busy ? "جارٍ التحقق…" : mode==="login" ? "تسجيل الدخول" : "إنشاء حساب"}</Button>
         {mode==="login" ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}
       </>}</div>
     </section>
@@ -799,8 +802,9 @@ function MoreButton({ active }: { active: boolean }) {
 }
 // رابط الاستعادة يُقرأ من العنوان في المتصفح فقط (لا يتعارض مع العرض على الخادم).
 const noopSubscribe = () => () => {};
+const subscribeHash = (cb: () => void) => { window.addEventListener("hashchange", cb); return () => window.removeEventListener("hashchange", cb); };
 export default function Home() {
-  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [accountEmail,setAccountEmail]=useState("");
+  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [accountEmail,setAccountEmail]=useState(""); const [needsConsent,setNeedsConsent]=useState(false); const privacyHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#privacy",()=>false);
   const gpsWatchRef = useRef<number | null>(null);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
@@ -810,7 +814,7 @@ export default function Home() {
   const eventsChannelRef = useRef<RealtimeChannel | null>(null);
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
   useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{if(event==="PASSWORD_RECOVERY"){setRecoveryClosed(false);setRecoveryEvent(true)}void refresh()});return()=>{alive=false;subscription.unsubscribe()}},[]);
-  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
+  useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
   useEffect(()=>()=>{if(gpsWatchRef.current!==null) navigator.geolocation.clearWatch(gpsWatchRef.current); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
   const [dbNotes,setDbNotes]=useState<DbNotification[]>([]);
   useEffect(()=>{
@@ -830,7 +834,7 @@ export default function Home() {
   const nav=useMemo(()=>role==="executive"&&platformAdmin?platformNav:navByRole[role],[role,platformAdmin]); const notifications=useMemo(()=>authMode==="authenticated" ? dbNotes.map((n)=>({id:n.id,title:n.title,body:n.body??"",time:formatEventTime(n.created_at),tone:noteTone(n.type)})) : data.source==="empty" ? [] : buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[authMode, dbNotes, data, simulation, driverGps, tripEvents, feedbackRows]);
   const unreadCount = authMode==="authenticated" ? dbNotes.filter((n)=>!n.read_at).length : notifications.length;
   const toggleNotifications=()=>{const opening=!notificationsOpen;setNotificationsOpen(opening);if(opening&&authMode==="authenticated"&&dbNotes.some((n)=>!n.read_at)){const ids=dbNotes.filter((n)=>!n.read_at).map((n)=>n.id);const now=new Date().toISOString();setDbNotes((cur)=>cur.map((n)=>ids.includes(n.id)?{...n,read_at:now}:n));void supabase.from("notifications").update({read_at:now}).in("id",ids).then(()=>{})}};
-  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
+  const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setView("dashboard");setEntered(true)};
   const stopGpsTracking=()=>{if(gpsWatchRef.current!==null){navigator.geolocation.clearWatch(gpsWatchRef.current);gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
   const stopRealtimeTracking=()=>{if(realtimeChannelRef.current){void supabase.removeChannel(realtimeChannelRef.current);realtimeChannelRef.current=null}};
   const stopEventsRealtime=()=>{if(eventsChannelRef.current){void supabase.removeChannel(eventsChannelRef.current);eventsChannelRef.current=null}};
@@ -1123,6 +1127,8 @@ export default function Home() {
   const recheckPending=async()=>{const {data:sessionData}=await supabase.auth.getSession();if(!sessionData.session)return;await enterAuthenticated(sessionData.session);await reloadData().catch(()=>{})};
   const finishRecovery=async()=>{setRecoveryClosed(true);setRecoveryEvent(false);const {data:sessionData}=await supabase.auth.getSession();if(sessionData.session)await enterAuthenticated(sessionData.session)};
   const cancelRecovery=async()=>{await supabase.auth.signOut({ scope: "local" });if(typeof window!=="undefined")window.history.replaceState(null,"",window.location.pathname);setRecoveryClosed(true);setRecoveryEvent(false)};
+  if(privacyHash) return <PrivacyPolicy onBack={()=>{window.location.hash="";}}/>;
+  if(needsConsent) return <ConsentGate onAccepted={()=>setNeedsConsent(false)} onSignOut={()=>{setNeedsConsent(false);void supabase.auth.signOut({ scope: "local" }).then(()=>window.location.reload())}}/>;
   if(recovering) return <ResetPasswordPage onDone={()=>void finishRecovery()} onCancel={()=>void cancelRecovery()}/>;
   if(pendingAccount) return <PendingAccount email={pendingAccount.email} requestedRole={pendingAccount.requestedRole} suspended={pendingAccount.suspended} onSignOut={()=>void leavePending()} onRecheck={recheckPending}/>;
   if(!entered && authView==="landing") return <Landing onLogin={()=>setAuthView("login")} onRegisterSchool={()=>setAuthView("school")} onFindSchool={()=>setAuthView("parent")}/>;

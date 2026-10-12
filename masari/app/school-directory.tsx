@@ -16,7 +16,7 @@ const OSM_NOTE = <p className="muted-label osm-attr">بيانات المدارس
 const claimText: Record<string, string> = { new: "طلب التفعيل قيد المراجعة", contacting: "فريق مساري يتواصل معكم", accepted: "تم قبول الطلب", rejected: "رُفض طلب التفعيل" };
 const statusText: Record<string, string> = { unclaimed: "غير مشتركة بعد", pending: "قيد المراجعة", active: "مشتركة", suspended: "موقوفة" };
 const statusTone: Record<string, string> = { unclaimed: "tone-1", pending: "tone-1", active: "tone-0", suspended: "tone-2" };
-const errText = (m: string) => m.includes("HOME_LOCATION_REQUIRED") ? "حدد موقع المنزل على الخريطة." : m.includes("national_id") ? "رقم الهوية 10 أرقام يبدأ بـ 1 أو 2." : m.includes("student_requests_one_open") ? "أرسلت طلبًا لهذا الابن في هذه المدرسة، وهو قيد المراجعة." : m.includes("FORBIDDEN") ? "هذا الإجراء لإدارة مساري فقط." : m.includes("SCHOOL_NOT_ACTIVE") ? "المدرسة غير مفعّلة بعد." : m.includes("duplicate") || m.includes("unique") ? "لديك طلب مفتوح لهذه المدرسة بالفعل." : m.includes("REASON_REQUIRED") ? "اكتب سبب الرفض." : "تعذر تنفيذ الطلب. حاول مرة أخرى.";
+const errText = (m: string) => m.includes("GUARDIAN_CONSENT_REQUIRED") ? "وافق على الإقرار قبل الإرسال." : m.includes("HOME_LOCATION_REQUIRED") ? "حدد موقع المنزل على الخريطة." : m.includes("national_id") ? "رقم الهوية 10 أرقام يبدأ بـ 1 أو 2." : m.includes("student_requests_one_open") ? "أرسلت طلبًا لهذا الابن في هذه المدرسة، وهو قيد المراجعة." : m.includes("FORBIDDEN") ? "هذا الإجراء لإدارة مساري فقط." : m.includes("SCHOOL_NOT_ACTIVE") ? "المدرسة غير مفعّلة بعد." : m.includes("duplicate") || m.includes("unique") ? "لديك طلب مفتوح لهذه المدرسة بالفعل." : m.includes("REASON_REQUIRED") ? "اكتب سبب الرفض." : "تعذر تنفيذ الطلب. حاول مرة أخرى.";
 
 type FoundSchool = { id: string; name: string; district: string | null; city: string | null; status: string; my_interest: boolean; my_claim_status: string | null };
 type MyRequest = FoundSchool & { school_id: string; reject_reason: string | null };
@@ -149,11 +149,12 @@ type Point = { lat: number; lng: number };
 function StudentRequestForm({ school, onCancel, onDone }: { school: FoundSchool; onCancel: () => void; onDone: (text: string) => Promise<void> }) {
   const [f, setF] = useState({ student_name: "", grade: "", national_id: "", parent_name: "", phone: "", address: "", note: "" });
   const [home, setHome] = useState<Point | null>(null);
+  const [consent, setConsent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((p) => ({ ...p, [k]: e.target.value }));
   const idOk = !f.national_id.trim() || /^[12][0-9]{9}$/.test(f.national_id.trim());
-  const valid = f.student_name.trim().length >= 3 && !!f.grade && /^\+?[0-9\s-]{9,20}$/.test(f.phone.trim()) && !!home && idOk;
+  const valid = f.student_name.trim().length >= 3 && !!f.grade && /^\+?[0-9\s-]{9,20}$/.test(f.phone.trim()) && !!home && idOk && consent;
   const submit = async () => {
     if (!home) return;
     setBusy(true); setErr("");
@@ -162,7 +163,7 @@ function StudentRequestForm({ school, onCancel, onDone }: { school: FoundSchool;
       school_id: school.id, created_by: auth.user?.id, status: "pending",
       student_name: f.student_name.trim(), grade: f.grade, student_national_id: f.national_id.trim() || null,
       parent_name: f.parent_name.trim() || null, parent_phone: f.phone.trim(), home_address: f.address.trim() || null,
-      home_latitude: home.lat, home_longitude: home.lng, note: f.note.trim() || null,
+      home_latitude: home.lat, home_longitude: home.lng, note: f.note.trim() || null, guardian_consent_at: new Date().toISOString(),
     });
     setBusy(false);
     if (error) { setErr(errText(error.message)); return; }
@@ -183,6 +184,7 @@ function StudentRequestForm({ school, onCancel, onDone }: { school: FoundSchool;
     <MapPicker value={home} onChange={setHome} />
     {home && <p className="muted-label">تم تحديد الموقع.</p>}
     <label htmlFor="sr-note" className="claim-grid-single">ملاحظة للمدرسة (اختياري)<textarea id="sr-note" value={f.note} onChange={set("note")} maxLength={500} /></label>
+    <label className="consent-check" htmlFor="sr-consent"><input id="sr-consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> أقر بأني ولي أمر الطالب، وأوافق على معالجة بياناته وموقع المنزل لغرض النقل المدرسي وفق <a href="/#privacy" target="_blank" rel="noreferrer">سياسة الخصوصية</a>.</label>
     {err && <p className="auth-message">{err}</p>}
     <div className="ops-actions"><Button disabled={busy || !valid} onClick={() => void submit()}>{busy ? "جارٍ الإرسال…" : "إرسال طلب التسجيل"}</Button><Button variant="outline" onClick={onCancel}>رجوع</Button></div>
   </article>;
