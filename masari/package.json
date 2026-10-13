@@ -15,6 +15,7 @@
     "preview:spa": "vite preview --config vite.spa.config.ts --port 4173",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:smoke": "node tests/smoke.mjs",
+    "test:db": "bash supabase/tests/local/run.sh",
     "typecheck": "tsc --noEmit -p .",
     "android:sync": "npm run build:spa && cap sync android"
   },

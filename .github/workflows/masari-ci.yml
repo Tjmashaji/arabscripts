@@ -40,6 +40,16 @@ jobs:
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173/ > /dev/null && break; sleep 1; done
           npm run test:smoke
 
+  # قاعدة البيانات: تُطبّق كل الترحيلات على Postgres 16 محلي ثم تُشغَّل اختبارات supabase/tests
+  # (العزل بين المدارس والأدوار، رفع الصلاحيات، اعتماد المحطات، إنهاء الرحلة). لا تلمس Supabase الحقيقي.
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Database tests (RLS and trip rules)
+        run: bash supabase/tests/local/run.sh
+
   # تطبيق أندرويد (للسائقين: موقع الباص يستمر والشاشة مطفأة). يُنزَّل الملف من صفحة التشغيل في GitHub Actions.
   android-apk:
     needs: checks
