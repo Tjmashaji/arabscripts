@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+@font-face{font-family:"Noto Sans Arabic";font-weight:400;src:url(node_modules/@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-400-normal.woff2)}
+@font-face{font-family:"Noto Sans Arabic";font-weight:700;src:url(node_modules/@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-700-normal.woff2)}
+@font-face{font-family:"Noto Sans Arabic";font-weight:800;src:url(node_modules/@fontsource/noto-sans-arabic/files/noto-sans-arabic-arabic-800-normal.woff2)}
+:root{--primary:#10394b;--primary-strong:#0b2b3a;--accent:#35a5a5;--accent2:#48b7b0;--secondary:#176b87;--bg:#f4f7fb;--text:#16243a;--muted:#5b6880;--success:#287760;--danger:#b42318;--warn:#9a5a13}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#0b1d2b;font-family:"Noto Sans Arabic",sans-serif;color:#fff}
+.scene{position:absolute;inset:0;opacity:0;overflow:hidden}
+.cap{position:absolute;left:70px;right:70px;text-align:center;font-weight:800;line-height:1.35;text-shadow:0 6px 30px #0008}
+/* phone */
+.phone{position:absolute;left:50%;width:700px;height:1440px;margin-left:-350px;border-radius:96px;background:#05121b;padding:22px;box-shadow:0 60px 120px #000a,0 0 0 3px #2a4a5c inset}
+.screen{position:relative;width:100%;height:100%;border-radius:76px;overflow:hidden}
+.island{position:absolute;top:22px;left:50%;width:200px;height:56px;margin-left:-100px;background:#000;border-radius:30px;z-index:5}
+.lock{background:radial-gradient(900px 700px at 50% 20%,#1e5a72,transparent 70%),linear-gradient(180deg,#0f3446,#071a24)}
+.clock{position:absolute;top:150px;width:100%;text-align:center}
+.clock .d{font-size:34px;font-weight:700;color:#cfe4ea}
+.clock .h{font-size:170px;font-weight:700;letter-spacing:2px;line-height:1.1;direction:ltr;color:#f1f8fa}
+.notif{position:absolute;left:28px;right:28px;border-radius:40px;background:rgba(240,247,249,.93);color:var(--text);padding:28px 30px;display:flex;gap:24px;align-items:center;box-shadow:0 20px 50px #0006}
+.notif .ic{flex:none;width:92px;height:92px;border-radius:24px}
+.notif .tx{flex:1;min-width:0}
+.notif .top{display:flex;justify-content:space-between;font-size:24px;color:var(--muted);font-weight:700}
+.notif b{display:block;font-size:36px;margin-top:4px}
+.notif p{font-size:27px;color:#3d4a5e;margin-top:2px;line-height:1.4}
+/* app screen */
+.app{background:var(--bg);color:var(--text)}
+.appbar{position:absolute;top:0;left:0;right:0;height:210px;background:linear-gradient(135deg,#10394b,#0b2b3a);padding:100px 40px 0;display:flex;align-items:center;gap:20px}
+.appbar .t{font-size:38px;font-weight:800;color:#fff}
+.appbar .s{font-size:24px;color:#9dc1cc}
+.pill{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:8px 22px;font-size:26px;font-weight:700}
+.card{position:absolute;left:30px;right:30px;background:#fff;border-radius:34px;box-shadow:0 14px 40px #10394b22;padding:30px 34px}
+/* end */
+.end{background:radial-gradient(1200px 700px at 50% 0%,#174a66 0%,transparent 65%),linear-gradient(180deg,#0b1d2b,#0f2a3d)}
+.sub{position:absolute;left:60px;right:60px;bottom:120px;text-align:center;font-size:52px;font-weight:800;line-height:1.4}
+.sub span{background:#0b1d2bcc;border-radius:22px;padding:8px 28px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const LOGO=(s)=>`<svg width="${s}" height="${s}" viewBox="0 0 64 64"><rect width="64" height="64" rx="17" fill="#10394b"/><path d="M16 20c0-4 3-7 7-7h18c4 0 7 3 7 7v23H16V20Z" fill="#48b7b0"/><path d="M21 20h22v12H21z" fill="#e9fbfa"/><circle cx="23" cy="45" r="5" fill="#fff"/><circle cx="41" cy="45" r="5" fill="#fff"/><path d="M21 37h6M37 37h6" stroke="#10394b" stroke-width="3" stroke-linecap="round"/></svg>`;
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const prog=(t,a,b)=>clamp((t-a)/(b-a));
+const ease=x=>1-Math.pow(1-x,3);
+const easeIO=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const back=x=>{const c=1.6;return 1+(c+1)*Math.pow(x-1,3)+c*Math.pow(x-1,2)};
+const lerp=(a,b,x)=>a+(b-a)*x;
+let TL=null, SCENES=[], SUBS=true;
+
+// ---------- shared pieces ----------
+function bus(w){return `<svg width="${w}" viewBox="0 0 220 120"><rect x="6" y="10" width="208" height="88" rx="18" fill="#35a5a5"/><rect x="6" y="64" width="208" height="12" fill="#1e7890"/><g fill="#e9fbfa"><rect x="20" y="22" width="52" height="30" rx="6"/><rect x="80" y="22" width="34" height="30" rx="6"/><rect x="122" y="22" width="34" height="30" rx="6"/><rect x="164" y="22" width="34" height="30" rx="6"/></g><text x="120" y="92" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" font-family="Noto Sans Arabic">مساري</text><circle cx="50" cy="100" r="16" fill="#10394b"/><circle cx="50" cy="100" r="7" fill="#cfe4ea"/><circle cx="168" cy="100" r="16" fill="#10394b"/><circle cx="168" cy="100" r="7" fill="#cfe4ea"/><rect x="4" y="70" width="12" height="10" rx="3" fill="#ffd77a"/></svg>`}
+function notif(title,body,time){return `<div class="ic" style="background:linear-gradient(135deg,#35adac,#1e7890);display:grid;place-items:center">${LOGO(92)}</div><div class="tx"><div class="top"><span>مساري</span><span>${time}</span></div><b>${title}</b><p>${body}</p></div>`}
+function el(html){const d=document.createElement('div');d.innerHTML=html.trim();return d.firstChild}
+function sub(t){ if(!SUBS) return ''; const c=TL.clips.find(c=>t>=c.start-0.05&&t<=c.end+0.25); return c?c.text:''}
+
+// map geometry (shared by map + tower)
+const ROUTE=[[110,1150],[180,980],[330,900],[420,760],[560,700],[600,540],[520,420],[560,300]];
+function routeLen(){let L=0;for(let i=1;i<ROUTE.length;i++)L+=Math.hypot(ROUTE[i][0]-ROUTE[i-1][0],ROUTE[i][1]-ROUTE[i-1][1]);return L}
+function pointAt(f){let L=routeLen()*f;for(let i=1;i<ROUTE.length;i++){const a=ROUTE[i-1],b=ROUTE[i],s=Math.hypot(b[0]-a[0],b[1]-a[1]);if(L<=s){const k=L/s;return[lerp(a[0],b[0],k),lerp(a[1],b[1],k)]}L-=s}return ROUTE[ROUTE.length-1]}
+function mapSVG(w,h,dark){
+  const bg=dark?'#0e3242':'#e9eef2', road=dark?'#1d4a5e':'#ffffff', blk=dark?'#123b4e':'#dde5ea', park=dark?'#134236':'#cfe8d9';
+  let s=`<svg width="${w}" height="${h}" viewBox="0 0 660 1240" preserveAspectRatio="xMidYMid slice"><rect width="660" height="1240" fill="${bg}"/>`;
+  for(let i=0;i<9;i++)for(let j=0;j<16;j++){const x=i*80-20+(j%2)*20,y=j*82-10;s+=`<rect x="${x}" y="${y}" width="62" height="64" rx="10" fill="${(i*7+j*3)%11==0?park:blk}"/>`}
+  s+=`<path d="M0 ${620} C 200 600, 400 680, 660 640" stroke="${road}" stroke-width="26" fill="none"/><path d="M300 0 C 280 400, 360 800, 320 1240" stroke="${road}" stroke-width="22" fill="none"/>`;
+  s+=`<polyline id="rt" points="${ROUTE.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#176b87" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity=".35"/>`;
+  s+=`<polyline id="done" points="" fill="none" stroke="#176b87" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>`;
+  [0,2,4,6].forEach((k,i)=>{const p=ROUTE[k];s+=`<circle class="stop" data-k="${k}" cx="${p[0]}" cy="${p[1]}" r="17" fill="#fff" stroke="#176b87" stroke-width="7"/>`});
+  const sc=ROUTE[ROUTE.length-1];
+  s+=`<g transform="translate(${sc[0]-34},${sc[1]-80})"><rect width="68" height="68" rx="18" fill="#10394b"/><path d="M14 52V30l20-14 20 14v22H40V40H28v12z" fill="#e9fbfa"/></g>`;
+  s+=`<g id="busdot"><circle r="46" fill="#35a5a5" opacity=".25"/><circle r="30" fill="#10394b"/><g transform="translate(-19,-15) scale(.6)"><rect x="4" y="2" width="56" height="44" rx="10" fill="#48b7b0"/><rect x="10" y="8" width="44" height="16" rx="3" fill="#e9fbfa"/></g></g>`;
+  return s+`</svg>`;
+}
+function updateMap(root,f){
+  const pts=[];const L=routeLen();let acc=0;pts.push(ROUTE[0]);
+  for(let i=1;i<ROUTE.length;i++){const a=ROUTE[i-1],b=ROUTE[i],s=Math.hypot(b[0]-a[0],b[1]-a[1]);if(acc+s<=L*f){pts.push(b);acc+=s}else{pts.push(pointAt(f));break}}
+  root.querySelector('#done').setAttribute('points',pts.map(p=>p.join(',')).join(' '));
+  const p=pointAt(f);root.querySelector('#busdot').setAttribute('transform',`translate(${p[0]},${p[1]})`);
+  const passed=f*routeLen();
+  root.querySelectorAll('.stop').forEach(c=>{const k=+c.dataset.k;let d=0;for(let i=1;i<=k;i++)d+=Math.hypot(ROUTE[i][0]-ROUTE[i-1][0],ROUTE[i][1]-ROUTE[i-1][1]);c.setAttribute('fill',passed>=d-1?'#176b87':'#fff')});
+}
+
+// ---------- scenes ----------
+const S={};
+S.morning={build(){return el(`<div class="scene" style="background:linear-gradient(180deg,#f6c99a 0%,#f3dcc0 35%,#cfe4ea 70%,#a9c7cf 100%)">
+  <div id="sun" style="position:absolute;width:260px;height:260px;border-radius:50%;background:radial-gradient(#fff4d8,#ffd28a 60%,transparent 70%);left:60px"></div>
+  <svg style="position:absolute;bottom:0;left:0" width="1080" height="1100" viewBox="0 0 1080 1100">
+    <rect y="760" width="1080" height="340" fill="#7d9aa3"/><rect y="840" width="1080" height="120" fill="#4f6c76"/>
+    <g fill="#f1f6f8" opacity=".9">${[0,1,2,3,4,5,6].map(i=>`<rect x="${i*170+30}" y="895" width="90" height="12" rx="6"/>`).join('')}</g>
+    <g transform="translate(600,330)"><rect x="0" y="180" width="380" height="290" fill="#f4efe6"/><path d="M-30 190 L190 30 L410 190Z" fill="#c9785a"/><rect x="150" y="300" width="90" height="170" rx="8" fill="#10394b"/><rect x="40" y="250" width="80" height="80" rx="8" fill="#9fd3d6"/><rect x="270" y="250" width="80" height="80" rx="8" fill="#9fd3d6"/></g>
+    <g transform="translate(120,560)"><rect x="40" y="0" width="22" height="220" fill="#6b5a4a"/><circle cx="51" cy="-10" r="90" fill="#5e9c7a"/><circle cx="0" cy="40" r="60" fill="#6fae8a"/></g>
+  </svg>
+  <div id="busw" style="position:absolute;top:1450px"></div>
+  <div class="cap" id="c1" style="top:220px;font-size:84px;color:#10394b;text-shadow:none"></div>
+  </div>`)},
+  render(n,t,a,b,o){
+    const p=prog(t,a,b); n.querySelector('#sun').style.top=(640-140*p)+'px';
+    const bw=n.querySelector('#busw'); if(!bw.innerHTML) bw.innerHTML=bus(520);
+    const bp=easeIO(prog(t,a+0.4,a+3.6)); const sc=lerp(1,0.55,bp);
+    bw.style.transform=`translateX(${lerp(560,-700,bp)}px) scale(${sc})`; bw.style.transformOrigin='left bottom'; bw.style.left='0px';
+    const c=n.querySelector('#c1'); const q=ease(prog(t,a+0.1,a+0.7));
+    const caps=(o&&o.caps)||[[0,'كل صباح…<br>يركب ولدك الباص']];let cc='';caps.forEach(([k,x])=>{const st=typeof k==='number'?k:TL.clips.find(c=>c.key===k).start;if(t>=st-0.1)cc=x});
+    if(o&&o.capsUntil&&t>=TL.clips.find(c=>c.key===o.capsUntil).start-0.1)cc='';else if(!(o&&o.caps)&&t>=TL.clips[1].start-0.1)cc='';c.innerHTML=cc; c.style.opacity=q; c.style.transform=`translateY(${(1-q)*40}px)`;
+  }};
+S.where={build(){return el(`<div class="scene lock-bg" style="background:linear-gradient(180deg,#0b1d2b,#0f2a3d)">
+  <div class="phone" id="ph" style="top:330px"><div class="screen lock"><div class="island"></div><div class="clock"><div class="d">الأحد، ١٢ أكتوبر</div><div class="h">6:42</div></div></div></div>
+  <div class="cap" id="q" style="top:120px;font-size:96px;color:#fff">وين ولدك الحين؟</div></div>`)},
+  render(n,t,a,b){const p=ease(prog(t,a,a+0.6));n.querySelector('#ph').style.transform=`translateY(${(1-p)*300}px) scale(${lerp(.9,1,p)})`;
+    const q=n.querySelector('#q');const k=back(prog(t,a+0.15,a+0.7));q.style.transform=`scale(${k})`;q.style.opacity=clamp(k)}};
+S.notifs={build(sp){const o=sp.opts;return el(`<div class="scene" style="background:linear-gradient(180deg,#0b1d2b,#0f2a3d)">
+  <div class="phone" style="top:330px"><div class="screen lock"><div class="island"></div>
+   <div class="clock" id="clk"><div class="d">الأحد، ١٢ أكتوبر</div><div class="h">6:42</div></div>
+   <div id="brand" style="position:absolute;top:620px;width:100%;display:grid;place-items:center;gap:20px">${LOGO(190)}<div style="font-size:64px;font-weight:800">مساري</div></div>
+   ${NL(o).map((x,i)=>`<div class="notif" id="n${i+1}">${notif(x[0],x[1],x[2])}</div>`).join('')}
+  </div></div>
+  <div class="cap" id="hd" style="top:120px;font-size:84px"></div></div>`)},
+  render(n,t,a,b,o){
+    const L=NL(o); const D=TL.dings; const show=(o&&o.at)?o.at.map(k=>K(k).start-0.18):L.map((x,i)=>D[i]); const GAP=(o&&o.gap)||230;
+    const br=n.querySelector('#brand'); const bi=ease(prog(t,a,a+0.5)); const bo=prog(t,show[0]-0.3,show[0]);
+    br.style.opacity=(o&&o.nobrand)?0:bi*(1-bo); br.style.transform=`scale(${lerp(.7,1,bi)})`;
+    const times=L.map(x=>x[2]); let clk='6:42'; show.forEach((s,i)=>{if(t>=s)clk=times[i]});
+    n.querySelector('#clk .h').textContent=clk;
+    // newest on top, older pushed down
+    show.forEach((s,i)=>{const e=n.querySelector('#n'+(i+1)); const p=back(prog(t,s,s+0.45)); const after=show.filter((x,j)=>j>i&&t>=x).length;
+      const shift=show.slice(i+1).reduce((acc,x)=>acc+ease(prog(t,x,x+0.4))*GAP,0);
+      e.style.top=(560+shift)+'px'; e.style.opacity=clamp(p*3)*(1-0.12*after); e.style.transform=`translateY(${(1-p)*-160}px) scale(${lerp(.85,1,clamp(p))*(1-0.03*after)})`;});
+    const h=n.querySelector('#hd'); const labels=(o&&o.labels)?o.labels.map(([k,x])=>[TL.clips.find(c=>c.key===k).start,x]):[[TL.clips[2].start,'مع مساري'],[show[0],'بدأت الرحلة ✓'],[show[1],'صعد ولدك ✓'],[show[2],'وصل المدرسة ✓']];
+    let cur='';labels.forEach(([s,l])=>{if(t>=s-0.1)cur=l});h.textContent=cur;
+  }};
+S.map={build(){return el(`<div class="scene" style="background:linear-gradient(180deg,#0b1d2b,#0f2a3d)">
+  <div class="phone" style="top:330px"><div class="screen app"><div class="island"></div>
+   <div id="mp" style="position:absolute;inset:0">${mapSVG(656,1396,false)}</div>
+   <div class="appbar" style="height:190px;padding-top:90px"><div style="width:62px;height:62px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,#35adac,#1e7890)">${LOGO(62)}</div><div><div class="t" style="font-size:34px">رحلة الذهاب</div><div class="s">مباشر · يتحدث كل 10 ثوانٍ</div></div></div>
+   <div class="card" style="bottom:40px"><div style="display:flex;justify-content:space-between;align-items:center"><span class="pill" style="background:#e5f6f1;color:#1f5f4c">● الرحلة جارية</span><span id="upd" style="font-size:24px;color:#5b6880">آخر تحديث: الآن</span></div>
+    <div style="font-size:26px;color:#5b6880;margin-top:18px">المحطة التالية</div><div id="nx" style="font-size:40px;font-weight:800;margin-top:2px">حي الياسمين</div></div>
+  </div></div>
+  <div class="cap" style="top:110px;font-size:80px">الباص قدامك<br>على الخريطة</div></div>`)},
+  render(n,t,a,b){updateMap(n,lerp(0.08,0.92,easeIO(prog(t,a+0.2,b-0.2))));const f=prog(t,a+0.2,b-0.2);
+    n.querySelector('#nx').textContent=f<0.35?'حي الياسمين':f<0.7?'حي النرجس':'المدرسة';}};
+S.endcard={build(){return el(`<div class="scene end">
+  <div id="lg" style="position:absolute;top:470px;width:100%;display:grid;place-items:center">${LOGO(300)}</div>
+  <div id="nm" style="position:absolute;top:790px;line-height:1.2;width:100%;text-align:center;font-size:150px;font-weight:800">مساري</div>
+  <div id="tg" style="position:absolute;top:1075px;width:100%;text-align:center;font-size:44px;color:#9fb6c6;font-weight:700">منصة النقل المدرسي</div>
+  <div id="cta" style="position:absolute;top:1210px;left:120px;right:120px;text-align:center;font-size:62px;font-weight:800;background:linear-gradient(135deg,#20828a,#176b87);border-radius:40px;padding:34px 20px;box-shadow:0 20px 60px #20828a55"></div>
+  <div id="url" style="position:absolute;top:1430px;width:100%;text-align:center;font-size:50px;font-weight:700;color:#2bb3c0;direction:ltr">masari-zeta.vercel.app</div>
+  </div>`)},
+  render(n,t,a,b,o){const l=back(prog(t,a,a+0.6));n.querySelector('#lg').style.transform=`scale(${l})`;
+    [['nm',a+0.2],['tg',a+0.45],['cta',(o&&o.ctaAt)||a+0.9],['url',((o&&o.ctaAt)||a+0.9)+0.4]].forEach(([id,s])=>{const p=ease(prog(t,s,s+0.5));const e=n.querySelector('#'+id);e.style.opacity=p;e.style.transform=`translateY(${(1-p)*50}px)`});
+    n.querySelector('#cta').textContent=(o&&o.cta)||'خلّ مدرسة ولدك تسجّل';}};
+
+const NL=o=>(o&&o.list)||[['بدأت رحلة الباص','الباص في الطريق. ستصلك التنبيهات عند الاقتراب.','6:45'],['صعد ابنك الباص','سجّل السائق الصعود.','6:58'],['وصل ابنك إلى المدرسة','وصل الباص إلى المدرسة.','7:21']];
+const K=k=>TL.clips.find(c=>c.key===k);
+function tap(n,sel,t,at){const e=n.querySelector(sel);const p=prog(t,at,at+0.35);e.style.transform=`scale(${p>0&&p<1?1-0.06*Math.sin(p*Math.PI):1})`;}
+function caption(n,t,list){let cc='',st=-9;list.forEach(([k,x,off])=>{const s0=K(k).start+(off||0);if(t>=s0-0.1){cc=x;st=s0}});const c=n.querySelector('.cap');c.innerHTML=cc;const q=ease(prog(t,st-0.1,st+0.3));c.style.opacity=q;c.style.transform=`translateY(${(1-q)*30}px)`}
+function phoneIn(n,t,a){const p=ease(prog(t,a,a+0.6));n.querySelector('.phone').style.transform=`translateY(${(1-p)*260}px)`}
+const STU=(name,st,col,bg)=>`<div style="display:flex;align-items:center;gap:22px;padding:22px 0;border-bottom:1px solid #eef2f5"><div style="width:76px;height:76px;border-radius:50%;background:#d9f0ee;color:#125467;display:grid;place-items:center;font-size:34px;font-weight:800">${name[0]}</div><div style="flex:1"><div style="font-size:34px;font-weight:800">${name}</div><div style="font-size:24px;color:#5b6880">محطة حي الياسمين</div></div><span class="pill" style="background:${bg};color:${col}">${st}</span></div>`;
+
+S.intro={build(){return el(`<div class="scene end">
+  <div id="lg" style="position:absolute;top:330px;width:100%;display:grid;place-items:center">${LOGO(260)}</div>
+  <div id="nm" style="position:absolute;top:620px;width:100%;text-align:center;font-size:140px;font-weight:800;line-height:1.2">مساري</div>
+  <div id="tg" style="position:absolute;top:860px;width:100%;text-align:center;font-size:48px;color:#9fb6c6;font-weight:700">منصة النقل المدرسي</div>
+  <svg id="trk" style="position:absolute;top:1130px;left:90px" width="900" height="360" viewBox="0 0 900 360">
+   <path d="M120 200 H780" stroke="#1f4560" stroke-width="16" stroke-linecap="round"/><path id="trp" d="M780 200 H120" stroke="#2bb3c0" stroke-width="16" stroke-linecap="round" stroke-dasharray="660" stroke-dashoffset="660"/>
+   <g transform="translate(720,110)"><rect width="120" height="110" rx="20" fill="#f4efe6"/><path d="M-12 20 L60 -40 L132 20Z" fill="#c9785a"/><rect x="44" y="50" width="34" height="60" rx="5" fill="#10394b"/></g>
+   <g transform="translate(40,90)"><rect width="150" height="130" rx="14" fill="#e3f3f3"/><rect x="0" y="0" width="150" height="34" rx="14" fill="#35a5a5"/><rect x="60" y="70" width="32" height="60" fill="#10394b"/><path d="M75 -40 v40" stroke="#e3f3f3" stroke-width="5"/><path d="M75 -40 h34 l-8 10 l8 10 h-34" fill="#2bb3c0"/></g>
+   <text x="780" y="300" text-anchor="middle" font-size="40" font-weight="800" fill="#e8f1f6" font-family="Noto Sans Arabic">البيت</text>
+   <text x="115" y="300" text-anchor="middle" font-size="40" font-weight="800" fill="#e8f1f6" font-family="Noto Sans Arabic">المدرسة</text>
+   <g id="tb"><g transform="translate(-60,-34) scale(.55)">${bus(220)}</g></g>
+  </svg></div>`)},
+  render(n,t,a,b){const l=back(prog(t,a,a+0.6));n.querySelector('#lg').style.transform=`scale(${l})`;
+    [['nm',a+0.15],['tg',K('intro2').start],['trk',K('intro2').start+0.6]].forEach(([id,s])=>{const p=ease(prog(t,s,s+0.5));const e=n.querySelector('#'+id);e.style.opacity=p;e.style.transform=`translateY(${(1-p)*40}px)`});
+    const f=easeIO(prog(t,K('intro2').start+1.2,b-0.4));n.querySelector('#trp').setAttribute('stroke-dashoffset',660*(1-f));
+    n.querySelector('#tb').setAttribute('transform',`translate(${lerp(780,120,f)},150)`);}};
+
+S.absence={build(){return el(`<div class="scene" style="background:linear-gradient(180deg,#0b1d2b,#0f2a3d)">
+  <div class="phone" style="top:330px"><div class="screen app"><div class="island"></div>
+   <div id="par" style="position:absolute;inset:0">
+    <div class="appbar"><div><div class="t">صباح الخير</div><div class="s">ولي الأمر · أبنائي</div></div></div>
+    <div class="card" style="top:250px"><div style="display:flex;align-items:center;gap:24px"><div style="width:110px;height:110px;border-radius:50%;background:#d9f0ee;color:#125467;display:grid;place-items:center;font-size:52px;font-weight:800">أ</div><div><div style="font-size:42px;font-weight:800">أحمد</div><div style="font-size:26px;color:#5b6880">الصف الرابع · باص ٣</div></div></div>
+     <div style="margin-top:28px;font-size:28px;color:#3d4a5e">رحلة الذهاب تبدأ <b>6:45</b></div>
+     <div id="qst" style="margin-top:30px;border-radius:26px;background:#f8fafc;border:2px solid #dfe6ec;padding:26px;font-size:32px;font-weight:700">هل أحمد غائب اليوم؟</div>
+     <div id="btn" style="margin-top:22px;border-radius:26px;background:linear-gradient(135deg,#20828a,#176b87);color:#fff;text-align:center;padding:28px;font-size:36px;font-weight:800">ابني غائب اليوم</div>
+    </div></div>
+   <div id="drv" style="position:absolute;inset:0;background:#f4f7fb">
+    <div class="appbar"><div><div class="t">رحلة اليوم · الذهاب</div><div class="s">السائق · باص ٣</div></div></div>
+    <div class="card" style="top:250px;padding-top:10px">${STU('سارة','بانتظار','#1f4f8a','#e8f0fb')}<div id="ahmad">${STU('أحمد','غائب اليوم','#8f1d15','#fdeceb')}</div>${STU('خالد','بانتظار','#1f4f8a','#e8f0fb')}${STU('نورة','بانتظار','#1f4f8a','#e8f0fb')}</div>
+    <div class="card" style="bottom:40px;text-align:center;font-size:34px;font-weight:800;color:#fff;background:linear-gradient(135deg,#20828a,#176b87)">بدء الرحلة</div>
+   </div>
+  </div></div>
+  <div class="cap" style="top:120px;font-size:80px"></div></div>`)},
+  render(n,t,a,b){phoneIn(n,t,a);caption(n,t,[['abs1','ولدك تعبان اليوم؟'],['abs2','سجّل غيابه قبل الرحلة'],['abs2','والسائق يشوفه غائب',3.0]]);
+    const press=K('abs2').start+0.9; tap(n,'#btn',t,press);
+    const done=t>=press+0.2; const q=n.querySelector('#qst'); q.textContent=done?'✓ أحمد مسجل غائبًا اليوم':'هل أحمد غائب اليوم؟';
+    q.style.background=done?'#fdeceb':'#f8fafc';q.style.color=done?'#8f1d15':'#16243a';q.style.borderColor=done?'#f5c8c3':'#dfe6ec';
+    n.querySelector('#btn').style.opacity=done?0.45:1;
+    const sw=easeIO(prog(t,K('abs2').start+3.0,K('abs2').start+3.6));
+    n.querySelector('#par').style.transform=`translateX(${sw*-100}%)`;n.querySelector('#drv').style.transform=`translateX(${(1-sw)*100}%)`;
+    const hl=prog(t,K('abs2').start+3.8,K('abs2').start+4.3);n.querySelector('#ahmad').style.background=hl>0?`rgba(253,236,235,${0.9*Math.sin(Math.min(1,hl)*Math.PI/2)})`:'transparent';
+}};
+
+S.safety={build(){return el(`<div class="scene" style="background:linear-gradient(180deg,#0b1d2b,#0f2a3d)">
+  <div class="phone" style="top:330px"><div class="screen app"><div class="island"></div>
+   <div class="appbar"><div><div class="t">رحلة العودة · باص ٣</div><div class="s">السائق</div></div></div>
+   <div class="card" style="top:250px"><div style="font-size:28px;color:#5b6880">في الباص الآن</div><div style="display:flex;align-items:baseline;gap:16px"><div id="cnt" style="font-size:120px;font-weight:800;color:#10394b">1</div><div style="font-size:34px;font-weight:700">طالب</div></div>
+    <div style="font-size:28px;color:#3d4a5e">آخر محطة: حي النرجس ✓</div></div>
+   <div id="end" class="card" style="top:640px;text-align:center;font-size:38px;font-weight:800;color:#fff;background:linear-gradient(135deg,#20828a,#176b87)">إنهاء الرحلة</div>
+   <div id="err" class="card" style="top:800px;background:#fdeceb;border:3px solid #f5c8c3;color:#8f1d15;font-size:32px;font-weight:800;text-align:center">⚠ ما زال طلاب مسجلون داخل الباص.</div>
+   <div id="sos" style="position:absolute;left:50%;top:1010px;width:300px;height:300px;margin-left:-150px;border-radius:50%;background:radial-gradient(#e0483d,#b42318);display:grid;place-items:center;text-align:center;font-size:40px;font-weight:800;color:#fff;box-shadow:0 0 0 0 #b4231888">إرسال<br>بلاغ طارئ</div>
+   <div id="ok" class="card" style="top:1010px;background:#e5f6f1;color:#1f5f4c;font-size:32px;font-weight:800;text-align:center;line-height:1.5">✓ أُرسل البلاغ وموقعك<br>إلى برج المراقبة</div>
+  </div></div>
+  <div class="cap" style="top:110px;font-size:76px"></div></div>`)},
+  render(n,t,a,b){phoneIn(n,t,a);caption(n,t,[['safe1','ما تنتهي الرحلة<br>إلا والباص فاضي'],['safe2','زر بلاغ طارئ']]);
+    const p1=K('safe1').start+1.3; tap(n,'#end',t,p1); const e=ease(prog(t,p1+0.3,p1+0.7)); const er=n.querySelector('#err');er.style.opacity=e;er.style.transform=`translateX(${t<p1+1.2?Math.sin(prog(t,p1+0.3,p1+1.0)*Math.PI*6)*14:0}px)`;
+    const s0=K('safe2').start; const so=n.querySelector('#sos'); const sp=ease(prog(t,s0,s0+0.5)); const pr=s0+2.4;
+    const pulse=(t*1.6)%1; so.style.opacity=sp*(1-prog(t,pr+0.5,pr+0.8)); so.style.boxShadow=`0 0 0 ${pulse*60}px rgba(180,35,24,${0.5*(1-pulse)})`;
+    so.style.transform=`scale(${lerp(.6,1,sp)*(t>pr&&t<pr+0.35?0.9:1)})`;
+    const ok=n.querySelector('#ok');const op=ease(prog(t,pr+0.6,pr+1.0));ok.style.opacity=op;ok.style.transform=`scale(${lerp(.9,1,op)})`;
+    n.querySelector('#end').style.opacity=1-prog(t,s0-0.2,s0+0.3)*0.6; er.style.opacity=e*(1-prog(t,s0-0.2,s0+0.3)*0.6);}};
+
+S.tower={build(){const rows=[['مسار الياسمين','حي النرجس','12','متصل','#e5f6f1','#1f5f4c'],['مسار الروضة','المدرسة','9','متصل','#e5f6f1','#1f5f4c'],['مسار العارض','حي الملقا','7','منقطع','#fdeceb','#8f1d15']];
+  return el(`<div class="scene" style="background:#0b2b3a">
+  <div style="position:absolute;top:0;left:0;right:0;height:250px;padding:120px 60px 0;display:flex;align-items:center;gap:24px"><div style="width:80px;height:80px;border-radius:22px;background:linear-gradient(135deg,#35adac,#1e7890);display:grid;place-items:center">${LOGO(80)}</div><div><div style="font-size:52px;font-weight:800">برج المراقبة</div><div style="font-size:28px;color:#9dc1cc">3 رحلات جارية الآن</div></div></div>
+  <div style="position:absolute;top:290px;left:50px;right:50px;height:680px;border-radius:40px;overflow:hidden;border:2px solid #1d4a5e">${mapSVG(980,680,true)}</div>
+  <div id="rows" style="position:absolute;top:1010px;left:50px;right:50px">${rows.map((r,i)=>`<div class="row" style="display:flex;align-items:center;gap:20px;background:#0f3446;border:2px solid #1d4a5e;border-radius:30px;padding:26px 30px;margin-bottom:20px"><div style="flex:1"><div style="font-size:36px;font-weight:800">${r[0]}</div><div style="font-size:26px;color:#9dc1cc">التالية: ${r[1]}</div></div><div style="text-align:center"><div style="font-size:44px;font-weight:800">${r[2]}</div><div style="font-size:22px;color:#9dc1cc">طالب</div></div><span class="pill" style="background:${r[4]};color:${r[5]}">● ${r[3]}</span></div>`).join('')}</div>
+  <div class="cap" style="top:1700px;font-size:64px;color:#e8f1f4"></div></div>`)},
+  render(n,t,a,b){updateMap(n,lerp(0.2,0.7,prog(t,a,b)));
+    n.querySelectorAll('.row').forEach((r,i)=>{const p=ease(prog(t,a+0.8+i*0.35,a+1.2+i*0.35));r.style.opacity=p;r.style.transform=`translateX(${(1-p)*-80}px)`});
+    const t2=K('tower2').start;const hl=[[t2+2.6,0],[t2+3.8,1],[t2+5.6,2]];
+    n.querySelectorAll('.row').forEach((r,i)=>{r.style.borderColor='#1d4a5e'});
+    caption(n,t,[['tower1','وللمدرسة: برج مراقبة'],['tower2','كل باصاتها مباشرة']]);}};
+
+// ---------- engine ----------
+let built=[];
+window.setup=function(tl,scenes,opts){TL=tl;SCENES=scenes;SUBS=(opts&&opts.subs)!==false;const root=document.getElementById('root');
+  built=scenes.map(s=>{const n=S[s.id].build(s);root.appendChild(n);return n});
+  const sb=document.createElement('div');sb.className='sub';sb.id='sub';root.appendChild(sb);}
+window.render=function(t){
+  SCENES.forEach((s,i)=>{const n=built[i];const fadeIn=s.cut?1:ease(prog(t,s.a,s.a+0.35));const fadeOut=1-prog(t,s.b-0.01,s.b+0.3);
+    const vis=t>=s.a&&t<s.b+0.3; n.style.opacity=vis?Math.min(fadeIn,fadeOut):0; n.style.zIndex=i; if(vis)S[s.id].render(n,t,s.a,s.b,s.opts)});
+  const sb=document.getElementById('sub');const tx=sub(t);sb.innerHTML=tx&&!(SCENES.find(s=>t>=s.a&&t<s.b&&s.nosub))?`<span>${tx}</span>`:'';
+}
+</script>
+</body>
+</html>
