@@ -1,10 +1,11 @@
-// إرسال إشعارات Web Push لأجهزة المستخدم عند إنشاء إشعار جديد.
+// إرسال إشعارات لأجهزة المستخدم عند إنشاء إشعار جديد: Web Push للمتصفح، وFCM لتطبيق أندرويد، وAPNs لتطبيق الآيفون (native.ts).
 // الحماية: "send" يتطلب x-push-secret المحفوظ في قاعدة البيانات (يرسله المشغّل فقط).
 // "init" يولّد مفاتيح VAPID مرة واحدة داخل Supabase ويعيد المفتاح العام فقط.
 // منشورة على مشروع masari باسم push (verify_jwt = false، والتحقق بالسر أعلاه).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import webpush from "npm:web-push@3.6.7";
+import { nativeConfig, sendApns, sendFcm, type SendResult } from "./native.ts";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -47,20 +48,31 @@ Deno.serve(async (req) => {
 
   const { data: note } = await admin.from("notifications").select("id,user_id,type,title,body,data").eq("id", body.notification_id).single();
   if (!note) return json({ error: "NOT_FOUND" }, 404);
-  const { data: tokens } = await admin.from("device_tokens").select("id,endpoint,p256dh,auth_key").eq("user_id", note.user_id);
+  const { data: tokens } = await admin.from("device_tokens").select("id,endpoint,p256dh,auth_key,platform").eq("user_id", note.user_id);
   if (!tokens?.length) return json({ sent: 0 });
 
-  webpush.setVapidDetails("https://hramsoavpanetdhwpokr.supabase.co", cfg.vapid_public!, cfg.vapid_private!);
+  const native = nativeConfig((k) => Deno.env.get(k));
+  const msg = { id: note.id, type: note.type, title: note.title, body: note.body ?? "" };
+  const web = tokens.filter((t) => t.platform !== "fcm" && t.platform !== "apns");
+  if (web.length) webpush.setVapidDetails("https://hramsoavpanetdhwpokr.supabase.co", cfg.vapid_public!, cfg.vapid_private!);
   const payload = JSON.stringify({ title: note.title, body: note.body ?? "", tag: note.type, url: "/", id: note.id });
-  const results = await Promise.all(tokens.map(async (t) => {
+  const results = await Promise.all(tokens.map(async (t): Promise<SendResult & { platform: string }> => {
+    const platform = t.platform ?? "web";
     try {
-      const res = await webpush.sendNotification({ endpoint: t.endpoint, keys: { p256dh: t.p256dh!, auth: t.auth_key! } }, payload, { TTL: 3600, urgency: "high" });
-      return { status: res.statusCode };
+      let r: SendResult;
+      if (platform === "fcm") r = native.fcm ? await sendFcm(t.endpoint, msg, native.fcm) : { status: 0, remove: false, error: "FCM_NOT_CONFIGURED" };
+      else if (platform === "apns") r = native.apns ? await sendApns(t.endpoint, msg, native.apns) : { status: 0, remove: false, error: "APNS_NOT_CONFIGURED" };
+      else {
+        const res = await webpush.sendNotification({ endpoint: t.endpoint, keys: { p256dh: t.p256dh!, auth: t.auth_key! } }, payload, { TTL: 3600, urgency: "high" });
+        r = { status: res.statusCode, remove: false };
+      }
+      // الرمز أو الاشتراك انتهى (حُذف التطبيق أو أُلغي من المتصفح): نحذفه حتى لا نحاول مجددًا.
+      if (r.remove) await admin.from("device_tokens").delete().eq("id", t.id);
+      return { ...r, platform };
     } catch (e) {
       const status = (e as { statusCode?: number }).statusCode ?? 0;
-      // الاشتراك انتهى أو أُلغي من المتصفح: نحذفه حتى لا نحاول مجددًا.
       if (status === 404 || status === 410) await admin.from("device_tokens").delete().eq("id", t.id);
-      return { status, error: String((e as Error).message ?? e).slice(0, 200) };
+      return { status, remove: status === 404 || status === 410, error: String((e as Error).message ?? e).slice(0, 200), platform };
     }
   }));
   return json({ sent: results.filter((r) => r.status >= 200 && r.status < 300).length, results });

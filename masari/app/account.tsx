@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BusFront, Check, KeyRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { disableNativePush, enableNativePush, isNativePush, nativePushState } from "@/lib/native-push";
 
 // استعادة كلمة المرور: رابط بالبريد يعيد المستخدم للتطبيق بجلسة استعادة (type=recovery)،
 // فتظهر صفحة تعيين كلمة المرور الجديدة.
@@ -83,6 +84,7 @@ const isStandalone = () => window.matchMedia("(display-mode: standalone)").match
 
 async function currentPushState(): Promise<PushState> {
   if (typeof window === "undefined") return "unsupported";
+  if (isNativePush()) return nativePushState();
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return isIos() && !isStandalone() ? "ios-install" : "unsupported";
   if (Notification.permission === "denied") return "denied";
   const reg = await navigator.serviceWorker.getRegistration();
@@ -102,6 +104,11 @@ export function PushToggle({ compact = false }: { compact?: boolean }) {
 
   const enable = async () => {
     setState("busy"); setMessage("");
+    if (isNativePush()) {
+      const next = await enableNativePush().catch(() => "off" as const);
+      setState(next); setMessage(next === "on" ? "تم تفعيل الإشعارات على هذا الجوال." : next === "denied" ? "" : "تعذر تفعيل الإشعارات. حاول مرة أخرى.");
+      return;
+    }
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") { setState(permission === "denied" ? "denied" : "off"); return; }
@@ -124,6 +131,7 @@ export function PushToggle({ compact = false }: { compact?: boolean }) {
   };
   const disable = async () => {
     setState("busy"); setMessage("");
+    if (isNativePush()) { setState(await disableNativePush()); setMessage("تم إيقاف الإشعارات على هذا الجوال."); return; }
     const reg = await navigator.serviceWorker.getRegistration();
     const sub = await reg?.pushManager.getSubscription();
     if (sub) { await supabase.from("device_tokens").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); }
@@ -131,7 +139,7 @@ export function PushToggle({ compact = false }: { compact?: boolean }) {
   };
 
   const hint = state === "ios-install" ? "على الآيفون: اضغط زر المشاركة ثم «إضافة إلى الشاشة الرئيسية»، وافتح مساري من الأيقونة لتفعيل الإشعارات."
-    : state === "denied" ? "الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح ثم أعد المحاولة."
+    : state === "denied" ? (isNativePush() ? "الإشعارات محظورة لمساري. فعّلها من إعدادات الجوال ← مساري ← الإشعارات." : "الإشعارات محظورة لهذا الموقع. فعّلها من إعدادات المتصفح ثم أعد المحاولة.")
     : state === "unsupported" ? "هذا المتصفح لا يدعم الإشعارات الفورية."
     : state === "on" ? "ستصلك التنبيهات حتى والتطبيق مغلق." : "فعّلها لتصلك تنبيهات الباص وصعود ابنك ووصوله حتى والتطبيق مغلق.";
   return <div className={compact ? "push-toggle compact" : "panel push-toggle"}>
