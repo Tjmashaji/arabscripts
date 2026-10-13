@@ -6,8 +6,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 // رابط العودة من بريد الدعوة: موقع مساري فقط (يمنع توجيه المدعو إلى موقع آخر)
-const PUBLIC_SITE = "https://masari-tjmashajis-projects.vercel.app";
-const safeRedirect = (v: unknown) => typeof v === "string" && /^https:\/\/masari[a-z0-9-]*-tjmashajis-projects\.vercel\.app\/?$/.test(v) ? v : PUBLIC_SITE;
+const PUBLIC_SITE = "https://masari-zeta.vercel.app";
+const safeRedirect = (v: unknown) => typeof v === "string" && /^https:\/\/(masari-zeta|masari[a-z0-9-]*-tjmashajis-projects)\.vercel\.app\/?$/.test(v) ? v : PUBLIC_SITE;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {

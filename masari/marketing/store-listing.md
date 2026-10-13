@@ -7,16 +7,17 @@
 | معرّف التطبيق (Bundle ID / Package) | `sa.masari.app` | `capacitor.config.json`، `android/app/build.gradle` |
 | الاسم على الجهاز | مساري | `capacitor.config.json`، `strings.xml` |
 | لغة التطوير الأساسية | العربية (`CFBundleDevelopmentRegion = ar`) | `ios/App/App/Info.plist` |
-| رابط سياسة الخصوصية | `https://masari-tjmashajis-projects.vercel.app/#privacy` | `lib/site.ts` + `app/privacy.tsx` |
+| رابط سياسة الخصوصية | `https://masari-zeta.vercel.app/#privacy` | `lib/site.ts` + `app/privacy.tsx` |
+| رابط حذف الحساب (Google Play) | `https://masari-zeta.vercel.app/#delete-account` | `app/delete-request.tsx` |
 
 ---
 
 ## ⚠️ قبل الرفع: نقاط تمنع أو تهدد القبول
 
 1. **الإشعارات في تطبيق الجوال غير مفعّلة بعد.** التطبيق يعتمد Web Push (`app/account.tsx`: `PushManager`/`serviceWorker`)، ولا يوجد في `package.json` أي إضافة إشعارات أصلية (مثل `@capacitor/push-notifications`). داخل غلاف Capacitor على iOS وAndroid لا يتوفر `PushManager`، فلن تصل الإشعارات والتطبيق مغلق. لذلك حذفتُ عبارة «حتى والتطبيق مغلق» من كل نصوص المتجر. أضيفوا إشعارات أصلية (APNs/FCM) قبل الرفع، وإلا فالتنبيهات الموصوفة هنا تظهر فقط في قائمة «الإشعارات» داخل التطبيق، أو برسائل SMS/واتساب إذا ضُبط مزوّد لها.
-2. **رابط الخصوصية:** `lib/site.ts` يشير إلى `masari-tjmashajis-projects.vercel.app`، بينما يستخدم الإعلان `masari-zeta.vercel.app`. افتحوا رابط الخصوصية من متصفح خاص بلا تسجيل دخول، فروابط فرق Vercel قد تكون محمية. اعتمدوا رابطًا واحدًا عامًا (ويُفضَّل نطاق خاص).
-3. **Google Play: رابط حذف الحساب من الويب.** يشترط المتجر رابطًا يطلب منه المستخدم حذف حسابه دون تثبيت التطبيق. سياسة الخصوصية تشرح الحذف من داخل التطبيق فقط («حسابي» ← «حذف الحساب»). أضيفوا طريقة طلب من الويب، ولو نموذجًا أو بريدًا.
-4. **Google Play: الموقع في الخدمة الأمامية.** `FOREGROUND_SERVICE_LOCATION` يتطلب نموذج «Foreground service types» في Play Console مع فيديو قصير لتدفق السائق، إضافة إلى إفصاح واضح داخل التطبيق قبل طلب إذن الموقع. التطبيق لا يطلب `ACCESS_BACKGROUND_LOCATION`، وهذا جيد.
+2. ✅ **رابط الخصوصية (تم):** النطاق القديم `masari-tjmashajis-projects.vercel.app` كان محميًا بتسجيل دخول Vercel، فلا يفتحه إلا أعضاء الفريق. صار `lib/site.ts` يشير إلى `masari-zeta.vercel.app` العام. يُفضَّل لاحقًا نطاق خاص.
+3. ✅ **Google Play: رابط حذف الحساب من الويب (تم):** `https://masari-zeta.vercel.app/#delete-account` صفحة عامة بلا دخول، تشرح الخطوات وما يُحذف وما يبقى، وزرها يفتح الدخول ثم «حسابي» مباشرة.
+4. **Google Play: الموقع في الخدمة الأمامية.** `FOREGROUND_SERVICE_LOCATION` يتطلب نموذج «Foreground service types» في Play Console مع فيديو قصير لتدفق السائق، والإفصاح الواضح داخل التطبيق قبل طلب إذن الموقع ✅ موجود (`app/location-disclosure.tsx`)، فيبقى الفيديو فقط. التطبيق لا يطلب `ACCESS_BACKGROUND_LOCATION`، وهذا جيد.
 5. **Apple: إرشاد 4.2 (الحد الأدنى من الوظائف).** التطبيق غلاف Capacitor لموقع ويب. في ملاحظات المراجعة اذكروا الميزات الأصلية: الموقع في الخلفية أثناء الرحلة، والكاميرا لمسح بطاقة QR. ولا تُرسلوا التطبيق قبل حل البند 1.
 6. **حسابات تجريبية للمراجعين:** التطبيق كله خلف تسجيل الدخول، ويحتاج ولي الأمر إلى مدرسة مشتركة. جهّزوا حساب ولي أمر وحساب سائق على المدرسة التجريبية (الرياض، باص 1، مسار 1: الروضة ← النهضة ← النسيم ← المدرسة)، مع رحلة يمكن بدؤها أثناء المراجعة.
 

@@ -356,3 +356,8 @@ html[lang="en"] [dir="rtl"], html[lang="en"] body { direction: ltr; }
 .shared-trip h1 { margin: 0; font-size: 1.4rem; }
 .check-line input[type="checkbox"] { width: 18px !important; height: 18px !important; min-height: 0 !important; padding: 0 !important; flex: none; }
 .account-stack { display: grid; gap: 16px; }
+
+/* صفحة حذف الحساب العامة، وإفصاح الموقع قبل طلب الإذن */
+.privacy-body ol{margin:0;padding-inline-start:22px;display:grid;gap:6px;list-style:decimal}.delete-request-login{margin-top:12px}
+.location-disclosure{text-align:right}[data-slot="alert-dialog-overlay"]:has(+ .location-disclosure),.location-disclosure{z-index:2000}.location-disclosure ul{list-style:disc;margin:0;padding-inline-start:20px;display:grid;gap:8px;color:#3d4a5e;font-size:14px;line-height:1.7;text-align:right}
+.location-disclosure-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:#e3f3f3;color:#176b87}.location-disclosure-icon svg{width:24px;height:24px}
