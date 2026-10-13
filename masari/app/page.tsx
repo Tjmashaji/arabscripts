@@ -44,7 +44,8 @@ import { LocationDisclosure, hasLocationDisclosure } from "./location-disclosure
 import { forgetNativePushToken, refreshNativePush } from "@/lib/native-push";
 import { applyLang } from "./i18n";
 import { ShareLinks, SharedTripPage, shareTokenFromHash } from "./share";
-import { enqueue, isNetworkError, useOfflineQueue } from "./offline-queue";
+import { dismissFailed, enqueue, isNetworkError, useOfflineQueue, type FailedItem } from "./offline-queue";
+import { OfflineError, cacheAccess, cacheDriverData, cachedAccess, cachedDriverData, clearOfflineCache } from "./offline-cache";
 import { AttendancePanel, DelayMap, StudentAvatar, usePhotoUrls } from "./school-extras";
 import { UserRound } from "lucide-react";
 import type { RealtimeChannel, Session } from "@supabase/supabase-js";
@@ -257,6 +258,9 @@ const rpcErrorText: Record<string, string> = {
   INVALID_TRANSITION: "لا يمكن تسجيل هذه الحالة للطالب الآن.",
   STUDENT_NOT_IN_TRIP: "الطالب غير مسجل في هذه الرحلة.",
   TRIP_ALREADY_STARTED: "بدأت الرحلة، ولا يمكن تغيير الغياب الآن. تواصل مع المدرسة.",
+  REASON_REQUIRED: "اكتب سبب تخطي المحطة.",
+  CANNOT_SKIP_SCHOOL: "لا يمكن تخطي محطة المدرسة.",
+  STOP_NOT_IN_TRIP: "المحطة ليست ضمن هذه الرحلة.",
 };
 const rpcError = (error: { message?: string } | null) => {
   const code = Object.keys(rpcErrorText).find((key) => error?.message?.includes(key));
@@ -349,15 +353,17 @@ const one = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? valu
 
 // السائق: رحلته المسندة إليه اليوم فقط.
 async function loadDriverData(userId: string): Promise<MasariData | null> {
-  const { data: drivers } = await supabase.from("drivers").select("id,school_id,full_name,email").eq("user_id", userId).limit(1);
+  const { data: drivers, error: driversError } = await supabase.from("drivers").select("id,school_id,full_name,email").eq("user_id", userId).limit(1);
+  if (driversError && isNetworkError(driversError)) throw new OfflineError();
   const driver = drivers?.[0];
   if (!driver) return null;
   const { data: schools } = await supabase.from("schools").select(SCHOOL_COLUMNS).eq("id", driver.school_id).limit(1);
   if (!schools?.[0]) return null;
   const next = blankDataFor(schools[0]);
   next.driver = { name: driver.full_name, email: driver.email ?? "" };
-  const { data: trips } = await supabase.from("trips").select("id,route_id,bus_id,driver_id,trip_date,status,direction,scheduled_start,completed_at")
+  const { data: trips, error: tripsError } = await supabase.from("trips").select("id,route_id,bus_id,driver_id,trip_date,status,direction,scheduled_start,completed_at")
     .eq("driver_id", driver.id).eq("trip_date", riyadhToday()).neq("status", "cancelled").order("scheduled_start", { ascending: true, nullsFirst: true });
+  if (tripsError && isNetworkError(tripsError)) throw new OfflineError();
   const trip = trips?.find((t) => t.status !== "completed") ?? [...(trips ?? [])].sort((x, y) => (y.completed_at ?? "").localeCompare(x.completed_at ?? ""))[0];
   if (!trip) return null;
   await applyRouteAndTrip(next, trip.route_id, trip);
@@ -425,14 +431,26 @@ async function loadParentData(userId: string, childId?: string | null): Promise<
   return next;
 }
 
+// بدون إنترنت: السائق يبقى على آخر بيانات رحلته المحفوظة على الجهاز. null تعني «أبقِ ما على الشاشة».
+// النسخة المحفوظة لا تُكتب إلا لرحلة السائق، فلا نعتمد على حالة الدور (قد لا تكون ضُبطت بعد عند أول تحميل).
+async function loadMasariDataOrCache(childId?: string | null): Promise<MasariData | null> {
+  try { return await loadMasariData(childId); }
+  catch (e) {
+    if (!(e instanceof OfflineError)) throw e;
+    const uid = (await supabase.auth.getSession()).data.session?.user.id;
+    return uid ? cachedDriverData<MasariData>(uid, riyadhToday()) : null;
+  }
+}
 async function loadMasariData(childId?: string | null): Promise<MasariData> {
   const { data: sessionData } = await supabase.auth.getSession();
   const session = sessionData.session;
   if (session) {
-    const { data: accessData } = await supabase.rpc("my_access");
+    const { data: accessData, error: accessError } = await supabase.rpc("my_access");
+    if (accessError && isNetworkError(accessError)) throw new OfflineError();
     const role = roleFromAccess(accessData as MyAccess | null);
     if (role === "driver" || role === "parent") {
       const roleData = role === "driver" ? await loadDriverData(session.user.id) : await loadParentData(session.user.id, childId);
+      if (!roleData && role === "driver" && typeof navigator !== "undefined" && !navigator.onLine) throw new OfflineError();
       return roleData ?? structuredClone(blankData);
     }
   }
@@ -546,8 +564,12 @@ async function resolveUserAccess(session: Session): Promise<UserAccess> {
   const name = access?.full_name || email.split("@")[0] || "مستخدم";
   const requestedRole = typeof session.user.user_metadata?.requested_role === "string" ? session.user.user_metadata.requested_role : undefined;
   const phone = typeof session.user.user_metadata?.phone === "string" ? session.user.user_metadata.phone : undefined;
+  // بدون إنترنت: نستخدم آخر صلاحيات معروفة لهذا الحساب بدل شاشة «حسابك بانتظار التفعيل»
+  if (error && isNetworkError(error)) { const cached = cachedAccess<UserAccess>(session.user.id); if (cached) return cached; }
   if (error) return { role: null, name, email, suspended: false, platformAdmin: false, requestedRole, phone };
-  return { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, phone, schoolRole: access?.schools.find((m) => m.status === "active" && m.school_status === "active")?.role, region: access?.region ?? null, privacyOk: access?.privacy_version === PRIVACY_VERSION };
+  const result: UserAccess = { role: roleFromAccess(access), name, email, suspended: access?.status === "suspended", platformAdmin: Boolean(access?.platform_roles.includes("super_admin")), requestedRole, phone, schoolRole: access?.schools.find((m) => m.status === "active" && m.school_status === "active")?.role, region: access?.region ?? null, privacyOk: access?.privacy_version === PRIVACY_VERSION };
+  if (result.role) cacheAccess(session.user.id, result);
+  return result;
 }
 
 function Stat({ icon: Icon, label, value, detail, accent }: { icon: typeof Users; label: string; value: string; detail: string; accent: string }) {
@@ -625,7 +647,7 @@ function ExecutiveDashboard({ data, simulation, driverGps }: { data: MasariData;
     </section>
   </>;
 }
-function DriverDashboard({ offlinePending = 0, data, simulation, tripSaveStatus, driverGps, gpsStatus, onStart, onEnd, onApproveStop, onRefreshGps, onReportIssue, onStudentEvent, onScanned }: { offlinePending?: number; onScanned: () => void; data: MasariData; simulation: SimulationState; tripSaveStatus: string; driverGps?: DriverGps | null; gpsStatus: string; onStart: () => void; onEnd: () => void; onApproveStop: () => void; onRefreshGps: () => void; onReportIssue: () => void; onStudentEvent: (studentId: string, event: AttendanceEvent) => void }) {
+function DriverDashboard({ onSkipStop, offlinePending = 0, offlineFailed = [], onDismissFailed, tripSaveTone = "ok", data, simulation, tripSaveStatus, driverGps, gpsStatus, onStart, onEnd, onApproveStop, onRefreshGps, onReportIssue, onStudentEvent, onScanned }: { onSkipStop?: () => void; offlinePending?: number; offlineFailed?: FailedItem[]; onDismissFailed?: () => void; tripSaveTone?: "ok" | "error"; onScanned: () => void; data: MasariData; simulation: SimulationState; tripSaveStatus: string; driverGps?: DriverGps | null; gpsStatus: string; onStart: () => void; onEnd: () => void; onApproveStop: () => void; onRefreshGps: () => void; onReportIssue: () => void; onStudentEvent: (studentId: string, event: AttendanceEvent) => void }) {
   const [scanning,setScanning]=useState(false);
   const currentStop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
   const finished = simulation.approvedStops.length >= data.route.stops.length;
@@ -644,7 +666,8 @@ function DriverDashboard({ offlinePending = 0, data, simulation, tripSaveStatus,
   return <>
     <div className="welcome driver-welcome"><div><p className="eyebrow">مسارك اليوم</p><h1>{data.trip?.direction === "to_home" ? "رحلة العودة" : "الرحلة الصباحية"} — {data.route.name}</h1><p>{data.route.stops.length} محطات · {students.length === 1 ? "طالب واحد" : `${students.length} طلاب`} · الباص {data.vehicle.number}</p></div>{tripDone ? <Badge className="safe-badge"><Check/> انتهت رحلة اليوم</Badge> : <Button className={simulation.active ? "danger-action" : "primary-action"} onClick={simulation.active ? onEnd : onStart}>{simulation.active ? <><X/> إنهاء الرحلة</> : <><Navigation/> بدء الرحلة وتفعيل الموقع</>}</Button>}</div>
     {simulation.active && <div className={`trip-live-strip ${driverGps ? "" : "gps-missing"}`}><span/><strong>{driverGps ? "GPS فعّال الآن" : "الرحلة بدأت والموقع غير متاح"}</strong><p>{driverGps ? `اعتماد المحطة متاح داخل نطاق ${stopRadius} متر فقط` : "اسمح للموقع من إعدادات المتصفح، ثم اضغط تحديث GPS"}</p></div>}
-    {tripSaveStatus && <div className="save-strip trip-save"><Check/><span>{tripSaveStatus}</span></div>}
+    {tripSaveStatus && <div className={`save-strip trip-save ${tripSaveTone==="error"?"trip-save-error":""}`} role={tripSaveTone==="error"?"alert":"status"}>{tripSaveTone==="error"?<AlertTriangle/>:<Check/>}<span>{tripSaveStatus}</span></div>}
+    {offlineFailed.length>0 && <div className="save-strip trip-save-error offline-failed" role="alert"><AlertTriangle/><div><strong>تعذر إرسال {offlineFailed.length===1?"عملية محفوظة":`${offlineFailed.length} عمليات محفوظة`} بعد عودة الإنترنت</strong><ul>{offlineFailed.slice(-5).map((f)=><li key={f.id}>{f.label} ({new Date(f.at).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"})}): {rpcError({ message: f.error })}</li>)}</ul><p>سجّلها يدويًا مرة أخرى أو أبلغ المدرسة.</p><Button size="sm" variant="outline" onClick={onDismissFailed}>فهمت</Button></div></div>}
     {offlinePending>0 && <div className="save-strip ops-message offline-strip"><span>{offlinePending} عملية محفوظة على الجهاز بانتظار الإنترنت. تابع رحلتك عاديًا.</span></div>}
     {data.trip && data.school.id && (data.trip.status==="scheduled"||data.trip.status==="ready") && <VehicleCheck tripId={data.trip.id} schoolId={data.school.id}/>}
     <article className="panel gps-panel">
@@ -665,6 +688,7 @@ function DriverDashboard({ offlinePending = 0, data, simulation, tripSaveStatus,
       <div className="student-checklist">{students.length===0&&<p className="muted-label">لا يوجد طلاب في هذه الرحلة.</p>}{students.map((student)=><div key={student.id || student.name} className={"check-row "+(student.checked?"checked":"")}><StudentAvatar url={student.photo ? photoUrls[student.photo] : null} name={student.name}/><div><strong>{student.name}</strong><p>{student.grade} · {student.status}</p></div>{student.actions.length ? <span className="student-actions">{student.actions.map((action)=><Button key={action.event} size="sm" variant="outline" onClick={()=>onStudentEvent(student.id, action.event)}>{action.label}</Button>)}</span> : <span className="check-box">{student.checked && <Check/>}</span>}</div>)}</div>
       {!finished && <p className={`geofence-status ${withinStopRadius ? "ready" : "blocked"}`}><MapPin/>{distanceToStop === null ? "لا يمكن الاعتماد دون موقع GPS فعلي" : withinStopRadius ? `داخل نطاق المحطة · ${distanceToStop} متر` : `اقترب حتى 250 متر من ${currentStop?.label}`}</p>}
       <Button className="wide-action" disabled={!canApprove} onClick={onApproveStop}><Check/> {approveLabel}</Button>
+      {simulation.active&&!finished&&currentStop&&onSkipStop&&<button type="button" className="skip-stop-link" onClick={onSkipStop}>لا أستطيع الوصول إلى {currentStop.label}؟ تخطَّ المحطة بسبب</button>}
     </article><article className="panel compact-route"><div className="panel-head"><div><p className="eyebrow">تسلسل الرحلة</p><h2>نقاط التوقف</h2></div></div>
       {data.route.stops.map((stop,i)=><div className={"timeline-row "+(simulation.approvedStops.includes(i)?"passed":i===simulation.currentStopIndex?"current":"")} key={stop.id ?? `${stop.label}-${i}`}><span>{simulation.approvedStops.includes(i)?<Check/>:i+1}</span><div><strong>{stop.label}</strong><p>{[stop.time,stop.students?.length?stop.students.join("، "):""].filter(Boolean).join(" · ")}</p></div><a className="stop-nav" href={navigateUrl(stop)} target="_blank" rel="noreferrer" aria-label={`الملاحة إلى ${stop.label}`}><Navigation/></a></div>)}
       <Button variant="outline" className="report-btn" disabled={!simulation.active} onClick={onReportIssue}><AlertTriangle/> إرسال بلاغ طارئ</Button>
@@ -827,8 +851,11 @@ const requestOpenAccount = () => { try { sessionStorage.setItem(OPEN_ACCOUNT_KEY
 const takeOpenAccount = () => { try { const v = sessionStorage.getItem(OPEN_ACCOUNT_KEY) === "1"; sessionStorage.removeItem(OPEN_ACCOUNT_KEY); return v; } catch { return false; } };
 const subscribeHash = (cb: () => void) => { window.addEventListener("hashchange", cb); return () => window.removeEventListener("hashchange", cb); };
 export default function Home() {
-  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [schoolRole,setSchoolRole]=useState("school_admin"); const [accountEmail,setAccountEmail]=useState(""); const [needsConsent,setNeedsConsent]=useState(false); const [disclosureFor,setDisclosureFor]=useState<"start"|"refresh"|null>(null); const deleteHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#delete-account",()=>false); const privacyHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#privacy",()=>false); const shareToken=useSyncExternalStore(subscribeHash,shareTokenFromHash,()=>null);
+  const [entered,setEntered]=useState(false); const [role,setRole]=useState<Role>("executive"); const [view,setView]=useState<View>("dashboard"); const [online,setOnline]=useState(()=>typeof navigator === "undefined" ? true : navigator.onLine); const [data,setData]=useState<MasariData>(blankData); const [simulation,setSimulation]=useState<SimulationState>(initialSimulation); const [feedbackRows,setFeedbackRows]=useState<FeedbackItem[]>([]); const [saveStatus,setSaveStatus]=useState(""); const [tripSaveStatus,setTripSaveStatus]=useState(""); const [tripSaveTone,setTripSaveTone]=useState<"ok"|"error">("ok"); const [gpsStatus,setGpsStatus]=useState(""); const [driverGps,setDriverGps]=useState<DriverGps | null>(null); const [tripEvents,setTripEvents]=useState<TripEventRow[]>([]); const [notificationsOpen,setNotificationsOpen]=useState(false); const [activeTripContext,setActiveTripContext]=useState<TripContext | null>(null); const [authMode,setAuthMode]=useState<AuthMode>("demo"); const [accountName,setAccountName]=useState(""); const [pendingAccount,setPendingAccount]=useState<UserAccess | null>(null); const recoveryLink=useSyncExternalStore(noopSubscribe,isRecoveryLink,()=>false); const [recoveryEvent,setRecoveryEvent]=useState(false); const [recoveryClosed,setRecoveryClosed]=useState(false); const recovering=!recoveryClosed&&(recoveryLink||recoveryEvent); const [platformAdmin,setPlatformAdmin]=useState(false); const [authView,setAuthView]=useState<"landing"|"login"|"school"|"parent">("landing"); const [accessRegion,setAccessRegion]=useState<string|null>(null); const [schoolRole,setSchoolRole]=useState("school_admin"); const [accountEmail,setAccountEmail]=useState(""); const [needsConsent,setNeedsConsent]=useState(false); const [disclosureFor,setDisclosureFor]=useState<"start"|"refresh"|null>(null); const deleteHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#delete-account",()=>false); const privacyHash=useSyncExternalStore(subscribeHash,()=>window.location.hash==="#privacy",()=>false); const shareToken=useSyncExternalStore(subscribeHash,shareTokenFromHash,()=>null);
   const gpsWatchRef = useRef<(() => void) | null>(null);
+  // أي رحلة يتتبعها GPS الآن، ورقم آخر طلب تشغيل (حتى لا يعمل متتبعان معًا إذا تزامن طلبان)
+  const gpsTripRef = useRef<string | null>(null);
+  const gpsTokenRef = useRef(0);
   const lastGpsSaveRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
   const selectedChildRef = useRef<string | null>(null);
@@ -837,7 +864,7 @@ export default function Home() {
   const eventsChannelRef = useRef<RealtimeChannel | null>(null);
   useEffect(()=>{installErrorReporter()},[]);
   useEffect(()=>{const a=()=>setOnline(true),b=()=>setOnline(false);window.addEventListener("online",a);window.addEventListener("offline",b);if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});return()=>{window.removeEventListener("online",a);window.removeEventListener("offline",b)}},[]);
-  useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariData(selectedChildRef.current).then((next)=>{if(!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{if(event==="PASSWORD_RECOVERY"){setRecoveryClosed(false);setRecoveryEvent(true)}void refresh()});return()=>{alive=false;subscription.unsubscribe()}},[]);
+  useEffect(()=>{let alive=true;const refresh=()=>{const seq=++loadSeqRef.current;return loadMasariDataOrCache(selectedChildRef.current).then((next)=>{if(!next||!alive||seq!==loadSeqRef.current)return;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim)}).catch(()=>{})};refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{if(event==="PASSWORD_RECOVERY"){setRecoveryClosed(false);setRecoveryEvent(true)}void refresh()});return()=>{alive=false;subscription.unsubscribe()}},[]);
   useEffect(()=>{let alive=true;supabase.auth.getSession().then(async({data:sessionData})=>{if(!alive||!sessionData.session)return;const access=await resolveUserAccess(sessionData.session);if(!alive)return;setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setSchoolRole(access.schoolRole??"school_admin");setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setEntered(true)}).catch(()=>{});return()=>{alive=false}},[]);
   useEffect(()=>()=>{gpsWatchRef.current?.(); if(realtimeChannelRef.current) void supabase.removeChannel(realtimeChannelRef.current); if(eventsChannelRef.current) void supabase.removeChannel(eventsChannelRef.current)},[]);
   const [dbNotes,setDbNotes]=useState<DbNotification[]>([]);
@@ -855,14 +882,14 @@ export default function Home() {
     void run();
     return()=>{alive=false;if(poll!==null)window.clearInterval(poll);if(channel)void supabase.removeChannel(channel)};
   },[entered,authMode]);
-  const offlinePending=useOfflineQueue(); useEffect(()=>{applyLang()},[]); const nav=useMemo(()=>{const base=role==="executive"&&platformAdmin?platformNav:role==="school"?schoolNavFor(schoolRole):navByRole[role];return authMode==="authenticated"?[...base,{id:"account" as View,label:"حسابي",icon:UserRound}]:base},[role,platformAdmin,schoolRole,authMode]); const notifications=useMemo(()=>authMode==="authenticated" ? dbNotes.map((n)=>({id:n.id,title:n.title,body:n.body??"",time:formatEventTime(n.created_at),tone:noteTone(n.type)})) : data.source==="empty" ? [] : buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[authMode, dbNotes, data, simulation, driverGps, tripEvents, feedbackRows]);
+  const {count:offlinePending,failed:offlineFailed}=useOfflineQueue(); useEffect(()=>{applyLang()},[]); const nav=useMemo(()=>{const base=role==="executive"&&platformAdmin?platformNav:role==="school"?schoolNavFor(schoolRole):navByRole[role];return authMode==="authenticated"?[...base,{id:"account" as View,label:"حسابي",icon:UserRound}]:base},[role,platformAdmin,schoolRole,authMode]); const notifications=useMemo(()=>authMode==="authenticated" ? dbNotes.map((n)=>({id:n.id,title:n.title,body:n.body??"",time:formatEventTime(n.created_at),tone:noteTone(n.type)})) : data.source==="empty" ? [] : buildNotifications(data, simulation, driverGps, tripEvents, feedbackRows),[authMode, dbNotes, data, simulation, driverGps, tripEvents, feedbackRows]);
   const unreadCount = authMode==="authenticated" ? dbNotes.filter((n)=>!n.read_at).length : notifications.length;
   const toggleNotifications=()=>{const opening=!notificationsOpen;setNotificationsOpen(opening);if(opening&&authMode==="authenticated"&&dbNotes.some((n)=>!n.read_at)){const ids=dbNotes.filter((n)=>!n.read_at).map((n)=>n.id);const now=new Date().toISOString();setDbNotes((cur)=>cur.map((n)=>ids.includes(n.id)?{...n,read_at:now}:n));void supabase.from("notifications").update({read_at:now}).in("id",ids).then(()=>{})}};
   const enterAuthenticated=async(session: Session)=>{const access=await resolveUserAccess(session);setNeedsConsent(access.privacyOk===false);if(!access.role){setPendingAccount(access);return}setPendingAccount(null);setRole(access.role);setAccountName(access.name);setPlatformAdmin(access.platformAdmin);setSchoolRole(access.schoolRole??"school_admin");setAccessRegion(access.region??null);setAccountEmail(access.email);setAuthMode("authenticated");setFeedbackRows([]);setView(takeOpenAccount()?"account":"dashboard");setEntered(true);void refreshNativePush()};
-  const stopGpsTracking=()=>{if(gpsWatchRef.current){gpsWatchRef.current();gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
+  const stopGpsTracking=()=>{gpsTokenRef.current++;gpsTripRef.current=null;if(gpsWatchRef.current){gpsWatchRef.current();gpsWatchRef.current=null}setGpsStatus("تم إيقاف تتبع GPS.")};
   const stopRealtimeTracking=()=>{if(realtimeChannelRef.current){void supabase.removeChannel(realtimeChannelRef.current);realtimeChannelRef.current=null}};
   const stopEventsRealtime=()=>{if(eventsChannelRef.current){void supabase.removeChannel(eventsChannelRef.current);eventsChannelRef.current=null}};
-  const signOut=async()=>{if(authMode==="authenticated"){await forgetNativePushToken().catch(()=>{});await supabase.auth.signOut();}stopGpsTracking();stopRealtimeTracking();stopEventsRealtime();setAuthMode("demo");setAccountName("");setEntered(false);setView("dashboard");setSimulation(initialSimulation);setActiveTripContext(null);setTripSaveStatus("");setDriverGps(null);setTripEvents([]);setFeedbackRows([]);setNotificationsOpen(false)};
+  const signOut=async()=>{clearOfflineCache();if(authMode==="authenticated"){await forgetNativePushToken().catch(()=>{});await supabase.auth.signOut();}stopGpsTracking();stopRealtimeTracking();stopEventsRealtime();setAuthMode("demo");setAccountName("");setEntered(false);setView("dashboard");setSimulation(initialSimulation);setActiveTripContext(null);setTripSaveStatus("");setDriverGps(null);setTripEvents([]);setFeedbackRows([]);setNotificationsOpen(false)};
   const submitFeedback=async(feedback: Omit<FeedbackItem, "id" | "createdAt" | "saved">)=>{
     const localId = `feedback-${Date.now()}`;
     const nextFeedback: FeedbackItem = { ...feedback, id: localId, createdAt: new Date().toISOString(), saved: authMode === "authenticated" };
@@ -909,7 +936,8 @@ export default function Home() {
     }
     setTimeout(()=>setSaveStatus(""), 3800);
   };
-  const showTripSaveStatus=(message: string)=>{setTripSaveStatus(message);if(statusTimerRef.current!==null)window.clearTimeout(statusTimerRef.current);statusTimerRef.current=window.setTimeout(()=>setTripSaveStatus(""), 5200)};
+  // الأخطاء تبقى ظاهرة أطول وباللون الأحمر حتى لا تفوت السائق
+  const showTripSaveStatus=(message: string, tone: "ok"|"error"="ok")=>{setTripSaveStatus(message);setTripSaveTone(tone);if(statusTimerRef.current!==null)window.clearTimeout(statusTimerRef.current);statusTimerRef.current=window.setTimeout(()=>setTripSaveStatus(""), tone==="error"?15000:5200)};
   const setSavedGpsPoint=(row: { latitude: number | string; longitude: number | string; created_at?: string | null })=>{
     const nextPoint: DriverGps = {
       label: "آخر موقع محفوظ للسائق",
@@ -965,7 +993,16 @@ export default function Home() {
       if (latest.eventType === "dropoff") setSimulation((current)=>({ ...current, studentStatus: "arrived" }));
     }
   };
-  const reloadData=async()=>{const seq=++loadSeqRef.current;const next=await loadMasariData(selectedChildRef.current);if(seq!==loadSeqRef.current)return next;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim);return next};
+  const reloadData=async()=>{
+    const seq=++loadSeqRef.current;
+    const next=await loadMasariDataOrCache(selectedChildRef.current);
+    if(!next)return data;
+    if(seq!==loadSeqRef.current)return next;setData(next);const sim=simulationFromTrip(next);if(sim)setSimulation(sim);return next};
+  // نحفظ آخر حالة لرحلة السائق (ومنها ما سُجّل بدون إنترنت) لتظهر إذا أُعيد فتح التطبيق بلا اتصال
+  useEffect(()=>{
+    if(role!=="driver"||authMode!=="authenticated"||!data.trip)return;
+    void supabase.auth.getSession().then(({ data: sd })=>{ const uid=sd.session?.user.id; if(uid) cacheDriverData(uid, riyadhToday(), data); });
+  },[role, authMode, data]);
   const liveTripId = authMode==="authenticated" && data.trip && ACTIVE_TRIP_STATUSES.includes(data.trip.status) ? data.trip.id : null;
   const loadLatestSavedGps=async()=>{
     const tripId = data.trip?.id;
@@ -1015,8 +1052,27 @@ export default function Home() {
   const startGpsTracking=(context?: TripContext | null)=>{
     setGpsStatus("نطلب إذن الموقع من الجهاز…");
     gpsWatchRef.current?.(); gpsWatchRef.current=null;
-    void watchLocation((fix)=>handleGpsPosition(fix, context), setGpsStatus).then((stop)=>{gpsWatchRef.current=stop;}).catch(()=>setGpsStatus("تعذر تشغيل تتبع الموقع."));
+    const token=++gpsTokenRef.current;
+    gpsTripRef.current=context?.tripId ?? "local";
+    void watchLocation((fix)=>handleGpsPosition(fix, context), setGpsStatus).then((stop)=>{
+      // طلب أحدث سبقنا (أو أُوقف التتبع): نوقف هذا المتتبع فورًا
+      if(token!==gpsTokenRef.current){stop();return}
+      gpsWatchRef.current=stop;
+    }).catch(()=>{if(token===gpsTokenRef.current){gpsTripRef.current=null;setGpsStatus("تعذر تشغيل تتبع الموقع.")}});
   };
+  // الرحلة الجارية تستمر في إرسال الموقع حتى لو أُغلق التطبيق وفُتح من جديد، أو عاد من الخلفية،
+  // أو أُعيد تحميل الصفحة: نعيد تشغيل التتبع تلقائيًا، ونوقفه إذا انتهت الرحلة من مكان آخر.
+  useEffect(()=>{
+    if(role!=="driver"||authMode!=="authenticated")return;
+    if(!liveTripId){ if(gpsTripRef.current) stopGpsTracking(); return; }
+    const context={ tripId: liveTripId };
+    if(gpsTripRef.current!==liveTripId&&hasLocationDisclosure()){ setActiveTripContext(context); startGpsTracking(context); }
+    // في المتصفح قد يتوقف GPS والشاشة مطفأة؛ تطبيق الجوال يتتبع في الخلفية فلا يحتاج ذلك
+    const onVisible=()=>{ if(document.visibilityState==="visible"&&!isNativeApp()) startGpsTracking(context); };
+    document.addEventListener("visibilitychange", onVisible);
+    return ()=>document.removeEventListener("visibilitychange", onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[role, authMode, liveTripId]);
   const refreshGpsNow=()=>{
     if(!hasLocationDisclosure()){setDisclosureFor("refresh");return}
     setGpsStatus("جارٍ تحديث موقع GPS…");
@@ -1034,12 +1090,12 @@ export default function Home() {
     if (!tripId) { showTripSaveStatus("لا توجد رحلة مسندة إليك اليوم."); return; }
     void (async()=>{
       const { error } = await supabase.rpc("start_trip", { p_trip: tripId });
-      if (error) { showTripSaveStatus(rpcError(error)); return; }
+      if (error) { showTripSaveStatus(rpcError(error),"error"); return; }
       const context = { tripId };
       setActiveTripContext(context);
+      startGpsTracking(context);
       await reloadData();
       showTripSaveStatus("بدأت الرحلة وتم إشعار أولياء الأمور.");
-      startGpsTracking(context);
     })();
   };
   const endTrip=()=>{
@@ -1053,7 +1109,7 @@ export default function Home() {
     if (!window.confirm("امشِ إلى آخر الباص وتأكد أنه خالٍ من الطلاب. هل تأكدت؟")) return;
     void (async()=>{
       const { data: res, error } = await supabase.rpc("complete_trip", { p_trip: tripId, p_bus_checked: true });
-      if (error) { showTripSaveStatus(rpcError(error)); return; }
+      if (error) { showTripSaveStatus(rpcError(error),"error"); return; }
       const r = res as { completed?: boolean; names?: string } | null;
       if (r && r.completed === false) { await reloadData(); window.alert(`لا يمكن إنهاء الرحلة: ما زال في الباص ${r.names ?? "طالب"}. تأكد من نزوله وسجّله، وقد أُبلغت المدرسة.`); showTripSaveStatus(`ما زال في الباص: ${r.names ?? ""}. سجّل نزوله ثم أنهِ الرحلة.`); return; }
       stopGpsTracking();
@@ -1066,7 +1122,7 @@ export default function Home() {
   const setAbsence=async(absent: boolean)=>{
     if (!data.trip || !data.student.id) return;
     const { error } = await supabase.rpc("guardian_set_absence", { p_trip: data.trip.id, p_student: data.student.id, p_absent: absent });
-    if (error) { showTripSaveStatus(rpcError(error)); return; }
+    if (error) { showTripSaveStatus(rpcError(error),"error"); return; }
     await reloadData();
     showTripSaveStatus(absent ? `تم تسجيل غياب ${data.student.name} اليوم، ولن ينتظره السائق.` : `تم إلغاء غياب ${data.student.name}.`);
   };
@@ -1083,7 +1139,7 @@ export default function Home() {
       showTripSaveStatus(`${attendanceDoneText[event]} (محفوظ على الجهاز، يُرسل عند عودة الإنترنت)`);
       return;
     }
-    if (error) { showTripSaveStatus(rpcError(error)); return; }
+    if (error) { showTripSaveStatus(rpcError(error),"error"); return; }
     await reloadData();
     showTripSaveStatus(attendanceDoneText[event]);
   })()};
@@ -1118,7 +1174,7 @@ export default function Home() {
         showTripSaveStatus(`اعتُمدت ${stop.label} على الجهاز، وتُرسل عند عودة الإنترنت.`);
         return;
       }
-      if(error){showTripSaveStatus(rpcError(error));return}
+      if(error){showTripSaveStatus(rpcError(error),"error");return}
       await reloadData();
       showTripSaveStatus(`تم اعتماد ${stop.label} من مسافة ${(result as { distance?: number } | null)?.distance ?? distance} متر.`);
       return;
@@ -1128,31 +1184,70 @@ export default function Home() {
     showTripSaveStatus(`تم اعتماد ${stop.label} عبر GPS من مسافة ${distance} متر. الحفظ الدائم يحتاج تسجيل دخول فعلي.`);
     approveStop();
   })()};
+  // محطة لا يمكن الوصول إليها (طريق مغلق، لا طلاب اليوم…): يتخطاها السائق بسبب مكتوب، فتُبلَّغ المدرسة
+  // ويستطيع إكمال الرحلة. الخادم يرفض تخطي المدرسة أو تخطي محطة ليست التالية.
+  const skipStop=()=>{void (async()=>{
+    const index=simulation.currentStopIndex;
+    const stop=data.route.stops[index];
+    if(!simulation.active||!stop)return;
+    const reason=window.prompt(`لماذا تتخطى محطة ${stop.label}؟\nمثال: الطريق مغلق، لا يوجد طلاب اليوم`)?.trim();
+    if(!reason)return;
+    if(authMode!=="authenticated"){approveStop();showTripSaveStatus(`تم تخطي ${stop.label}.`);return}
+    if(!data.trip||!stop.id){showTripSaveStatus("ابدأ الرحلة أولاً.","error");return}
+    const args={ p_trip: data.trip.id, p_stop: stop.id, p_reason: reason };
+    const { error }=await supabase.rpc("skip_stop", args);
+    if(error&&isNetworkError(error)){
+      void enqueue({ kind: "rpc", name: "skip_stop", args });
+      setData((current)=>({ ...current, route: { ...current.route, stops: current.route.stops.map((st, i)=>i===index ? { ...st, status: "skipped" } : st) } }));
+      approveStop();
+      showTripSaveStatus(`تم تخطي ${stop.label} على الجهاز، ويُرسل للمدرسة عند عودة الإنترنت.`);
+      return;
+    }
+    if(error){showTripSaveStatus(rpcError(error),"error");return}
+    await reloadData();
+    showTripSaveStatus(`تم تخطي ${stop.label} وإبلاغ المدرسة.`);
+  })()};
   useEffect(()=>{
     const onFlushed=(e: Event)=>{ const r=(e as CustomEvent<{ sent: number }>).detail; if(r?.sent){ void reloadData().catch(()=>{}); showTripSaveStatus(`أُرسلت ${r.sent} عملية محفوظة بعد عودة الإنترنت.`); } };
     window.addEventListener("masari-queue-flushed", onFlushed);
     return ()=>window.removeEventListener("masari-queue-flushed", onFlushed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   },[entered, authMode, role, data.trip?.id]);
   const reportIssue=()=>{
     if (!simulation.active) {
-      showTripSaveStatus("ابدأ الرحلة أولاً قبل إرسال البلاغ.");
+      showTripSaveStatus("ابدأ الرحلة أولاً قبل إرسال البلاغ.","error");
       return;
     }
+    // تأكيد يمنع الإرسال بلمسة خاطئة أثناء القيادة
+    if (!window.confirm("إرسال بلاغ طارئ إلى المدرسة وبرج المراقبة الآن؟")) return;
     const stop = data.route.stops[simulation.currentStopIndex] ?? data.route.stops[0];
-    const point = driverGps ?? (stop ? { label: stop.label, address: stop.label, lat: stop.lat, lng: stop.lng } : data.student.location);
+    // موقع الباص الفعلي فقط؛ إن لم يتوفر GPS لا نرسل موقع المحطة على أنه موقع الباص
+    const point = driverGps ? { lat: driverGps.lat, lng: driverGps.lng } : null;
+    const note = `بلاغ طارئ من السائق${stop ? ` قرب ${stop.label}` : ""}${point ? "" : " (موقع الباص غير متاح)"}: يحتاج متابعة من برج المراقبة`;
+    if (authMode !== "authenticated") { showTripSaveStatus("بلاغ تجريبي: الإرسال الفعلي يحتاج تسجيل دخول."); return; }
+    if (!data.trip) return;
     const localId = `local-emergency-${Date.now()}`;
-    const note = `بلاغ طارئ من السائق عند ${stop?.label ?? point.label}: يحتاج متابعة من برج المراقبة`;
-    const optimisticEvent: TripEventRow = { id: localId, eventType: "emergency", note, createdAt: new Date().toISOString() };
+    const optimisticEvent: TripEventRow = { id: localId, eventType: "emergency", note: `${note} (جارٍ الإرسال…)`, createdAt: new Date().toISOString() };
     setTripEvents((current)=>[optimisticEvent, ...current].slice(0, 10));
     setNotificationsOpen(true);
-    showTripSaveStatus("تم إرسال البلاغ لبرج المراقبة.");
+    showTripSaveStatus("جارٍ إرسال البلاغ…");
+    const args = { p_trip: data.trip.id, p_type: "emergency", p_description: note, p_lat: point?.lat ?? null, p_lng: point?.lng ?? null };
+    const tripId = data.trip.id;
     void (async()=>{
-      if (authMode !== "authenticated") return;
-      if (!data.trip) return;
-      const { error } = await supabase.rpc("report_emergency", { p_trip: data.trip.id, p_type: "emergency", p_description: note, p_lat: point.lat, p_lng: point.lng });
-      if (error) { showTripSaveStatus(rpcError(error)); return; }
-      await loadTripEvents(data.trip.id);
-      showTripSaveStatus("تم حفظ البلاغ الطارئ وإشعار برج المراقبة.");
+      const { error } = await supabase.rpc("report_emergency", args);
+      if (error && isNetworkError(error)) {
+        void enqueue({ kind: "rpc", name: "report_emergency", args });
+        setTripEvents((current)=>current.map((ev)=>ev.id===localId ? { ...ev, note: `${note} (محفوظ على الجهاز، يُرسل عند عودة الإنترنت)` } : ev));
+        showTripSaveStatus("لا يوجد إنترنت: البلاغ محفوظ ويُرسل فور عودة الاتصال. اتصل بالمدرسة مباشرة الآن.","error");
+        return;
+      }
+      if (error) {
+        setTripEvents((current)=>current.filter((ev)=>ev.id!==localId));
+        showTripSaveStatus(`لم يُرسل البلاغ: ${rpcError(error)} اتصل بالمدرسة مباشرة.`,"error");
+        return;
+      }
+      await loadTripEvents(tripId);
+      showTripSaveStatus("تم إرسال البلاغ الطارئ وإشعار المدرسة وبرج المراقبة.");
     })();
   };
   const leavePending=async()=>{await supabase.auth.signOut({ scope: "local" });setPendingAccount(null)};
@@ -1169,6 +1264,6 @@ export default function Home() {
   if(!entered) return <AuthPage key={authView} onAuthenticated={enterAuthenticated} initialMode={authView==="school"||authView==="parent"?"signup":"login"} initialRole={authView==="school"?"school":authView==="parent"?"parent":undefined} onBack={()=>setAuthView("landing")}/>;
   return <div dir="rtl" className="masari-app"><LocationDisclosure open={disclosureFor!==null} onDecline={()=>{if(disclosureFor==="start")showTripSaveStatus("لا يمكن بدء الرحلة دون مشاركة الموقع.");setDisclosureFor(null)}} onAccept={()=>{const next=disclosureFor;setDisclosureFor(null);if(next==="start")startTrip();else if(next==="refresh")refreshGpsNow()}}/>{!online&&<div className="offline-banner">أنت تعمل دون اتصال — نعرض آخر بيانات محفوظة</div>}<SidebarProvider style={{"--sidebar-width":"17.5rem"} as React.CSSProperties}>
     <Sidebar side="right" variant="sidebar" collapsible="offcanvas" className="masari-sidebar"><SidebarHeader className="sidebar-brand"><div className="brand-mark"><BusFront/></div><div><strong>مساري</strong><span>إدارة النقل المدرسي</span></div></SidebarHeader><SidebarContent><SidebarGroup><SidebarGroupContent><SidebarMenu>{nav.map(item=><SidebarMenuItem key={item.id}><NavButton active={view===item.id} onSelect={()=>setView(item.id)} label={item.label} icon={item.icon}/></SidebarMenuItem>)}</SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent><SidebarFooter className="sidebar-footer"><div className="support-card"><MessageSquareText/><strong>تحتاج مساعدة؟</strong><p>{data.source==="empty" || (data.school.contactName==="—" && data.school.phone==="—") ? "تواصل مع إدارة مساري" : [data.school.contactName, data.school.phone].filter((v)=>v!=="—").join(" · ")}</p><button>تواصل معنا</button></div><div className="account-row"><span>{(accountName || data.school.contactName).charAt(0)}</span><div><strong>{accountName || (role==="parent"?data.parent.name:role==="driver"?data.driver.name:data.school.contactName)}</strong><p>{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</p></div><button onClick={()=>void signOut()}>خروج</button></div></SidebarFooter></Sidebar>
-    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Badge variant="outline" className="role-badge">{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</Badge><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={toggleNotifications}><Bell/>{unreadCount>0&&<span>{unreadCount}</span>}</button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{authMode==="authenticated"&&<PushToggle compact/>}{authMode==="authenticated"&&role==="parent"&&<MessageChannels/>}{notifications.length===0&&<p className="muted-label notification-empty">لا توجد إشعارات بعد.</p>}{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{authMode==="authenticated" && view==="account" ? <AccountPage name={accountName} email={accountEmail} roleLabel={role==="executive"&&platformAdmin?"مدير النظام":roleNames[role]} onDeleted={()=>window.location.reload()}/> : authMode==="authenticated" && role==="executive" ? (view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : view==="reports" ? <><RegionReport/><DelayMap/></> : view==="control" ? <LiveControl canHandleEmergencies={platformAdmin}/> : platformAdmin && view==="users" ? <UsersAdmin myEmail={accountEmail}/> : platformAdmin && view==="billing" ? <AdminBilling/> : platformAdmin && view==="data" ? <DataManager/> : platformAdmin && view==="audit" ? <AuditLog/> : platformAdmin && view==="errors" ? <><ErrorLog/><MessageStats/></> : <RegionOverview region={accessRegion} platformAdmin={platformAdmin} onOpen={setView}/>) : authMode==="authenticated" && view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : authMode==="authenticated" && view==="control" && (role==="school"||role==="executive") ? <LiveControl canHandleEmergencies={role==="school"||platformAdmin}/> : authMode==="authenticated" && role==="school" && OPS_VIEWS.includes(view) ? (data.school.id ? <SchoolOps schoolId={data.school.id} tab={view as OpsTab} isAdmin={schoolRole==="school_admin"}/> : <EmptyState role={role}/>) : authMode==="authenticated" && role==="school" && view==="feedback" ? <FeedbackList/> : authMode==="authenticated" && role==="school" && view==="billing" && data.school.id ? <SchoolBilling schoolId={data.school.id} schoolName={data.school.name}/> : authMode==="authenticated" && role==="parent" && view==="children" ? <><ParentChildren email={accountEmail}/><ShareLinks/></> : authMode==="authenticated" && view==="history" && (role==="parent"||role==="driver") ? <TripHistory role={role}/> : authMode==="authenticated" && role==="parent" && view==="locations" ? <ParentHomeLocations/> : authMode==="authenticated" && role==="parent" && view==="pickup" ? <ParentGate/> : authMode==="authenticated" && role==="parent" && view==="chat" ? <ParentChat/> : authMode==="authenticated" && role==="parent" && view==="fees" ? <ParentFees/> : authMode==="authenticated" && role==="school" && view==="chat" && data.school.id ? <SchoolChat schoolId={data.school.id}/> : authMode==="authenticated" && role==="school" && view==="fees" && schoolRole==="school_admin" && data.school.id ? <SchoolFees schoolId={data.school.id} schoolName={data.school.name}/> : authMode==="authenticated" && role==="school" && view==="reports" && data.school.id ? <><SchoolReport schoolId={data.school.id}/><AttendancePanel schoolId={data.school.id}/><DelayMap schoolId={data.school.id}/></> : authMode==="authenticated" && role==="school" && view==="team" && schoolRole==="school_admin" && data.school.id ? <SchoolTeam schoolId={data.school.id}/> : authMode==="authenticated" && role==="school" && schoolRole==="gate" && data.school.id ? <SchoolGate schoolId={data.school.id}/> : authMode==="authenticated" && role==="school" && view==="gate" && data.school.id ? <SchoolGate schoolId={data.school.id}/> : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard offlinePending={offlinePending} data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent} onScanned={()=>void reloadData()}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} schoolRole={schoolRole} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <EmptyState role={role}/>}</main><nav className="mobile-nav">{(nav.length>5?nav.slice(0,3):nav).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}{nav.length>5&&<MoreButton active={!nav.slice(0,3).some((item)=>item.id===view)}/>}</nav></SidebarInset>
+    <SidebarInset className="app-inset"><header className="topbar"><div className="mobile-logo"><SidebarTrigger><Menu/></SidebarTrigger><div className="brand-mark"><BusFront/></div><strong>مساري</strong></div><div className="top-actions"><Badge variant="outline">{authMode==="authenticated"?"جلسة فعلية":simulation.active?driverGps?"GPS مباشر":"GPS غير متاح":data.source==="supabase"?"متصل بقاعدة البيانات":"بيانات محفوظة"}</Badge><Badge variant="outline" className="role-badge">{(role==="executive"&&platformAdmin?"مدير النظام":roleNames[role])}</Badge><button className="text-link top-exit" onClick={()=>void signOut()}>خروج</button><div className="notification-wrap"><button className="icon-button" aria-label="الإشعارات" onClick={toggleNotifications}><Bell/>{unreadCount>0&&<span>{unreadCount}</span>}</button>{notificationsOpen&&<div className="notification-popover"><div className="notification-head"><strong>الإشعارات</strong><small>{notifications.length} تحديثات</small></div>{authMode==="authenticated"&&<PushToggle compact/>}{authMode==="authenticated"&&role==="parent"&&<MessageChannels/>}{notifications.length===0&&<p className="muted-label notification-empty">لا توجد إشعارات بعد.</p>}{notifications.map((notification)=><div className="notification-item" key={notification.id}><span className={`notify-dot ${notification.tone}`}/><div><strong>{notification.title}</strong><p>{notification.body}</p></div><small>{notification.time}</small></div>)}</div>}</div></div></header><main className="content">{authMode==="authenticated" && view==="account" ? <AccountPage name={accountName} email={accountEmail} roleLabel={role==="executive"&&platformAdmin?"مدير النظام":roleNames[role]} onDeleted={()=>window.location.reload()}/> : authMode==="authenticated" && role==="executive" ? (view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : view==="reports" ? <><RegionReport/><DelayMap/></> : view==="control" ? <LiveControl canHandleEmergencies={platformAdmin}/> : platformAdmin && view==="users" ? <UsersAdmin myEmail={accountEmail}/> : platformAdmin && view==="billing" ? <AdminBilling/> : platformAdmin && view==="data" ? <DataManager/> : platformAdmin && view==="audit" ? <AuditLog/> : platformAdmin && view==="errors" ? <><ErrorLog/><MessageStats/></> : <RegionOverview region={accessRegion} platformAdmin={platformAdmin} onOpen={setView}/>) : authMode==="authenticated" && view==="schools" ? <AdminDirectory canManage={platformAdmin}/> : authMode==="authenticated" && view==="control" && (role==="school"||role==="executive") ? <LiveControl canHandleEmergencies={role==="school"||platformAdmin}/> : authMode==="authenticated" && role==="school" && OPS_VIEWS.includes(view) ? (data.school.id ? <SchoolOps schoolId={data.school.id} tab={view as OpsTab} isAdmin={schoolRole==="school_admin"}/> : <EmptyState role={role}/>) : authMode==="authenticated" && role==="school" && view==="feedback" ? <FeedbackList/> : authMode==="authenticated" && role==="school" && view==="billing" && data.school.id ? <SchoolBilling schoolId={data.school.id} schoolName={data.school.name}/> : authMode==="authenticated" && role==="parent" && view==="children" ? <><ParentChildren email={accountEmail}/><ShareLinks/></> : authMode==="authenticated" && view==="history" && (role==="parent"||role==="driver") ? <TripHistory role={role}/> : authMode==="authenticated" && role==="parent" && view==="locations" ? <ParentHomeLocations/> : authMode==="authenticated" && role==="parent" && view==="pickup" ? <ParentGate/> : authMode==="authenticated" && role==="parent" && view==="chat" ? <ParentChat/> : authMode==="authenticated" && role==="parent" && view==="fees" ? <ParentFees/> : authMode==="authenticated" && role==="school" && view==="chat" && data.school.id ? <SchoolChat schoolId={data.school.id}/> : authMode==="authenticated" && role==="school" && view==="fees" && schoolRole==="school_admin" && data.school.id ? <SchoolFees schoolId={data.school.id} schoolName={data.school.name}/> : authMode==="authenticated" && role==="school" && view==="reports" && data.school.id ? <><SchoolReport schoolId={data.school.id}/><AttendancePanel schoolId={data.school.id}/><DelayMap schoolId={data.school.id}/></> : authMode==="authenticated" && role==="school" && view==="team" && schoolRole==="school_admin" && data.school.id ? <SchoolTeam schoolId={data.school.id}/> : authMode==="authenticated" && role==="school" && schoolRole==="gate" && data.school.id ? <SchoolGate schoolId={data.school.id}/> : authMode==="authenticated" && role==="school" && view==="gate" && data.school.id ? <SchoolGate schoolId={data.school.id}/> : data.source==="empty" && (view==="dashboard"||view==="control"||view==="locations") ? <EmptyState role={role}/> : view==="dashboard" ? role==="driver" ? <DriverDashboard onSkipStop={skipStop} offlinePending={offlinePending} offlineFailed={offlineFailed} onDismissFailed={dismissFailed} tripSaveTone={tripSaveTone} data={data} simulation={simulation} tripSaveStatus={tripSaveStatus} driverGps={driverGps} gpsStatus={gpsStatus} onStart={startTrip} onEnd={endTrip} onApproveStop={approveStopAndRecord} onRefreshGps={refreshGpsNow} onReportIssue={reportIssue} onStudentEvent={recordStudent} onScanned={()=>void reloadData()}/> : role==="parent" ? <ParentDashboard data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents} feedbackRows={feedbackRows} authMode={authMode} tripSaveStatus={tripSaveStatus} onSubmitFeedback={submitFeedback} onSelectChild={selectChild} onSetAbsence={setAbsence}/> : <ExecutiveDashboard data={data} simulation={simulation} driverGps={driverGps}/> : view==="control" ? <ControlTower data={data} simulation={simulation} driverGps={driverGps} tripEvents={tripEvents}/> : view==="locations" ? <LocationsView data={data} role={role} schoolRole={schoolRole} simulation={simulation} saveStatus={saveStatus} onSaveLocation={saveLocation}/> : <EmptyState role={role}/>}</main><nav className="mobile-nav">{(nav.length>5?nav.slice(0,3):nav).map(item=><button className={view===item.id?"active":""} onClick={()=>setView(item.id)} key={item.id}><item.icon/><span>{item.label}</span></button>)}{nav.length>5&&<MoreButton active={!nav.slice(0,3).some((item)=>item.id===view)}/>}</nav></SidebarInset>
   </SidebarProvider></div>;
 }

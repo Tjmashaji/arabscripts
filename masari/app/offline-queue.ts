@@ -2,19 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { isGpsItem, trimQueue, type NewItem } from "./queue-core";
+export { isGpsItem, trimQueue };
 
-// وضع بدون إنترنت للسائق: ما يفشل بسبب انقطاع الشبكة (تسجيل الركوب والنزول، اعتماد المحطة، نقاط GPS)
-// يُحفظ على الجهاز ويُرسل بالترتيب عند عودة الاتصال. الأخطاء غير الشبكية (صلاحية، رحلة منتهية…) لا تُعاد.
+// وضع بدون إنترنت للسائق: ما يفشل بسبب انقطاع الشبكة (تسجيل الركوب والنزول، اعتماد المحطة، البلاغات، نقاط GPS)
+// يُحفظ على الجهاز ويُرسل بالترتيب عند عودة الاتصال. الأخطاء غير الشبكية (صلاحية، رحلة منتهية…) لا تُعاد،
+// لكن العمليات المهمة المرفوضة تُحفظ في قائمة «تعذر إرسالها» ليراها السائق، ولا تختفي بصمت.
 
-type NewItem = { kind: "rpc"; name: string; args: Record<string, unknown> } | { kind: "insert"; table: string; row: Record<string, unknown> };
 type Item = NewItem & { id: string; at: string; uid: string };
+export type FailedItem = { id: string; at: string; label: string; error: string };
 const KEY = "masari-offline-queue-v1";
-const MAX = 600;
+const FAILED_KEY = "masari-offline-failed-v1";
 const listeners = new Set<() => void>();
 
-const read = (): Item[] => { try { const v: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]"); return Array.isArray(v) ? v as Item[] : []; } catch { return []; } };
+const readJson = <T,>(key: string): T[] => { try { const v: unknown = JSON.parse(localStorage.getItem(key) ?? "[]"); return Array.isArray(v) ? v as T[] : []; } catch { return []; } };
+const read = (): Item[] => readJson<Item>(KEY);
 const currentUid = async () => (await supabase.auth.getSession()).data.session?.user.id ?? null;
-const write = (items: Item[]) => { try { localStorage.setItem(KEY, JSON.stringify(items.slice(-MAX))); } catch { /* التخزين ممتلئ أو محجوب */ } listeners.forEach((l) => l()); };
+const write = (items: Item[]) => { try { localStorage.setItem(KEY, JSON.stringify(trimQueue(items))); } catch { /* التخزين ممتلئ أو محجوب */ } listeners.forEach((l) => l()); };
+
+const LABELS: Record<string, string> = { record_attendance: "تسجيل حضور طالب", arrive_at_stop: "اعتماد محطة", report_emergency: "بلاغ طارئ", skip_stop: "تخطي محطة" };
+export const failedItems = (): FailedItem[] => readJson<FailedItem>(FAILED_KEY);
+const writeFailed = (items: FailedItem[]) => { try { localStorage.setItem(FAILED_KEY, JSON.stringify(items.slice(-50))); } catch { /* محجوب */ } listeners.forEach((l) => l()); };
+export const dismissFailed = () => writeFailed([]);
 
 export const isNetworkError = (error: { message?: string } | null | undefined) =>
   (typeof navigator !== "undefined" && !navigator.onLine) || /failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(error?.message ?? "");
@@ -24,7 +33,7 @@ export async function enqueue(item: NewItem) {
   const uid = await currentUid(); if (!uid) return;
   write([...read(), { ...item, uid, id: crypto.randomUUID?.() ?? String(Date.now() + Math.random()), at: new Date().toISOString() }]);
 }
-export const clearQueue = () => write([]);
+export const clearQueue = () => { write([]); writeFailed([]); };
 export const pendingCount = () => read().length;
 
 let flushing = false;
@@ -43,7 +52,11 @@ export async function flushQueue(): Promise<{ sent: number; dropped: number }> {
       if (!item) break;
       const { error } = item.kind === "rpc" ? await supabase.rpc(item.name, item.args) : await supabase.from(item.table).insert(item.row);
       if (error && isNetworkError(error)) break;
-      if (error) dropped++; else sent++;
+      if (error) {
+        dropped++;
+        // نقطة GPS مرفوضة (رحلة انتهت مثلًا) لا تهم السائق؛ أي عملية أخرى تُعرض له
+        if (!isGpsItem(item)) writeFailed([...failedItems(), { id: item.id, at: item.at, label: item.kind === "rpc" ? LABELS[item.name] ?? item.name : item.table, error: error.message ?? "" }]);
+      } else sent++;
       write(read().filter((x) => x.id !== item.id));
     }
   } finally { flushing = false; }
@@ -54,8 +67,9 @@ export async function flushQueue(): Promise<{ sent: number; dropped: number }> {
 // بعد كل إرسال ناجح يُطلق الحدث masari-queue-flushed ليعيد التطبيق تحميل بياناته.
 export function useOfflineQueue() {
   const [count, setCount] = useState(0);
+  const [failed, setFailed] = useState<FailedItem[]>([]);
   useEffect(() => {
-    const update = () => setCount(pendingCount());
+    const update = () => { setCount(pendingCount()); setFailed(failedItems()); };
     listeners.add(update);
     const run = () => { void flushQueue().then((r) => { update(); if (r.sent || r.dropped) window.dispatchEvent(new CustomEvent("masari-queue-flushed", { detail: r })); }); };
     window.addEventListener("online", run);
@@ -63,5 +77,5 @@ export function useOfflineQueue() {
     run();
     return () => { listeners.delete(update); window.removeEventListener("online", run); window.clearInterval(t); };
   }, []);
-  return count;
+  return { count, failed };
 }

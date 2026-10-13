@@ -361,3 +361,11 @@ html[lang="en"] [dir="rtl"], html[lang="en"] body { direction: ltr; }
 .privacy-body ol{margin:0;padding-inline-start:22px;display:grid;gap:6px;list-style:decimal}.delete-request-login{margin-top:12px}
 .location-disclosure{text-align:right}[data-slot="alert-dialog-overlay"]:has(+ .location-disclosure),.location-disclosure{z-index:2000}.location-disclosure ul{list-style:disc;margin:0;padding-inline-start:20px;display:grid;gap:8px;color:#3d4a5e;font-size:14px;line-height:1.7;text-align:right}
 .location-disclosure-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:#e3f3f3;color:#176b87}.location-disclosure-icon svg{width:24px;height:24px}
+
+/* رسائل السائق: الخطأ أحمر وواضح، وقائمة العمليات التي تعذر إرسالها بعد عودة الإنترنت */
+.trip-save.trip-save-error,.offline-failed{background:#fdeceb;border-color:#f5c8c3;color:#8f1d15}.trip-save-error svg{color:#b42318}
+.offline-failed{align-items:flex-start}.offline-failed>div{display:grid;gap:6px}.offline-failed ul{margin:0;padding-inline-start:18px;list-style:disc;font-size:13px}.offline-failed p{margin:0;font-size:13px}.offline-failed button{justify-self:start}
+.skip-stop-link{border:0;background:transparent;color:#5b6880;text-decoration:underline;font-size:14px;padding:10px 4px;cursor:pointer;justify-self:center}
+
+/* زر البلاغ الطارئ: أحمر وواضح وسهل الضغط أثناء القيادة */
+.compact-route .report-btn:not(:disabled){background:#b42318;border-color:#b42318;color:#fff;min-height:52px;font-size:16px;font-weight:800}.compact-route .report-btn:not(:disabled):hover{background:#8f1d15;color:#fff}
