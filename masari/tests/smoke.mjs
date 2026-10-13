@@ -38,6 +38,12 @@ const overflowX = (page) => page.evaluate(() => document.documentElement.scrollW
   check(await page.locator(".auth-form-card button.wide-action").isDisabled(), "التسجيل معطل قبل الموافقة على الخصوصية");
   await page.goto(BASE + "#privacy", { waitUntil: "load" });
   check((await page.locator(".privacy-body h2").count()) >= 8, "صفحة سياسة الخصوصية");
+  // صفحة حذف الحساب العامة (شرط Google Play): تفتح بلا دخول، وزرها يوصل لصفحة الدخول
+  await page.goto(BASE + "#delete-account", { waitUntil: "load" });
+  check(await page.locator(".privacy-body h1", { hasText: "حذف حسابك" }).isVisible(), "صفحة حذف الحساب تفتح بلا دخول");
+  check((await overflowX(page)) <= 1, "صفحة حذف الحساب بلا تمرير أفقي على الجوال");
+  await page.click(".delete-request-login");
+  check(await page.locator("input[type=email]").waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false), "زر حذف الحساب يفتح صفحة الدخول");
   await page.context().close();
 }
 
@@ -63,6 +69,42 @@ for (const [role, access] of Object.entries(ROLES)) {
     const text = (await page.locator("main.content").innerText()).trim();
     check(text.length > 10, `${role}: ${label.trim()}`);
   }
+  await ctx.close();
+}
+// السائق: إفصاح الموقع داخل التطبيق قبل أول طلب للإذن، والرفض لا يطلب الإذن ولا يُحفظ
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("driver@example.com"))]);
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, (route) => {
+    const req = route.request(); const path = new URL(req.url()).pathname; const accept = req.headers().accept ?? "";
+    const ok = (d) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    if (path.endsWith("/auth/v1/user")) return ok(session("driver@example.com").user);
+    if (path.endsWith("/rpc/my_access")) return ok({ ...ROLES.driver, full_name: "driver", privacy_version: "2026-10-b" });
+    // رحلة مسندة اليوم حتى يظهر زر «بدء الرحلة»
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    if (path.endsWith("/rest/v1/drivers")) return ok([{ id: "d1", school_id: "sch1", full_name: "سائق", email: "driver@example.com" }]);
+    if (path.endsWith("/rest/v1/schools")) return ok([{ id: "sch1", name: "مدرسة الاختبار", city: "الخرج", latitude: 24.15, longitude: 47.31 }]);
+    if (path.endsWith("/rest/v1/trips")) return ok([{ id: "t1", route_id: "r1", bus_id: null, driver_id: "d1", trip_date: today, status: "scheduled", direction: "to_school", scheduled_start: null, completed_at: null }]);
+    if (path.endsWith("/rest/v1/routes")) return ok([{ name: "مسار الاختبار", scheduled_time: "06:30:00", estimated_duration_minutes: 30, bus_id: null }]);
+    if (path.endsWith("/rest/v1/route_stops")) return ok([{ label: "منزل", scheduled_time: "06:35:00", latitude: 24.16, longitude: 47.30, radius_m: 250 }, { label: "المدرسة", scheduled_time: "07:00:00", latitude: 24.15, longitude: 47.31, radius_m: 250 }]);
+    if (accept.includes("object")) return route.fulfill({ status: 406, contentType: "application/json", body: "{}" });
+    return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
+  });
+  const page = await ctx.newPage(); watch(page, "driver-disclosure");
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(2500);
+  const start = page.locator("button", { hasText: "بدء الرحلة" }).first();
+  const dialog = page.locator('[role="alertdialog"]');
+  if (await start.count()) {
+    await start.click();
+    check(await dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false), "السائق: إفصاح الموقع يظهر قبل بدء الرحلة");
+    check((await dialog.innerText()).includes("الخلفية"), "السائق: الإفصاح يذكر الموقع في الخلفية");
+    await dialog.locator("button", { hasText: "ليس الآن" }).click();
+    check(await dialog.waitFor({ state: "hidden", timeout: 3000 }).then(() => true, () => false), "السائق: «ليس الآن» يغلق الإفصاح");
+    check(await page.evaluate(() => localStorage.getItem("masari-location-disclosure")) === null, "السائق: الرفض لا يُحفظ كموافقة");
+    await start.click(); await dialog.waitFor({ state: "visible", timeout: 5000 });
+    await dialog.locator("button", { hasText: "موافق" }).click();
+    check(await page.evaluate(() => localStorage.getItem("masari-location-disclosure")) === "1", "السائق: الموافقة تُحفظ فلا يتكرر السؤال");
+  } else check(false, "السائق: زر بدء الرحلة غير موجود");
   await ctx.close();
 }
 await browser.close();

@@ -17,6 +17,13 @@ const EN: Record<string, string> = {
   "الإدارة التنفيذية": "Executive", "إدارة المدرسة": "School admin", "السائق": "Driver", "ولي الأمر": "Parent", "مدير النظام": "System admin",
   "خروج": "Sign out", "تسجيل الخروج": "Sign out", "الإشعارات": "Notifications", "جلسة فعلية": "Live session", "مساري": "Masari", "إدارة النقل المدرسي": "School transport",
   "تحتاج مساعدة؟": "Need help?", "تواصل معنا": "Contact us", "تواصل مع إدارة مساري": "Contact Masari support", "المزيد": "More", "لا توجد إشعارات بعد.": "No notifications yet.",
+  // إفصاح الموقع قبل طلب الإذن
+  "مساري يستخدم موقعك أثناء الرحلة": "Masari uses your location during trips",
+  "يجمع مساري موقع جوالك (GPS) أثناء الرحلة فقط: من بدء الرحلة حتى إنهائها.": "Masari collects your phone's GPS location only during a trip: from trip start until you end it.",
+  "يستمر جمع الموقع والشاشة مطفأة أو التطبيق في الخلفية، مع إشعار ظاهر «رحلة جارية».": "Location is collected even when the screen is off or the app is in the background, with a visible \"Trip in progress\" notification.",
+  "ليرى أولياء الأمور والمدرسة موقع الباص، ويُعتمد وصولك للمحطات.": "So parents and the school can see the bus, and your stop arrivals can be confirmed.",
+  "يتوقف التتبع تلقائيًا عند إنهاء الرحلة، ولا يُستخدم الموقع لأي غرض آخر، ويُحذف بعد 90 يومًا.": "Tracking stops automatically when the trip ends, is never used for anything else, and is deleted after 90 days.",
+  "ليس الآن": "Not now", "موافق، تابِع": "Agree and continue", "لا يمكن بدء الرحلة دون مشاركة الموقع.": "The trip can't start without sharing location.",
   // شاشة السائق
   "مسارك اليوم": "Your route today", "الرحلة الصباحية": "Morning trip", "رحلة العودة": "Return trip", "انتهت رحلة اليوم": "Today's trip is done",
   "إنهاء الرحلة": "End trip", "بدء الرحلة وتفعيل الموقع": "Start trip & enable location", "GPS فعّال الآن": "GPS is active",

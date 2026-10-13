@@ -1,0 +1,6 @@
+{"opts":{"subs":false},"scenes":[
+ {"id":"morning","a":0,"b":"hook2"},
+ {"id":"where","a":"hook2","b":"with"},
+ {"id":"notifs","a":"with","b":"map"},
+ {"id":"map","a":"map","b":"brand"},
+ {"id":"endcard","a":"brand","b":"end","opts":{"ctaAt":"cta","cta":"خلّ مدرسة ولدك تسجّل"}}]}
