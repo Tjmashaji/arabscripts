@@ -34,15 +34,18 @@ export function LiveControl({ canHandleEmergencies }: { canHandleEmergencies: bo
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [counts, setCounts] = useState({ emergencies: 0, alerts: 0 });
 
   const load = useCallback(async () => {
     const [live, em, al] = await Promise.all([
       supabase.rpc("live_trips"),
-      supabase.from("emergency_reports").select("id,type,description,status,created_at,latitude,longitude,trip_id").neq("status", "resolved").order("created_at", { ascending: false }).limit(20),
-      supabase.from("trip_alerts").select("id,trip_id,type,started_at,latitude,longitude,max_distance_m,trips(routes(name))").eq("status", "open").order("started_at", { ascending: false }).limit(30),
+      supabase.from("emergency_reports").select("id,type,description,status,created_at,latitude,longitude,trip_id", { count: "exact" }).neq("status", "resolved").order("created_at", { ascending: false }).limit(50),
+      supabase.from("trip_alerts").select("id,trip_id,type,started_at,latitude,longitude,max_distance_m,trips(routes(name))", { count: "exact" }).eq("status", "open").order("started_at", { ascending: false }).limit(50),
     ]);
     setTrips((live.data as LiveTrip[] | null) ?? []);
     setEmergencies(em.data ?? []);
+    // العدد الحقيقي من الخادم، لا عدد ما عُرض في القائمة
+    setCounts({ emergencies: em.count ?? (em.data ?? []).length, alerts: al.count ?? (al.data ?? []).length });
     setAlerts(((al.data ?? []) as unknown as (Omit<TripAlert, "trips"> & { trips: unknown })[]).map((a) => { const t = Array.isArray(a.trips) ? a.trips[0] : a.trips as { routes: unknown } | null; const r = t ? (Array.isArray(t.routes) ? t.routes[0] : t.routes) as { name: string } | null : null; return { ...a, trips: t ? { routes: r } : null }; }));
     setNow(Date.now());
     setLoaded(true);
@@ -86,8 +89,8 @@ export function LiveControl({ canHandleEmergencies }: { canHandleEmergencies: bo
       <article className="panel mini-metric"><span>رحلات جارية</span><strong>{trips.length}</strong></article>
       <article className="panel mini-metric"><span>طلاب في الباصات</span><strong>{onBus}</strong></article>
       <article className="panel mini-metric"><span>باصات منقطعة</span><strong>{trips.filter(offline).length}</strong></article>
-      <article className="panel mini-metric"><span>بلاغات مفتوحة</span><strong>{emergencies.length}</strong></article>
-      <article className={`panel mini-metric ${alerts.length ? "metric-warn" : ""}`}><span>تنبيهات المسار</span><strong>{alerts.length}</strong></article>
+      <article className="panel mini-metric"><span>بلاغات مفتوحة</span><strong>{counts.emergencies}</strong></article>
+      <article className={`panel mini-metric ${counts.alerts ? "metric-warn" : ""}`}><span>تنبيهات المسار</span><strong>{counts.alerts}</strong></article>
     </section>
     {emergencies.length > 0 && <article className="panel ops-panel emergency-panel">
       <div className="panel-head"><div><p className="eyebrow">تحتاج تصرفًا</p><h2>البلاغات</h2></div><AlertTriangle className="title-icon" /></div>

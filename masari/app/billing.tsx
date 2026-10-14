@@ -5,6 +5,7 @@ import { Check, FileText, Printer, WalletCards, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
+import { MySupport, RevenuePanel } from "./admin-suite";
 
 // اشتراك المدارس في مساري: باقات، اشتراك لكل مدرسة، وفواتير بضريبة القيمة المضافة 15%.
 // مدير النظام يدير الباقات ويصدر الفواتير ويسجل الدفع، والمدرسة ترى باقتها واستخدامها وفواتيرها.
@@ -44,6 +45,7 @@ export function SchoolBilling({ schoolId, schoolName }: { schoolId: string; scho
   const [data, setData] = useState<SchoolBillingData | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [view, setView] = useState<Invoice | null>(null);
+  const [upgrade, setUpgrade] = useState(false);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -54,10 +56,11 @@ export function SchoolBilling({ schoolId, schoolName }: { schoolId: string; scho
     return () => { alive = false; };
   }, [schoolId]);
   if (view) return <InvoiceView inv={view} schoolName={schoolName} onClose={() => setView(null)} />;
+  if (upgrade) return <><Button variant="outline" onClick={() => setUpgrade(false)}>رجوع للاشتراك</Button><MySupport schoolId={schoolId} defaultCategory="upgrade" defaultSubject={`طلب ترقية باقة ${schoolName}`} /></>;
   const sub = data?.subscription;
   const usage = (used: number, max: number | null, label: string) => <div className="usage"><div className="usage-head"><span>{label}</span><b>{used}{max ? ` من ${max}` : " · بلا حد"}</b></div>{max && <div className="usage-bar"><span className={used > max ? "over" : ""} style={{ width: `${Math.min(100, (used / max) * 100)}%` }} /></div>}</div>;
   return <>
-    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>اشتراك مساري</h1><p>باقة مدرستك واستخدامها والفواتير.</p></div></div>
+    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>اشتراك مساري</h1><p>باقة مدرستك واستخدامها والفواتير.</p></div><Button variant="outline" onClick={() => setUpgrade(true)}>طلب ترقية الباقة</Button></div>
     <article className="panel ops-panel">
       {!data ? <p className="muted-label">جارٍ التحميل…</p> : !sub ? <p className="muted-label">لم تُحدَّد باقة لمدرستك بعد. يتواصل معك فريق مساري لاختيار الباقة المناسبة.</p> : <>
         <div className="panel-head"><div><p className="eyebrow">الباقة الحالية</p><h2>{sub.plan_name} · {sar(sub.monthly_price)} شهريًا</h2></div><Badge className={`status-badge ${subStatus[sub.status]?.[1]}`}>{subStatus[sub.status]?.[0] ?? sub.status}</Badge></div>
@@ -114,18 +117,16 @@ export function AdminBilling() {
     setMsg({ text: ok, ok: true }); await load(); return true;
   };
   const nameOf = (id: string) => rows.find((r) => r.school_id === id)?.school_name ?? "مدرسة";
-  const mrr = rows.filter((r) => r.sub_status === "active").reduce((a, r) => a + Number(r.monthly_price ?? 0), 0);
-  const due = invoices.filter((i) => i.status === "issued").reduce((a, i) => a + Number(i.total), 0);
   if (view) return <InvoiceView inv={view} schoolName={nameOf(view.school_id)} onClose={() => setView(null)} />;
 
   return <>
     <div className="welcome"><div><p className="eyebrow">مدير النظام</p><h1>الاشتراكات والفواتير</h1><p>باقات مساري، واشتراك كل مدرسة، وإصدار الفواتير وتسجيل الدفع.</p></div></div>
     <Flash msg={msg} />
+    <RevenuePanel />
     <div className="kpi-grid">
-      <div className="kpi-tile"><span className="kpi-value">{sar(mrr)}</span><span className="kpi-label">الإيراد الشهري من الاشتراكات النشطة</span></div>
       <div className="kpi-tile"><span className="kpi-value">{rows.filter((r) => r.sub_status === "active").length}</span><span className="kpi-label">مدارس مشتركة</span></div>
       <div className="kpi-tile"><span className="kpi-value">{rows.filter((r) => r.sub_status === "trial").length}</span><span className="kpi-label">فترة تجريبية</span></div>
-      <div className={`kpi-tile ${due ? "warn" : ""}`}><span className="kpi-value">{sar(due)}</span><span className="kpi-label">فواتير مستحقة</span></div>
+      <div className="kpi-tile"><span className="kpi-value">{rows.filter((r) => r.sub_status === "past_due").length}</span><span className="kpi-label">متأخرة السداد</span></div>
     </div>
 
     <article className="panel ops-panel">
