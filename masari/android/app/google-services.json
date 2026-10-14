@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "480608176172",
+    "project_id": "brideprepappp",
+    "storage_bucket": "brideprepappp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:480608176172:android:ddf91f617f7d847cfb2989",
+        "android_client_info": {
+          "package_name": "sa.masari.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYrmitl5Ox2knmr2KwmL2G4-QvqS5QZR4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
