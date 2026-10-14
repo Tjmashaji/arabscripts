@@ -257,6 +257,79 @@ for (const [role, access] of Object.entries(ROLES)) {
   check(schoolGets.some((q) => q.includes("id=eq.sch2")) && await page.evaluate(() => localStorage.getItem("masari-school-ctx")) === "sch2", "المدرسة: التبديل بين مدرستين ويُحفظ الاختيار");
   await ctx.close();
 }
+// مدير النظام: صحة النظام، الرد على تذكرة، نشر إعلان، سجل التدقيق. وولي الأمر يفتح تذكرة دعم ويرى شريط الإعلان
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("admin@example.com"))]);
+  const calls = [];
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, (r) => {
+    const req = r.request(); const path = new URL(req.url()).pathname; const accept = req.headers().accept ?? "";
+    const ok = (d) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    if (req.method() === "POST") calls.push({ path, body: req.postDataJSON?.() ?? null });
+    if (path.endsWith("/auth/v1/user")) return ok(session("admin@example.com").user);
+    if (path.endsWith("/rpc/my_access")) return ok({ ...ROLES.admin, full_name: "admin", privacy_version: "2026-10-b" });
+    if (path.endsWith("/rpc/admin_health")) return ok({ date: "2026-10-14", failed_messages_24h: 2, client_errors_24h: 0, open_emergencies: 1, open_alerts: 0, open_tickets: 1, pending_claims: 0,
+      routes_without_trips: [{ school: "مدرسة الاختبار", route: "مسار النسيم", reason: "NO_DRIVER" }], stale_trips: [], expiring: [{ kind: "license", school: "مدرسة الاختبار", name: "سائق", date: "2026-10-20" }] });
+    if (path.endsWith("/rest/v1/support_tickets")) return ok([{ id: "tk1", subject: "الطالب لا يظهر", category: "bug", status: "open", created_at: "2026-10-14T05:00:00Z", updated_at: "2026-10-14T05:00:00Z", school_id: "sch1", created_by: "u9", schools: { name: "مدرسة الاختبار" } }]);
+    if (path.endsWith("/rest/v1/support_ticket_messages")) return ok([{ id: "m1", body: "لا يظهر في الرحلة", from_staff: false, created_at: "2026-10-14T05:00:00Z" }]);
+    if (path.endsWith("/rpc/admin_post_announcement")) return ok({ id: "a1", notified: 12 });
+    if (path.endsWith("/rpc/admin_audit_search")) return ok([{ id: "l1", created_at: "2026-10-14T05:00:00Z", action: "login", table_name: "auth.users", record_id: "x", actor_email: "pr@example.com", school_name: null, old_values: null, new_values: null }]);
+    if (accept.includes("object")) return r.fulfill({ status: 406, contentType: "application/json", body: "{}" });
+    return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
+  });
+  const page = await ctx.newPage(); watch(page, "admin-suite");
+  const open = async (label) => { await page.locator('.masari-sidebar [data-sidebar="menu-button"]', { hasText: label }).first().click(); await page.waitForTimeout(800); };
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(2500);
+  check(calls.some((c) => c.path.endsWith("/rpc/log_login")), "مدير النظام: الدخول يُسجَّل في سجل التدقيق");
+  const main = page.locator("main.content");
+  await open("صحة النظام");
+  check((await main.innerText()).includes("مسار النسيم") && (await main.innerText()).includes("بلا سائق"), "مدير النظام: صحة النظام تعرض المسار بلا رحلة وسببه");
+  await open("الدعم الفني");
+  await main.locator("button", { hasText: "فتح" }).first().click(); await page.waitForTimeout(600);
+  await main.locator('textarea[aria-label="الرد"]').fill("تم الإصلاح");
+  await main.locator("button", { hasText: "إرسال" }).first().click(); await page.waitForTimeout(600);
+  check(calls.some((c) => c.path.endsWith("/rpc/reply_ticket") && c.body?.p_ticket === "tk1" && c.body?.p_body === "تم الإصلاح"), "مدير النظام: الرد على تذكرة دعم");
+  await open("الإعلانات");
+  await main.locator("input").first().fill("صيانة مجدولة");
+  await main.locator(".claim-grid textarea").fill("سيتوقف النظام عشر دقائق");
+  await main.locator("button", { hasText: "نشر الإعلان" }).click(); await page.waitForTimeout(600);
+  check(calls.some((c) => c.path.endsWith("/rpc/admin_post_announcement") && c.body?.p_title === "صيانة مجدولة") && (await main.innerText()).includes("12 حساب"), "مدير النظام: نشر إعلان مع إشعار");
+  await open("سجل التدقيق");
+  check((await main.innerText()).includes("pr@example.com"), "مدير النظام: سجل التدقيق القابل للبحث");
+  await open("المستخدمون والصلاحيات");
+  check(await main.locator("h2", { hasText: "نقل سائق أو طالب" }).count() === 1, "مدير النظام: أداة النقل بين المدارس");
+  await ctx.close();
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("parent@example.com"))]);
+  const calls = [];
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, (r) => {
+    const req = r.request(); const path = new URL(req.url()).pathname; const accept = req.headers().accept ?? "";
+    const ok = (d) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    if (req.method() === "POST") calls.push({ path, body: req.postDataJSON?.() ?? null });
+    if (path.endsWith("/auth/v1/user")) return ok(session("parent@example.com").user);
+    if (path.endsWith("/rpc/my_access")) return ok({ ...ROLES.parent, full_name: "parent", privacy_version: "2026-10-b" });
+    if (path.endsWith("/rpc/my_announcements")) return ok([{ id: "an1", title: "صيانة", body: "سيتوقف التطبيق الليلة", tone: "warning", starts_at: "2026-10-14T05:00:00Z" }]);
+    if (path.endsWith("/rpc/open_ticket")) return ok("tk9");
+    if (accept.includes("object")) return r.fulfill({ status: 406, contentType: "application/json", body: "{}" });
+    return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
+  });
+  const page = await ctx.newPage(); watch(page, "parent-support");
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(2500);
+  check(await page.locator(".announcement-banner").isVisible(), "ولي الأمر: شريط الإعلان يظهر");
+  await page.locator(".announcement-banner button").click();
+  check(!(await page.locator(".announcement-banner").count()) && (await page.evaluate(() => localStorage.getItem("masari-dismissed-announcements") ?? "")).includes("an1"), "ولي الأمر: إخفاء الإعلان يُحفظ");
+  await page.locator(".support-card button").click(); await page.waitForTimeout(800);
+  const main = page.locator("main.content");
+  await main.locator("input").first().fill("الباص تأخر");
+  await main.locator(".claim-grid textarea").fill("تأخر الباص نصف ساعة اليوم");
+  await main.locator("button", { hasText: "إرسال للدعم الفني" }).click(); await page.waitForTimeout(800);
+  check(calls.some((c) => c.path.endsWith("/rpc/open_ticket") && c.body?.p_subject === "الباص تأخر"), "ولي الأمر: «تواصل معنا» يفتح تذكرة دعم");
+  await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300);
+  check((await overflowX(page)) <= 1, "ولي الأمر: صفحة الدعم بلا تمرير أفقي على الجوال");
+  await ctx.close();
+}
 await browser.close();
 if (failures.length) { console.error(`\n${failures.length} فشل:\n- ${failures.join("\n- ")}`); process.exit(1); }
 console.log("\nكل اختبارات الدخان نجحت.");

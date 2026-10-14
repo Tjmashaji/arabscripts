@@ -5,6 +5,7 @@ import { Check, Pencil, RadioTower, School, Search, ShieldCheck, Trash2, X } fro
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
+import { TransferPanel, UserTools } from "./admin-suite";
 
 // صفحات الإدارة العليا:
 // - نظرة المنطقة: للإدارة التنفيذية (منطقتها فقط) ولمدير النظام (كل المناطق).
@@ -75,7 +76,7 @@ const memberRole: Record<string, string> = { school_admin: "مدير مدرسة"
 const ROLE_OPTIONS: { value: string; label: string; needs: "none" | "region" | "school" }[] = [
   { value: "guardian", label: "ولي أمر", needs: "school" }, { value: "driver", label: "سائق", needs: "school" },
   { value: "school_admin", label: "مدير مدرسة", needs: "school" }, { value: "supervisor", label: "مشرف نقل", needs: "school" },
-  { value: "operations", label: "تشغيل مدرسة", needs: "school" }, { value: "gate", label: "موظف بوابة", needs: "school" },
+  { value: "operations", label: "تشغيل مدرسة", needs: "school" }, { value: "gate", label: "موظف بوابة", needs: "school" }, { value: "control_tower", label: "برج مراقبة المدرسة", needs: "school" },
   { value: "executive", label: "إدارة تنفيذية (منطقة)", needs: "region" }, { value: "super_admin", label: "مدير النظام", needs: "none" },
 ];
 const SUSPEND_FOR: { value: string; label: string; hours: number | null }[] = [
@@ -129,8 +130,8 @@ function UserPanel({ u, mode, busy, onAct, onClose }: { u: UserRow; mode: "role"
       <label htmlFor={`period-${u.user_id}`}>مدة الإيقاف<select id={`period-${u.user_id}`} value={period} onChange={(e) => setPeriod(e.target.value)}>{SUSPEND_FOR.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}</select></label>
       <label htmlFor={`reason-${u.user_id}`}>السبب<input id={`reason-${u.user_id}`} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
     </div>
-    <p className="muted-label">لا يستطيع صاحب الحساب الدخول أثناء الإيقاف. الإيقاف المؤقت يُرفع تلقائيًا عند انتهاء المدة.</p>
-    <div className="ops-actions"><Button size="sm" disabled={busy || !reason.trim()} onClick={() => { const h = SUSPEND_FOR.find((p) => p.value === period)?.hours ?? null; void onAct(() => supabase.rpc("admin_suspend_user", { p_user: u.user_id, p_until: h ? new Date(Date.now() + h * 3600000).toISOString() : null, p_note: reason.trim() }), `تم إيقاف ${u.email} ${h ? `لمدة ${SUSPEND_FOR.find((p) => p.value === period)?.label}` : "حتى إعادة تفعيله"}.`); }}>إيقاف</Button>
+    <p className="muted-label">لا يستطيع صاحب الحساب الدخول أثناء الإيقاف، ويُسجَّل خروجه من كل أجهزته فورًا. الإيقاف المؤقت يُرفع تلقائيًا عند انتهاء المدة.</p>
+    <div className="ops-actions"><Button size="sm" disabled={busy || !reason.trim()} onClick={() => { const h = SUSPEND_FOR.find((p) => p.value === period)?.hours ?? null; void onAct(async () => { const r = await supabase.rpc("admin_suspend_user", { p_user: u.user_id, p_until: h ? new Date(Date.now() + h * 3600000).toISOString() : null, p_note: reason.trim() }); if (!r.error) await supabase.rpc("admin_revoke_sessions", { p_user: u.user_id }); return r; }, `تم إيقاف ${u.email} ${h ? `لمدة ${SUSPEND_FOR.find((p) => p.value === period)?.label}` : "حتى إعادة تفعيله"}.`); }}>إيقاف</Button>
       <Button size="sm" variant="outline" onClick={onClose}>إلغاء</Button></div>
   </div>;
   return <div className="user-panel danger-panel">
@@ -148,7 +149,7 @@ export function UsersAdmin({ myEmail }: { myEmail: string }) {
   const [roleF, setRoleF] = useState("");
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<{ id: string; mode: "role" | "suspend" | "delete" } | null>(null);
+  const [open, setOpen] = useState<{ id: string; mode: "role" | "suspend" | "delete" | "tools" } | null>(null);
   const load = useCallback(async (q: string, st: string, rl: string) => {
     const { data, error } = await supabase.rpc("admin_users", { p_query: q.trim() || null, p_status: st || null, p_role: rl || null });
     if (error) { setMsg({ text: userErr(error.message), ok: false }); return; }
@@ -200,15 +201,17 @@ export function UsersAdmin({ myEmail }: { myEmail: string }) {
                 {u.status === "suspended" ? <Button size="sm" disabled={busy} onClick={() => void act(() => supabase.rpc("admin_set_user_status", { p_user: u.user_id, p_status: "active", p_note: null }), `أُعيد تفعيل ${u.email}.`)}>إعادة تفعيل</Button>
                   : <Button size="sm" variant="outline" disabled={busy} onClick={() => setOpen(isOpen && open?.mode === "suspend" ? null : { id: u.user_id, mode: "suspend" })}>إيقاف</Button>}
                 {u.status === "pending" && <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(() => supabase.rpc("admin_set_user_status", { p_user: u.user_id, p_status: "active", p_note: null }), `تم تفعيل ${u.email}.`)}><Check /> تفعيل</Button>}
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => setOpen(isOpen && open?.mode === "tools" ? null : { id: u.user_id, mode: "tools" })}>أدوات</Button>
                 <Button size="sm" variant="outline" className="danger-outline" disabled={busy} aria-label={`حذف ${u.email}`} onClick={() => setOpen(isOpen && open?.mode === "delete" ? null : { id: u.user_id, mode: "delete" })}><Trash2 /></Button>
               </>}
             </div>
           </div>
-          {isOpen && open && <UserPanel key={open.mode} u={u} mode={open.mode} busy={busy} onAct={act} onClose={() => setOpen(null)} />}
+          {isOpen && open && (open.mode === "tools" ? <UserTools user={u} onDone={(m) => { setMsg(m); void reload(); }} /> : <UserPanel key={open.mode} u={u} mode={open.mode} busy={busy} onAct={act} onClose={() => setOpen(null)} />)}
         </div>;
       })}
       {rows.length === 0 && <p className="muted-label">لا توجد حسابات مطابقة.</p>}
     </article>
+    <TransferPanel />
   </>;
 }
 

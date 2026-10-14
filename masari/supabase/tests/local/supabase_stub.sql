@@ -24,7 +24,8 @@ create table if not exists auth.users (
   created_at timestamptz default now(), updated_at timestamptz default now()
 );
 create table if not exists auth.identities (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete cascade, provider text, identity_data jsonb, created_at timestamptz default now());
-create table if not exists auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete cascade, created_at timestamptz default now());
+create table if not exists auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete cascade, created_at timestamptz default now(), not_after timestamptz);
+create table if not exists auth.refresh_tokens (id bigserial primary key, user_id text, session_id uuid, revoked boolean default false, created_at timestamptz default now());
 
 create or replace function auth.jwt() returns jsonb language sql stable as $$
   select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;

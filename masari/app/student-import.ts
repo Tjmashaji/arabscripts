@@ -91,4 +91,5 @@ export const importErrorText: Record<string, string> = {
   INVALID_LOCATION: "الموقع غير صحيح؛ اكتبه هكذا: 24.7501, 46.8001",
   DUPLICATE_STUDENT: "الطالب مسجل مسبقًا",
   INVALID_ROW: "بيانات الصف غير صالحة",
+  PLAN_LIMIT_STUDENTS: "وصلت المدرسة لحد الطلاب في باقتها",
 };

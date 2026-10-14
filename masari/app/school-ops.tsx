@@ -45,6 +45,8 @@ const errorText = (error: { message?: string; code?: string } | null) => {
   if (m.includes("DUPLICATE_DRIVER")) return "السائق مسجل مسبقًا.";
   if (m.includes("ALREADY_REVIEWED")) return "تمت مراجعة هذا الطلب مسبقًا.";
   if (m.includes("REASON_REQUIRED")) return "سبب الرفض مطلوب.";
+  if (m.includes("PLAN_LIMIT_BUSES")) return "وصلت مدرستك لحد الباصات في باقتها. اطلب الترقية من «اشتراك مساري».";
+  if (m.includes("PLAN_LIMIT_STUDENTS")) return "وصلت مدرستك لحد الطلاب في باقتها. اطلب الترقية من «اشتراك مساري».";
   if (m.includes("BUS_CAPACITY_EXCEEDED")) return "عدد الطلاب في المسار أكبر من مقاعد الباص.";
   if (m.includes("STOP_NOT_IN_ROUTE")) return "المحطة ليست من محطات هذا المسار.";
   if (m.includes("ROUTE_HAS_TRIPS")) return "للمسار رحلات مسجلة، فلا يمكن حذفه. أرشفه بدلًا من ذلك.";

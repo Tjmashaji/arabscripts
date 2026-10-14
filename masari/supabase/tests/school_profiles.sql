@@ -82,7 +82,7 @@ begin
     select count(*) into n from public.drivers where id = drv and full_name = 'سائق معدّل' and license_number = 'L-1';
     out := array_append(out, (case when n = 1 then 'PASS' else 'FAIL' end) || ' 6 تعديل بيانات السائق');
   exception when others then out := array_append(out,'FAIL 6 '||sqlerrm); end;
-  update public.drivers set user_id = dr where id = drv;
+  reset role; update public.drivers set user_id = dr where id = drv; set local role authenticated;
   begin perform public.update_driver_profile(drv, 'سائق معدّل', null, 'other@example.com', null); out := array_append(out,'FAIL 6b غيّر بريد حساب مربوط');
   exception when others then out := array_append(out,(case when sqlerrm = 'EMAIL_LOCKED' then 'PASS' else 'FAIL' end) || ' 6b بريد السائق المربوط لا يتغير'); end;
   v := public.set_driver_status(drv, 'suspended', 'مخالفة');
