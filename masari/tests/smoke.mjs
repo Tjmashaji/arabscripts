@@ -208,6 +208,55 @@ for (const [role, access] of Object.entries(ROLES)) {
   check(await main.locator(".ops-student").count() === 1 && (await main.locator(".ops-student").innerText()).includes("فهد"), "المدرسة: تصفية الطلاب بلا مسار");
   await ctx.close();
 }
+// مدير النظام: «الدخول كـ» مدرسة ثم الرجوع، والمدرسة المختارة لمن يعمل في مدرستين
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("admin@example.com"))]);
+  const calls = []; const schoolGets = [];
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, (r) => {
+    const req = r.request(); const url = new URL(req.url()); const path = url.pathname; const accept = req.headers().accept ?? "";
+    const ok = (d) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    if (req.method() === "POST") calls.push({ path, body: req.postDataJSON?.() ?? null });
+    if (path.endsWith("/auth/v1/user")) return ok(session("admin@example.com").user);
+    if (path.endsWith("/rpc/my_access")) return ok({ ...ROLES.admin, full_name: "admin", privacy_version: "2026-10-b" });
+    if (path.endsWith("/rpc/admin_view_as")) return ok({ kind: "school", school_id: "sch2", school_name: "مدرسة النخيل", label: "مدرسة النخيل" });
+    if (path.endsWith("/rest/v1/schools")) { schoolGets.push(url.search); return ok(accept.includes("object") ? { id: "sch2", name: "مدرسة النخيل", latitude: 24.15, longitude: 47.31 } : [{ id: "sch2", name: "مدرسة النخيل", city: "الخرج", latitude: 24.15, longitude: 47.31 }]); }
+    if (accept.includes("object")) return r.fulfill({ status: 406, contentType: "application/json", body: "{}" });
+    return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
+  });
+  const page = await ctx.newPage(); watch(page, "view-as");
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(2500);
+  await page.locator('.masari-sidebar [data-sidebar="menu-button"]', { hasText: "الدخول كـ" }).first().click(); await page.waitForTimeout(800);
+  await page.locator(".view-as-panel button", { hasText: "الدخول كـمدرسة" }).first().click(); await page.waitForTimeout(1500);
+  check(calls.some((c) => c.path.endsWith("/rpc/admin_view_as") && c.body?.p_kind === "school" && c.body?.p_target === "sch2"), "مدير النظام: الدخول كـ مدرسة يمر عبر الخادم (ويُسجَّل)");
+  check(await page.locator(".view-as-banner").isVisible(), "مدير النظام: شريط «تشاهد كـ» ظاهر");
+  check((await page.locator('.masari-sidebar [data-sidebar="menu-button"]').allInnerTexts()).some((t) => t.includes("رحلات اليوم")), "مدير النظام: قائمة المدرسة تظهر");
+  check(schoolGets.some((q) => q.includes("id=eq.sch2")), "مدير النظام: تُحمَّل المدرسة المختارة بالتحديد");
+  await page.locator(".view-as-banner button").click(); await page.waitForTimeout(800);
+  check(!(await page.locator(".view-as-banner").count()) && (await page.locator('.masari-sidebar [data-sidebar="menu-button"]').allInnerTexts()).some((t) => t.includes("الدخول كـ")), "مدير النظام: الرجوع لحسابه");
+  await ctx.close();
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("school@example.com"))]);
+  const schoolGets = [];
+  const two = { ...ROLES.school, schools: [school, { school_id: "sch2", role: "operations", status: "active", school_name: "مدرسة النخيل", school_status: "active" }] };
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, (r) => {
+    const req = r.request(); const url = new URL(req.url()); const path = url.pathname; const accept = req.headers().accept ?? "";
+    const ok = (d) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    if (path.endsWith("/auth/v1/user")) return ok(session("school@example.com").user);
+    if (path.endsWith("/rpc/my_access")) return ok({ ...two, full_name: "school", privacy_version: "2026-10-b" });
+    if (path.endsWith("/rest/v1/schools")) { schoolGets.push(url.search); return ok([{ id: url.search.includes("sch2") ? "sch2" : "sch1", name: url.search.includes("sch2") ? "مدرسة النخيل" : "مدرسة الاختبار", city: "الخرج", latitude: 24.15, longitude: 47.31 }]); }
+    if (accept.includes("object")) return r.fulfill({ status: 406, contentType: "application/json", body: "{}" });
+    return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
+  });
+  const page = await ctx.newPage(); watch(page, "school-switch");
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(2500);
+  check(schoolGets.some((q) => q.includes("id=eq.sch1")), "المدرسة: تُحمَّل مدرسة المستخدم لا أقدم مدرسة");
+  await page.locator(".school-switch").selectOption("sch2"); await page.waitForTimeout(1200);
+  check(schoolGets.some((q) => q.includes("id=eq.sch2")) && await page.evaluate(() => localStorage.getItem("masari-school-ctx")) === "sch2", "المدرسة: التبديل بين مدرستين ويُحفظ الاختيار");
+  await ctx.close();
+}
 await browser.close();
 if (failures.length) { console.error(`\n${failures.length} فشل:\n- ${failures.join("\n- ")}`); process.exit(1); }
 console.log("\nكل اختبارات الدخان نجحت.");

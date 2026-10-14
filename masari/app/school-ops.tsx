@@ -8,6 +8,7 @@ import { RouteCard } from "./route-editor";
 import { TripActual, riyadhWeekday } from "./route-tools";
 import { HomeLocationRequests } from "./home-location";
 import { StudentImport } from "./student-import-ui";
+import { DriverEdit, StudentProfile, studentStatusLabel } from "./school-profiles";
 import { TodayChecks } from "./safety";
 import { BusCare, DriverLicense, StudentAvatar, HolidaysPanel, StudentPhotoButton, blockerText, busDocsBadge, useHolidays, usePhotoUrls } from "./school-extras";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { supabase } from "@/lib/supabase";
 export type OpsTab = "requests" | "fleet" | "routes" | "students" | "trips";
 type StudentRequest = { id: string; student_name: string; grade: string | null; parent_name: string | null; parent_phone: string | null; parent_email: string | null; status: string; student_national_id: string | null; home_address: string | null; home_latitude: number | null; home_longitude: number | null; note: string | null; created_by: string | null };
 type DriverRequest = { id: string; driver_name: string; phone: string | null; email: string | null; vehicle_plate: string | null };
-type Driver = { id: string; full_name: string; status: string; user_id: string | null; license_expiry?: string | null };
+type Driver = { id: string; full_name: string; status: string; user_id: string | null; license_expiry?: string | null; phone?: string | null; email?: string | null; license_number?: string | null };
 type Bus = { id: string; bus_number: string; plate_number: string; capacity: number; driver_id: string | null; status?: string; registration_expiry?: string | null; insurance_expiry?: string | null; inspection_expiry?: string | null; next_service_on?: string | null };
 type Stop = { id: string; stop_order: number; label: string; stop_type: string; latitude: number | null; longitude: number | null; scheduled_time: string | null; radius_m?: number | null };
 type RouteRow = { id: string; name: string; direction: string; scheduled_time: string | null; estimated_duration_minutes: number | null; is_active: boolean; archived_at: string | null; days: number[] | null; bus_id: string | null; driver_id: string | null; route_stops: Stop[] };
@@ -31,7 +32,7 @@ type Trip = { id: string; route_id: string; status: string; driver_id: string | 
 const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
 const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : "إلى المدرسة";
 const routeReasonText: Record<string, string> = {
-  NO_DRIVER: "بلا سائق", NO_BUS: "بلا باص", NOT_ENOUGH_STOPS: "محطات غير كافية", STOP_HAS_NO_LOCATION: "محطة بلا موقع",
+  NO_DRIVER: "بلا سائق", DRIVER_SUSPENDED: "السائق موقوف", NO_BUS: "بلا باص", NOT_ENOUGH_STOPS: "محطات غير كافية", STOP_HAS_NO_LOCATION: "محطة بلا موقع",
   NO_STUDENTS: "لا طلاب مسندين", DRIVER_OR_BUS_BUSY: "للسائق أو الباص رحلة أخرى اليوم بنفس الاتجاه", ROUTE_INACTIVE: "المسار غير نشط",
 };
 const tripStatusLabel: Record<string, string> = { scheduled: "مجدولة", ready: "جاهزة", in_progress: "جارية", paused: "متوقفة", completed: "انتهت", cancelled: "ملغاة", emergency: "طارئ" };
@@ -91,7 +92,7 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
       supabase.from("schools").select("name,latitude,longitude").eq("id", schoolId).single(),
       supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status,student_national_id,home_address,home_latitude,home_longitude,note,created_by").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
       supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
-      supabase.from("drivers").select("id,full_name,status,user_id,license_expiry").eq("school_id", schoolId).order("full_name"),
+      supabase.from("drivers").select("id,full_name,status,user_id,license_expiry,phone,email,license_number").eq("school_id", schoolId).order("full_name"),
       supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id,status,registration_expiry,insurance_expiry,inspection_expiry,next_service_on").eq("school_id", schoolId).order("bus_number"),
       supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,days,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude,scheduled_time,radius_m)").eq("school_id", schoolId).order("name"),
       supabase.from("students").select("id,full_name,grade,service_status,qr_token,photo_path,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
@@ -136,7 +137,7 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
     {message && <p className={`save-strip ops-message ${message.ok ? "" : "ops-error"}`}>{message.ok ? <Check /> : <X />}<span>{message.text}</span></p>}
     {tab === "requests" && <RequestsTab schoolId={schoolId} reload={load} setMessage={setMessage} studentRequests={studentRequests} driverRequests={driverRequests} busy={busy} act={act} />}
     {tab === "requests" && <HomeLocationRequests schoolId={schoolId} onDone={(text) => setMessage({ text, ok: true })} />}
-    {tab === "fleet" && <FleetTab schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} reload={load} />}
+    {tab === "fleet" && <FleetTab isAdmin={isAdmin} setMessage={setMessage} schoolId={schoolId} buses={buses} drivers={drivers} busy={busy} act={act} reload={load} />}
     {tab === "routes" && <RoutesTab isAdmin={isAdmin} schoolName={schoolName} schoolId={schoolId} schoolLat={schoolPoint.lat} schoolLng={schoolPoint.lng} routes={routes} buses={buses} drivers={drivers} students={students} busy={busy} act={act} />}
     {tab === "students" && <StudentsTab schoolId={schoolId} setMessage={setMessage} reload={load} students={students} routes={routes} schoolName={schoolName} busy={busy} act={act} />}
     {tab === "trips" && <TripsTab schoolId={schoolId} autoTrips={autoTrips} routes={routes} trips={trips} drivers={drivers} buses={buses} students={students} busy={busy} act={act} />}
@@ -234,8 +235,9 @@ function RequestsTab({ schoolId, reload, setMessage, studentRequests, driverRequ
   </>;
 }
 
-function FleetTab({ schoolId, buses, drivers, busy, act, reload }: { schoolId: string; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act; reload: () => Promise<void> }) {
+function FleetTab({ isAdmin, setMessage, schoolId, buses, drivers, busy, act, reload }: { isAdmin: boolean; setMessage: (m: { text: string; ok: boolean } | null) => void; schoolId: string; buses: Bus[]; drivers: Driver[]; busy: boolean; act: Act; reload: () => Promise<void> }) {
   const [careFor, setCareFor] = useState<string | null>(null);
+  const [editDriver, setEditDriver] = useState<string | null>(null);
   const [form, setForm] = useState({ number: "", plate: "", capacity: "20" });
   const capacity = Number(form.capacity);
   const canAdd = form.number.trim() && form.plate.trim() && Number.isInteger(capacity) && capacity > 0;
@@ -269,7 +271,9 @@ function FleetTab({ schoolId, buses, drivers, busy, act, reload }: { schoolId: s
     <article className="panel ops-panel">
       <div className="panel-head"><div><p className="eyebrow">السائقون</p><h2>سائقو المدرسة</h2></div></div>
       {drivers.length === 0 && <p className="muted-label">لا يوجد سائقون بعد. أضف سائقًا من «الأسطول والسائقون» ثم اعتمده من «الطلبات».</p>}
-      {drivers.map((d) => <div className="ops-row" key={d.id}><div><strong>{d.full_name}</strong><p>{d.user_id ? "الحساب مربوط" : "بانتظار تسجيل السائق بنفس البريد"}</p></div><DriverLicense driverId={d.id} value={d.license_expiry ?? null} canEdit onSaved={() => void reload()} /><Badge className="status-badge tone-2">{d.status === "active" ? "معتمد" : d.status === "pending" ? "قيد المراجعة" : "موقوف"}</Badge></div>)}
+      {drivers.map((d) => <div className="ops-row ops-bus" key={d.id}><div><strong>{d.full_name}</strong><p>{[d.phone, d.user_id ? "الحساب مربوط" : "بانتظار تسجيل السائق بنفس البريد"].filter(Boolean).join(" · ")}</p></div><DriverLicense driverId={d.id} value={d.license_expiry ?? null} canEdit onSaved={() => void reload()} /><Badge className={`status-badge ${d.status === "suspended" ? "tone-1" : "tone-2"}`}>{d.status === "active" ? "معتمد" : d.status === "pending" ? "قيد المراجعة" : "موقوف"}</Badge>
+        <Button size="sm" variant="outline" onClick={() => setEditDriver(editDriver === d.id ? null : d.id)}>{editDriver === d.id ? "إغلاق" : "تعديل"}</Button>
+        {editDriver === d.id && <DriverEdit driver={d} canSuspend={isAdmin} onClose={() => setEditDriver(null)} onDone={(text, ok) => { setMessage({ text, ok }); void reload(); }} />}</div>)}
     </article>
   </>;
 }
@@ -341,6 +345,7 @@ function StudentsTab({ schoolId, setMessage, reload, students, routes, schoolNam
   const [filter, setFilter] = useState<"all" | "unassigned" | "no_home" | "inactive">("all");
   const [grade, setGrade] = useState("");
   const [limit, setLimit] = useState(PAGE);
+  const [profileFor, setProfileFor] = useState<string | null>(null);
   const grades = [...new Set(students.map((st) => st.grade).filter((g): g is string => Boolean(g)))].sort((a, b) => a.localeCompare(b, "ar"));
   const q = arabicKey(query);
   const shown = students.filter((st) => (!q || arabicKey(st.full_name).includes(q))
@@ -368,16 +373,18 @@ function StudentsTab({ schoolId, setMessage, reload, students, routes, schoolNam
     {students.length > 0 && shown.length === 0 && <p className="muted-label">لا يوجد طلاب بهذا البحث.</p>}
     {shown.slice(0, limit).map((student) => <div className="ops-row ops-student" key={student.id}>
       <StudentAvatar url={student.photo_path ? photos[student.photo_path] : null} name={student.full_name} />
-      <div><strong>{student.full_name}</strong><p>{student.grade ?? "—"}</p>
+      <div><strong>{student.full_name}</strong>{student.service_status !== "active" && <Badge className="status-badge tone-1 req-badge">{studentStatusLabel[student.service_status] ?? student.service_status}</Badge>}<p>{student.grade ?? "—"}</p>
         <div className="ops-chips">{student.student_route_assignments.map((a) => <span className="ops-chip" key={a.id}>{routeName(a.route_id)} · {stopName(a.route_id, a.stop_id)}<button aria-label="إلغاء الإسناد" disabled={busy} onClick={() => void act(() => supabase.from("student_route_assignments").delete().eq("id", a.id), "تم إلغاء الإسناد.")}><X /></button></span>)}</div>
       </div>
       <div className="ops-actions">
         <AssignForm student={student} routes={routes} busy={busy} act={act} />
+        <Button size="sm" variant="outline" onClick={() => setProfileFor(profileFor === student.id ? null : student.id)}>{profileFor === student.id ? "إغلاق الملف" : "الملف"}</Button>
         <Button size="sm" variant="outline" onClick={() => setSheet([toCard(student)])}><IdCard /> البطاقة</Button>
         <StudentPhotoButton schoolId={schoolId} studentId={student.id} name={student.full_name} hasPhoto={Boolean(student.photo_path)} onSaved={(text) => { setMessage({ text, ok: !text.startsWith("تعذر") }); void reload(); }} />
         {confirmReissue === student.id ? <><Button size="sm" className="danger-btn" disabled={busy} onClick={() => void act(() => supabase.rpc("reissue_student_card", { p_student: student.id }), `صدرت بطاقة جديدة لـ ${student.full_name}، والبطاقة القديمة لم تعد تعمل. اطبع الجديدة.`).then(() => setConfirmReissue(null))}>تأكيد: إيقاف القديمة</Button><Button size="sm" variant="outline" onClick={() => setConfirmReissue(null)}>إلغاء</Button></>
           : <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmReissue(student.id)}>بطاقة مفقودة</Button>}
       </div>
+      {profileFor === student.id && <StudentProfile studentId={student.id} onClose={() => setProfileFor(null)} onDone={(text, ok) => { setMessage({ text, ok }); void reload(); }} />}
     </div>)}
     {shown.length > limit && <Button className="wide-action" variant="outline" onClick={() => setLimit(limit + PAGE)}>عرض المزيد ({shown.length - limit} طالبًا)</Button>}
   </article>;
@@ -416,9 +423,10 @@ function TripsTab({ schoolId, autoTrips, routes, trips, drivers, buses, students
   // الرحلة الملغاة لا تحجز المسار في العرض؛ تظهر وحدها مع زر «إعادة الإنشاء»
   const tripFor = (routeId: string) => trips.find((t) => t.route_id === routeId && t.status !== "cancelled");
   const cancelledFor = (routeId: string) => trips.find((t) => t.route_id === routeId && t.status === "cancelled");
-  const studentsOn = (routeId: string) => students.filter((s) => s.student_route_assignments.some((a) => a.route_id === routeId)).length;
+  const studentsOn = (routeId: string) => students.filter((s) => s.service_status === "active" && s.student_route_assignments.some((a) => a.route_id === routeId)).length;
+  const driverSuspended = (r: RouteRow) => drivers.find((d) => d.id === r.driver_id)?.status === "suspended";
   // سبب عدم جاهزية المسار لإنشاء رحلة اليوم، أو null إن كان جاهزًا
-  const blocker = (r: RouteRow) => todayHoliday ? "إجازة" : !runsToday(r) ? "لا يعمل اليوم" : fleetBlock(r) ? fleetBlock(r) : !r.driver_id ? "بلا سائق" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
+  const blocker = (r: RouteRow) => todayHoliday ? "إجازة" : !runsToday(r) ? "لا يعمل اليوم" : fleetBlock(r) ? fleetBlock(r) : !r.driver_id ? "بلا سائق" : driverSuspended(r) ? "السائق موقوف" : !r.bus_id ? "بلا باص" : r.route_stops.length < 2 ? "محطات غير كافية"
     : r.route_stops.some((s) => s.latitude == null || s.longitude == null) ? "محطة بلا موقع" : !studentsOn(r.id) ? "لا طلاب مسندين" : null;
   // المسار الذي أُلغيت رحلته اليوم لا يُعاد إنشاؤه تلقائيًا (نفس قاعدة الخادم)
   const ready = active.filter((r) => !tripFor(r.id) && !cancelledFor(r.id) && !blocker(r));
