@@ -51,9 +51,9 @@ masari/
 ├─ lib/                 Supabase، الإشعارات الأصلية، رابط الموقع
 ├─ components/ui/       مكونات الواجهة
 ├─ supabase/
-│  ├─ migrations/       44 ترحيلًا (كل تاريخ قاعدة البيانات)
+│  ├─ migrations/       41 ترحيلًا (كل تاريخ قاعدة البيانات)
 │  ├─ functions/        push · messages · invite-school-admin
-│  └─ tests/            اختبارات قاعدة البيانات (5 ملفات، أكثر من 140 فحصًا)
+│  └─ tests/            اختبارات قاعدة البيانات (5 ملفات، 123 فحصًا)
 ├─ tests/               اختبارات الوحدات + اختبار الدخان في متصفح حقيقي
 ├─ android/ · ios/      مشروعا تطبيق الجوال
 ├─ marketing/           نصوص الإعلان، الفيديو، بطاقة المتجر
@@ -199,9 +199,9 @@ masari/
 
 | النوع | الأمر | العدد |
 |---|---|---|
-| قاعدة البيانات | `npm run test:db` | 5 ملفات: `isolation` و`school_day` و`school_ops` و`school_profiles` و`admin_suite` (أكثر من 140 فحصًا) |
+| قاعدة البيانات | `npm run test:db` | 5 ملفات: `isolation` و`school_day` و`school_ops` و`school_profiles` و`admin_suite` (123 فحصًا) |
 | الوحدات | `npm test` | 19 اختبارًا |
-| الدخان في متصفح حقيقي | `npm run test:smoke` | أكثر من 100 فحص لكل الأدوار |
+| الدخان في متصفح حقيقي | `npm run test:smoke` | 101 فحص لكل الأدوار |
 | أخرى | `npm run typecheck` · `npm run lint` | نظيفة |
 | تطبيق أندرويد | يُبنى تلقائيًا | ملف APK في GitHub Actions |
 
