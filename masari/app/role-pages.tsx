@@ -94,25 +94,50 @@ export function TripHistory({ role }: { role: "parent" | "driver" }) {
 }
 
 // ───────── ملاحظات أولياء الأمور (المدرسة) ─────────
-type Feedback = { id: string; author_name: string | null; rating: number; category: string | null; message: string | null; created_at: string };
+type Feedback = { id: string; author_name: string | null; rating: number | null; category: string | null; message: string | null; created_at: string; status: string; reply: string | null };
+const fbStatus: Record<string, [string, string]> = { new: ["جديدة", "tone-1"], in_review: ["قيد المتابعة", "tone-1"], closed: ["تم الرد", "tone-0"] };
 
+// ملاحظات أولياء الأمور: متوسط التقييم من التقييمات فقط (الشكوى لا تُحسب)، والرد يصل لولي الأمر إشعارًا
 export function FeedbackList() {
   const [rows, setRows] = useState<Feedback[] | null>(null);
+  const [filter, setFilter] = useState("open");
+  const [replyFor, setReplyFor] = useState<string | null>(null);
+  const [reply, setReply] = useState("");
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     let alive = true;
     void (async () => {
-      const { data } = await supabase.from("ratings_feedback").select("id,author_name,rating,category,message,created_at").order("created_at", { ascending: false }).limit(100);
+      const { data } = await supabase.from("ratings_feedback").select("id,author_name,rating,category,message,created_at,status,reply").order("created_at", { ascending: false }).limit(200);
       if (alive) setRows((data ?? []) as Feedback[]);
     })().catch(() => setRows([]));
     return () => { alive = false; };
-  }, []);
-  const avg = rows?.length ? (rows.reduce((a, r) => a + r.rating, 0) / rows.length).toFixed(1) : null;
+  }, [tick]);
+  const rated = (rows ?? []).filter((r) => r.rating != null);
+  const avg = rated.length ? (rated.reduce((a, r) => a + (r.rating ?? 0), 0) / rated.length).toFixed(1) : null;
+  const shown = (rows ?? []).filter((r) => filter === "all" || (filter === "open" ? r.status !== "closed" : r.category === "شكوى"));
+  const send = async (id: string) => {
+    const { error } = await supabase.rpc("reply_feedback", { p_id: id, p_reply: reply.trim(), p_status: "closed" });
+    if (error) { setMsg({ text: error.message.includes("FORBIDDEN") ? "ليست لديك صلاحية الرد." : "تعذر إرسال الرد.", ok: false }); return; }
+    setMsg({ text: "أُرسل الرد لولي الأمر.", ok: true }); setReplyFor(null); setReply(""); setTick((t) => t + 1);
+  };
   return <>
-    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>ملاحظات أولياء الأمور</h1><p>تقييمات أولياء الأمور وملاحظاتهم على الرحلات.{avg ? ` متوسط التقييم ${avg} من 5.` : ""}</p></div></div>
+    <div className="welcome"><div><p className="eyebrow">إدارة المدرسة</p><h1>ملاحظات أولياء الأمور</h1><p>الشكاوى والاقتراحات والتقييمات. ردك يصل ولي الأمر إشعارًا ويظهر عنده.{avg ? ` متوسط التقييم ${avg} من 5 (${rated.length} تقييم).` : ""}</p></div></div>
+    {msg && <p className={`save-strip ops-message ${msg.ok ? "" : "ops-error"}`}><span>{msg.text}</span></p>}
     <article className="panel ops-panel">
-      {rows && rows.length === 0 && <p className="muted-label">لا توجد ملاحظات بعد.</p>}
-      {rows?.map((r) => <div className="ops-row" key={r.id}><div><strong><MessageSquareText className="inline-icon" /> {r.category ?? "ملاحظة"} · {r.author_name ?? "ولي أمر"}</strong><p>{r.message}</p><p>{new Date(r.created_at).toLocaleString("ar-SA-u-ca-gregory", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" })}</p></div>
-        <span className="rating-stars" aria-label={`${r.rating} من 5`}>{Array.from({ length: 5 }, (_, i) => <Star key={i} className={i < r.rating ? "on" : ""} />)}</span></div>)}
+      <div className="dir-filters">{[["open", "بانتظار الرد"], ["complaints", "الشكاوى"], ["all", "الكل"]].map(([id, l]) => <button key={id} className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>{l}</button>)}</div>
+      {rows && shown.length === 0 && <p className="muted-label">لا توجد ملاحظات هنا.</p>}
+      {shown.map((r) => <div className="user-row" key={r.id}>
+        <div className="ops-row"><div><strong><MessageSquareText className="inline-icon" /> {r.category ?? "ملاحظة"} · {r.author_name ?? "ولي أمر"}</strong><p>{r.message}</p><p>{new Date(r.created_at).toLocaleString("ar-SA-u-ca-gregory", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" })}</p>
+          {r.reply && <p className="feedback-reply"><strong>ردكم:</strong> {r.reply}</p>}</div>
+          <div className="ops-actions">
+            {r.rating != null && <span className="rating-stars" aria-label={`${r.rating} من 5`}>{Array.from({ length: 5 }, (_, i) => <Star key={i} className={i < (r.rating ?? 0) ? "on" : ""} />)}</span>}
+            <Badge className={`status-badge ${fbStatus[r.status]?.[1] ?? "tone-1"}`}>{fbStatus[r.status]?.[0] ?? r.status}</Badge>
+            {!r.reply && <Button size="sm" variant="outline" onClick={() => { setReplyFor(replyFor === r.id ? null : r.id); setReply(""); }}>{replyFor === r.id ? "إلغاء" : "رد"}</Button>}
+          </div></div>
+        {replyFor === r.id && <div className="inline-form"><textarea aria-label="الرد" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="اكتب ردك لولي الأمر" />
+          <Button size="sm" disabled={!reply.trim()} onClick={() => void send(r.id)}>إرسال الرد</Button></div>}
+      </div>)}
     </article>
   </>;
 }

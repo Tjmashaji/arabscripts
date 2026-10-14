@@ -330,6 +330,68 @@ for (const [role, access] of Object.entries(ROLES)) {
   check((await overflowX(page)) <= 1, "ولي الأمر: صفحة الدعم بلا تمرير أفقي على الجوال");
   await ctx.close();
 }
+// ولي الأمر: عنوان رحلة العودة، موقع قديم لا يُعرض «مباشر»، غياب اليوم كله، الشكوى بلا نجوم وبعد الحفظ فقط، طريقة الدفع، والضغط على الإشعار
+{
+  const parentRoutes = (opts) => async (r) => {
+    const req = r.request(); const path = new URL(req.url()).pathname; const accept = req.headers().accept ?? "";
+    const ok = (d, status = 200) => r.fulfill({ status, contentType: "application/json", body: JSON.stringify(d) });
+    if (req.method() === "POST") opts.calls.push({ path, body: req.postDataJSON?.() ?? null });
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+    if (path.endsWith("/auth/v1/user")) return ok(session("parent@example.com").user);
+    if (path.endsWith("/rpc/my_access")) return ok({ ...ROLES.parent, full_name: "parent", privacy_version: "2026-10-b" });
+    if (path.endsWith("/rest/v1/guardians")) return ok([{ id: "g1", full_name: "أبو سعد", phone: "0500000000", email: "parent@example.com" }]);
+    if (path.endsWith("/rest/v1/guardian_students")) return ok([{ students: { id: "st1", school_id: "sch1", full_name: "سعد", grade: "الثالث", home_address: "النسيم", home_label: "البيت", home_latitude: 24.16, home_longitude: 47.30, service_status: "active" } }]);
+    if (path.endsWith("/rest/v1/schools")) return ok([{ id: "sch1", name: "مدرسة الاختبار", city: "الخرج", latitude: 24.15, longitude: 47.31 }]);
+    if (path.endsWith("/rest/v1/student_route_assignments")) return ok([{ route_id: "r2" }]);
+    if (path.endsWith("/rest/v1/trips")) return ok([{ id: "t2", route_id: "r2", bus_id: null, driver_id: "d1", trip_date: today, status: opts.tripStatus, direction: "to_home", scheduled_start: null, completed_at: null }]);
+    if (path.endsWith("/rest/v1/routes")) return ok([{ name: "مسار العودة", scheduled_time: "13:00:00", estimated_duration_minutes: 30, bus_id: null }]);
+    if (path.endsWith("/rest/v1/route_stops") || path.endsWith("/rest/v1/trip_stops")) return ok([{ id: "s1", status: "pending", label: "المدرسة", scheduled_time: "13:00:00", latitude: 24.15, longitude: 47.31, radius_m: 250 }, { id: "s2", status: "pending", label: "النسيم", scheduled_time: "13:20:00", latitude: 24.16, longitude: 47.30, radius_m: 250 }]);
+    if (path.endsWith("/rest/v1/vehicle_locations")) return ok([{ latitude: 24.155, longitude: 47.305, recorded_at: new Date(Date.now() - 10 * 60000).toISOString() }]);
+    if (path.endsWith("/rest/v1/notifications") && req.method() === "GET") return ok([{ id: "n1", type: "fee_invoice", title: "فاتورة نقل جديدة", body: "رسوم الفصل", created_at: new Date().toISOString(), read_at: null }]);
+    if (path.endsWith("/rest/v1/fee_invoices")) return ok([{ id: "f1", number: "F-1", title: "رسوم النقل", note: "حوّل على الآيبان SA0000", amount: 500, vat_rate: 0, total: 500, due_date: today, status: "unpaid", payment_ref: null, paid_at: null, created_at: today, student_id: "st1", students: { full_name: "سعد", grade: "الثالث" } }]);
+    if (path.endsWith("/rest/v1/ratings_feedback") && req.method() === "POST") return ok(null, 201);
+    if (path.endsWith("/rest/v1/ratings_feedback")) return ok(opts.feedback);
+    if (path.endsWith("/rpc/guardian_absent_today")) return ok(2);
+    if (accept.includes("object")) return r.fulfill({ status: 406, contentType: "application/json", body: "{}" });
+    return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
+  };
+  // رحلة العودة جارية بموقع عمره 10 دقائق
+  let ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("parent@example.com"))]);
+  let opts = { calls: [], tripStatus: "in_progress", feedback: [] };
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, parentRoutes(opts));
+  let page = await ctx.newPage(); watch(page, "parent-live");
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(3500);
+  const head = await page.locator(".map-panel .panel-head").innerText();
+  check(head.includes("إلى المنزل"), "ولي الأمر: عنوان رحلة العودة «إلى المنزل»");
+  check(head.includes("آخر موقع قبل") && !head.includes("GPS مباشر"), "ولي الأمر: الموقع القديم لا يظهر «GPS مباشر»");
+  await page.locator(".icon-button[aria-label='الإشعارات']").click(); await page.waitForTimeout(400);
+  await page.locator(".notification-item", { hasText: "فاتورة نقل جديدة" }).click(); await page.waitForTimeout(1000);
+  const fees = await page.locator("main.content").innerText();
+  check(fees.includes("فواتير النقل"), "ولي الأمر: الضغط على إشعار الفاتورة يفتح الفواتير");
+  check(fees.includes("SA0000"), "ولي الأمر: طريقة الدفع (الآيبان) تظهر في الفاتورة");
+  await ctx.close();
+  // رحلة لم تبدأ: الغياب والشكوى
+  ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("parent@example.com"))]);
+  opts = { calls: [], tripStatus: "scheduled", feedback: [{ id: "fb1", category: "شكوى", message: "تأخر الباص أمس", rating: null, status: "closed", reply: "نعتذر وتابعنا مع السائق", replied_at: new Date().toISOString(), created_at: new Date().toISOString() }] };
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, parentRoutes(opts));
+  page = await ctx.newPage(); watch(page, "parent-absence");
+  await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(3500);
+  await page.locator("button", { hasText: "ابني غائب اليوم" }).click(); await page.waitForTimeout(800);
+  check(opts.calls.some((c) => c.path.endsWith("/rpc/guardian_absent_today") && c.body?.p_student === "st1" && c.body?.p_absent === true), "ولي الأمر: «ابني غائب اليوم» يسجل الذهاب والعودة");
+  check((await page.locator(".trip-save").innerText()).includes("الذهاب والعودة"), "ولي الأمر: رسالة الغياب توضح أنه لليوم كله");
+  const panel = page.locator(".feedback-panel");
+  check((await panel.innerText()).includes("نعتذر وتابعنا مع السائق"), "ولي الأمر: سجل الملاحظات يبقى بعد الدخول مع رد المدرسة");
+  await panel.locator("select").first().selectOption("شكوى");
+  check(await panel.locator("select").count() === 1, "ولي الأمر: الشكوى بلا تقييم نجوم");
+  await panel.locator("textarea").fill("الباص تأخر نصف ساعة اليوم");
+  await panel.locator("button", { hasText: "إرسال للإدارة" }).click(); await page.waitForTimeout(800);
+  const fb = opts.calls.find((c) => c.path.endsWith("/rest/v1/ratings_feedback"));
+  check(fb?.body?.rating === null && fb?.body?.student_id === "st1" && fb?.body?.school_id === "sch1", "ولي الأمر: الشكوى تُرسل بمعرّف الطالب وبلا تقييم");
+  check((await panel.innerText()).includes("وصلت رسالتك"), "ولي الأمر: «وصلت رسالتك» بعد الحفظ فعلًا");
+  await ctx.close();
+}
 await browser.close();
 if (failures.length) { console.error(`\n${failures.length} فشل:\n- ${failures.join("\n- ")}`); process.exit(1); }
 console.log("\nكل اختبارات الدخان نجحت.");
