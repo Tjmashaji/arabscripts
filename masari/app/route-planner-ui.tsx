@@ -57,26 +57,18 @@ export function RoutePlanner({ schoolId, school, students, missingHome, defaultC
 
   const create = async () => {
     if (!school) return;
-    await act(async () => {
-      for (const [i, r] of plan.entries()) {
-        const base = `مسار ${i + 1} — ${r.stops[0]?.label.replace(/^محطة /, "") ?? ""}`;
-        for (const dir of withReturn ? ["to_school", "to_home"] as const : ["to_school"] as const) {
-          const { data: route, error } = await supabase.from("routes").insert({ school_id: schoolId, name: dir === "to_school" ? base : `${base} (عودة)`, direction: dir, scheduled_time: dir === "to_school" ? time : returnTime, estimated_duration_minutes: Math.max(r.minutes, 10) }).select("id").single();
-          if (error || !route) return { error };
-          const homes = dir === "to_school" ? r.stops : [...r.stops].reverse();
-          const rows = [...homes.map((s) => ({ label: s.label, type: dir === "to_school" ? "pickup" : "dropoff", lat: s.lat, lng: s.lng }))];
-          const schoolStop = { label: "المدرسة", type: "school", lat: school.lat, lng: school.lng };
-          const ordered = dir === "to_school" ? [...rows, schoolStop] : [schoolStop, ...rows];
-          const { data: stops, error: se } = await supabase.from("route_stops").insert(ordered.map((s, k) => ({ route_id: route.id, stop_order: k + 1, label: s.label, stop_type: s.type, latitude: +s.lat.toFixed(6), longitude: +s.lng.toFixed(6) }))).select("id,stop_order");
-          if (se || !stops) return { error: se };
-          const offset = dir === "to_school" ? 1 : 2;
-          const assignments = homes.flatMap((s, k) => s.students.map((st) => ({ student_id: st.id, route_id: route.id, stop_id: stops.find((x) => x.stop_order === k + offset)?.id })));
-          const { error: ae } = await supabase.from("student_route_assignments").insert(assignments);
-          if (ae) return { error: ae };
-        }
-      }
-      return { error: null };
-    }, `أُنشئ ${plan.length} ${withReturn ? "مسار ذهاب ومثلها للعودة" : "مسار"}، وأُسند كل طالب لمحطته. حدّد الباص والسائق لكل مسار.`);
+    // كل المسارات ومحطاتها وإسناد طلابها في عملية واحدة على الخادم: إما تُنشأ كلها أو لا شيء
+    const routes = plan.flatMap((r, i) => {
+      const base = `مسار ${i + 1} — ${r.stops[0]?.label.replace(/^محطة /, "") ?? ""}`;
+      const homes = (dir: "to_school" | "to_home") => (dir === "to_school" ? r.stops : [...r.stops].reverse())
+        .map((s) => ({ label: s.label, type: dir === "to_school" ? "pickup" : "dropoff", lat: s.lat, lng: s.lng, students: s.students.map((st) => st.id) }));
+      const schoolStop = { label: "المدرسة", type: "school", lat: school.lat, lng: school.lng, students: [] as string[] };
+      return (withReturn ? ["to_school", "to_home"] as const : ["to_school"] as const).map((dir) => ({
+        name: dir === "to_school" ? base : `${base} (عودة)`, direction: dir, time: dir === "to_school" ? time : returnTime, minutes: Math.max(r.minutes, 10),
+        stops: dir === "to_school" ? [...homes(dir), schoolStop] : [schoolStop, ...homes(dir)],
+      }));
+    });
+    await act(() => supabase.rpc("school_create_planned_routes", { p_school: schoolId, p_routes: routes }), `أُنشئ ${plan.length} ${withReturn ? "مسار ذهاب ومثلها للعودة" : "مسار"}، وأُسند كل طالب لمحطته. حدّد الباص والسائق لكل مسار.`);
     setOpen(false);
   };
 

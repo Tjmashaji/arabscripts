@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "@/lib/supabase";
+import { pushOpened } from "@/lib/push-open";
 
 // إشعارات الجوال الأصلية في تطبيق مساري (Capacitor): أندرويد عبر Firebase (FCM)، والآيفون عبر Apple (APNs) مباشرة.
 // رمز الجهاز يُحفظ في device_tokens بنفس جدول Web Push: endpoint = الرمز، وplatform = "fcm" أو "apns"،
@@ -23,6 +24,14 @@ async function saveToken(token: string) {
   const userId = data.session?.user.id;
   if (!userId) return;
   await supabase.from("device_tokens").upsert({ user_id: userId, endpoint: token, platform: platform(), p256dh: null, auth_key: null }, { onConflict: "endpoint" });
+}
+
+// لمس الإشعار يفتح الصفحة المناسبة؛ يُسجَّل مبكرًا لأن التطبيق قد يُفتح من الإشعار نفسه
+if (Capacitor.isNativePlatform()) {
+  void PushNotifications.addListener("pushNotificationActionPerformed", (a) => {
+    const t = (a.notification.data as { type?: unknown } | undefined)?.type;
+    pushOpened(typeof t === "string" ? t : null);
+  });
 }
 
 function listen() {
