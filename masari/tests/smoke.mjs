@@ -131,12 +131,24 @@ for (const [role, access] of Object.entries(ROLES)) {
     return ok(req.method() === "GET" || path.includes("/rpc/") ? [] : null);
   });
   const page = await ctx.newPage(); watch(page, "driver-trip");
-  page.on("dialog", (d) => void (d.type() === "prompt" ? d.accept("الطريق مغلق") : d.accept()));
+  let confirms = 0;
+  page.on("dialog", (d) => { if (d.type() === "confirm") confirms++; void (d.type() === "prompt" ? d.accept("الطريق مغلق") : d.accept()); });
   await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(3500);
   check(calls.some((c) => c.path.endsWith("/rest/v1/vehicle_locations")), "السائق: GPS يعود تلقائيًا لرحلة جارية بعد فتح التطبيق");
-  await page.locator(".skip-stop-link").click(); await page.waitForTimeout(800);
+  // وضع القيادة يفتح تلقائيًا أثناء الرحلة: المحطة بخط كبير، وتخطي المحطة منه، والطوارئ بضغط مطوّل بلا نافذة تأكيد
+  const drive = page.locator(".drive-mode");
+  check(await drive.isVisible() && (await drive.locator(".drive-card h1").innerText()).includes("حي النرجس"), "وضع القيادة: يظهر تلقائيًا بالمحطة التالية بخط كبير");
+  await drive.locator(".skip-stop-link").click(); await page.waitForTimeout(800);
   const skip = calls.find((c) => c.path.endsWith("/rpc/skip_stop"));
   check(skip?.body?.p_stop === "ts1" && skip?.body?.p_reason === "الطريق مغلق", "السائق: تخطي المحطة يُرسل بالسبب");
+  const sosBtn = drive.locator(".drive-sos");
+  await sosBtn.click({ delay: 300 }); await page.waitForTimeout(500);
+  check(!calls.some((c) => c.path.endsWith("/rpc/report_emergency")), "وضع القيادة: لمسة قصيرة على الطوارئ لا ترسل بلاغًا");
+  await sosBtn.hover(); await page.mouse.down(); await page.waitForTimeout(1800); await page.mouse.up(); await page.waitForTimeout(800);
+  check(calls.some((c) => c.path.endsWith("/rpc/report_emergency")) && confirms === 0, "وضع القيادة: الضغط المطوّل يرسل البلاغ بلا نافذة تأكيد");
+  await drive.locator(".drive-exit").click(); await page.waitForTimeout(300);
+  check(await page.locator(".drive-enter").isVisible() && await page.evaluate(() => localStorage.getItem("masari-drive-mode")) === "0", "وضع القيادة: «كل التفاصيل» يرجع للشاشة الكاملة ويتذكر الاختيار");
+  calls.length = 0;
   await page.locator(".report-btn").click(); await page.waitForTimeout(800);
   const sos = calls.find((c) => c.path.endsWith("/rpc/report_emergency"));
   check(Math.abs((sos?.body?.p_lat ?? 0) - 24.16) < 0.001, "السائق: البلاغ الطارئ يُرسل بموقع الباص الفعلي");
@@ -370,6 +382,14 @@ for (const [role, access] of Object.entries(ROLES)) {
   const fees = await page.locator("main.content").innerText();
   check(fees.includes("فواتير النقل"), "ولي الأمر: الضغط على إشعار الفاتورة يفتح الفواتير");
   check(fees.includes("SA0000"), "ولي الأمر: طريقة الدفع (الآيبان) تظهر في الفاتورة");
+  await ctx.close();
+  // لمس إشعار الجوال يفتح التطبيق على #open=<النوع> فيذهب للصفحة المناسبة بعد الدخول
+  ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("parent@example.com"))]);
+  await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, parentRoutes({ calls: [], tripStatus: "scheduled", feedback: [] }));
+  page = await ctx.newPage(); watch(page, "parent-push-open");
+  await page.goto(BASE + "#open=fee_invoice", { waitUntil: "load" }); await page.waitForTimeout(3500);
+  check((await page.locator("main.content").innerText()).includes("فواتير النقل") && !page.url().includes("#open"), "ولي الأمر: لمس إشعار الفاتورة في الجوال يفتح الفواتير");
   await ctx.close();
   // رحلة لم تبدأ: الغياب والشكوى
   ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
