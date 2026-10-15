@@ -72,6 +72,8 @@ type MasariData = {
   // الرحلة الفعلية اليوم وطلابها (للحساب الفعلي فقط).
   trip?: { id: string; status: string; date: string; direction: string } | null;
   students?: { id: string; name: string; grade: string; status: string; photo?: string | null }[];
+  // السائق: رحلاته الباقية اليوم بعد الحالية (فترة صباحية ثانية مثلًا)
+  laterTrips?: { name: string; time: string }[];
 };
 type SimulationState = {
   active: boolean;
@@ -379,12 +381,18 @@ async function loadDriverData(userId: string | null, driverId?: string): Promise
   if (!schools?.[0]) return null;
   const next = blankDataFor(schools[0]);
   next.driver = { name: driver.full_name, email: driver.email ?? "" };
-  const { data: trips, error: tripsError } = await supabase.from("trips").select("id,route_id,bus_id,driver_id,trip_date,status,direction,scheduled_start,completed_at")
-    .eq("driver_id", driver.id).eq("trip_date", riyadhToday()).neq("status", "cancelled").order("scheduled_start", { ascending: true, nullsFirst: true });
+  const { data: trips, error: tripsError } = await supabase.from("trips").select("id,route_id,bus_id,driver_id,trip_date,status,direction,scheduled_start,completed_at,routes(name,scheduled_time)")
+    .eq("driver_id", driver.id).eq("trip_date", riyadhToday()).neq("status", "cancelled");
   if (tripsError && isNetworkError(tripsError)) throw new OfflineError();
-  const trip = trips?.find((t) => t.status !== "completed") ?? [...(trips ?? [])].sort((x, y) => (y.completed_at ?? "").localeCompare(x.completed_at ?? ""))[0];
+  // قد يكون للسائق أكثر من رحلة في اليوم: الجارية أولًا، ثم أقرب رحلة لم تنتهِ بموعد مسارها، وإلا آخر رحلة انتهت
+  const routeOf = (t: { routes?: unknown }) => one(t.routes as { name: string; scheduled_time: string | null } | { name: string; scheduled_time: string | null }[] | null);
+  const byTime = [...(trips ?? [])].sort((x, y) => (routeOf(x)?.scheduled_time ?? "").localeCompare(routeOf(y)?.scheduled_time ?? ""));
+  const trip = byTime.find((t) => ACTIVE_TRIP_STATUSES.includes(t.status)) ?? byTime.find((t) => t.status !== "completed")
+    ?? [...byTime].sort((x, y) => (y.completed_at ?? "").localeCompare(x.completed_at ?? ""))[0];
   if (!trip) return null;
   await applyRouteAndTrip(next, trip.route_id, trip);
+  next.laterTrips = byTime.filter((t) => t.id !== trip.id && (t.status === "scheduled" || t.status === "ready"))
+    .map((t) => ({ name: routeOf(t)?.name ?? "رحلة", time: routeOf(t)?.scheduled_time?.slice(0, 5) ?? "" }));
 
   const { data: tripStudents } = await supabase.from("trip_students").select("status,students(id,full_name,grade,photo_path)").eq("trip_id", trip.id);
   if (tripStudents?.length) {
@@ -712,7 +720,7 @@ function DriverDashboard({ onSkipStop, offlinePending = 0, offlineFailed = [], o
   </>;
   return <>
     {simulation.active && !tripDone && <button type="button" className="drive-enter" onClick={()=>setDriveMode(true)}><Navigation/> وضع القيادة: شاشة كبيرة ومبسطة أثناء الرحلة</button>}
-    <div className="welcome driver-welcome"><div><p className="eyebrow">مسارك اليوم</p><h1>{data.trip?.direction === "to_home" ? "رحلة العودة" : "الرحلة الصباحية"} — {data.route.name}</h1><p>{data.route.stops.length} محطات · {students.length === 1 ? "طالب واحد" : `${students.length} طلاب`} · الباص {data.vehicle.number}</p></div>{tripDone ? <Badge className="safe-badge"><Check/> انتهت رحلة اليوم</Badge> : <Button className={simulation.active ? "danger-action" : "primary-action"} onClick={simulation.active ? onEnd : onStart}>{simulation.active ? <><X/> إنهاء الرحلة</> : <><Navigation/> بدء الرحلة وتفعيل الموقع</>}</Button>}</div>
+    <div className="welcome driver-welcome"><div><p className="eyebrow">مسارك اليوم</p><h1>{data.trip?.direction === "to_home" ? "رحلة العودة" : "الرحلة الصباحية"} — {data.route.name}</h1><p>{data.route.stops.length} محطات · {students.length === 1 ? "طالب واحد" : `${students.length} طلاب`} · الباص {data.vehicle.number}</p>{data.laterTrips?.length ? <p className="later-trips">بعدها اليوم: {data.laterTrips.map((t)=>`${t.name}${t.time?` (${t.time})`:""}`).join("، ")}</p> : null}</div>{tripDone ? <Badge className="safe-badge"><Check/> انتهت رحلة اليوم</Badge> : <Button className={simulation.active ? "danger-action" : "primary-action"} onClick={simulation.active ? onEnd : onStart}>{simulation.active ? <><X/> إنهاء الرحلة</> : <><Navigation/> بدء الرحلة وتفعيل الموقع</>}</Button>}</div>
     {simulation.active && <div className={`trip-live-strip ${driverGps ? "" : "gps-missing"}`}><span/><strong>{driverGps ? "GPS فعّال الآن" : "الرحلة بدأت والموقع غير متاح"}</strong><p>{driverGps ? `اعتماد المحطة متاح داخل نطاق ${stopRadius} متر فقط` : "اسمح للموقع من إعدادات المتصفح، ثم اضغط تحديث GPS"}</p></div>}
     {tripSaveStatus && <div className={`save-strip trip-save ${tripSaveTone==="error"?"trip-save-error":""}`} role={tripSaveTone==="error"?"alert":"status"}>{tripSaveTone==="error"?<AlertTriangle/>:<Check/>}<span>{tripSaveStatus}</span></div>}
     {offlineFailed.length>0 && <div className="save-strip trip-save-error offline-failed" role="alert"><AlertTriangle/><div><strong>تعذر إرسال {offlineFailed.length===1?"عملية محفوظة":`${offlineFailed.length} عمليات محفوظة`} بعد عودة الإنترنت</strong><ul>{offlineFailed.slice(-5).map((f)=><li key={f.id}>{f.label} ({new Date(f.at).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"})}): {rpcError({ message: f.error })}</li>)}</ul><p>سجّلها يدويًا مرة أخرى أو أبلغ المدرسة.</p><Button size="sm" variant="outline" onClick={onDismissFailed}>فهمت</Button></div></div>}

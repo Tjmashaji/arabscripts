@@ -84,7 +84,10 @@ for (const [role, access] of Object.entries(ROLES)) {
     const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
     if (path.endsWith("/rest/v1/drivers")) return ok([{ id: "d1", school_id: "sch1", full_name: "سائق", email: "driver@example.com" }]);
     if (path.endsWith("/rest/v1/schools")) return ok([{ id: "sch1", name: "مدرسة الاختبار", city: "الخرج", latitude: 24.15, longitude: 47.31 }]);
-    if (path.endsWith("/rest/v1/trips")) return ok([{ id: "t1", route_id: "r1", bus_id: null, driver_id: "d1", trip_date: today, status: "scheduled", direction: "to_school", scheduled_start: null, completed_at: null }]);
+    // فترتان صباحيتان: الثانية تأتي أولًا من الخادم، والتطبيق يرتبها بموعد المسار
+    if (path.endsWith("/rest/v1/trips")) return ok([
+      { id: "t2", route_id: "r2", bus_id: null, driver_id: "d1", trip_date: today, status: "scheduled", direction: "to_school", scheduled_start: null, completed_at: null, routes: { name: "الفترة الثانية", scheduled_time: "07:15:00" } },
+      { id: "t1", route_id: "r1", bus_id: null, driver_id: "d1", trip_date: today, status: "scheduled", direction: "to_school", scheduled_start: null, completed_at: null, routes: { name: "مسار الاختبار", scheduled_time: "06:30:00" } }]);
     if (path.endsWith("/rest/v1/routes")) return ok([{ name: "مسار الاختبار", scheduled_time: "06:30:00", estimated_duration_minutes: 30, bus_id: null }]);
     if (path.endsWith("/rest/v1/route_stops")) return ok([{ label: "منزل", scheduled_time: "06:35:00", latitude: 24.16, longitude: 47.30, radius_m: 250 }, { label: "المدرسة", scheduled_time: "07:00:00", latitude: 24.15, longitude: 47.31, radius_m: 250 }]);
     if (accept.includes("object")) return route.fulfill({ status: 406, contentType: "application/json", body: "{}" });
@@ -92,6 +95,7 @@ for (const [role, access] of Object.entries(ROLES)) {
   });
   const page = await ctx.newPage(); watch(page, "driver-disclosure");
   await page.goto(BASE, { waitUntil: "load" }); await page.waitForTimeout(2500);
+  check((await page.locator(".later-trips").innerText().catch(() => "")).includes("الفترة الثانية (07:15)"), "السائق: رحلتان في اليوم بالترتيب، والثانية تظهر «بعدها اليوم»");
   const start = page.locator("button", { hasText: "بدء الرحلة" }).first();
   const dialog = page.locator('[role="alertdialog"]');
   if (await start.count()) {
@@ -166,14 +170,14 @@ for (const [role, access] of Object.entries(ROLES)) {
 {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-hramsoavpanetdhwpokr-auth-token", JSON.stringify(session("school@example.com"))]);
-  const calls = [];
+  const calls = []; const gets = [];
   const stops = [{ id: "s1", stop_order: 1, label: "منزل", stop_type: "pickup", latitude: 24.16, longitude: 47.30, scheduled_time: null }, { id: "s2", stop_order: 2, label: "المدرسة", stop_type: "school", latitude: 24.15, longitude: 47.31, scheduled_time: null }];
   const route = (id, name, driver) => ({ id, name, direction: "to_school", scheduled_time: "06:30:00", estimated_duration_minutes: 30, is_active: true, archived_at: null, days: [0, 1, 2, 3, 4, 5, 6], bus_id: "b" + id, driver_id: driver, route_stops: stops });
   const student = (id, full_name, grade, routeId, home) => ({ id, full_name, grade, service_status: "active", qr_token: "q" + id, photo_path: null, home_latitude: home ? 24.16 : null, home_longitude: home ? 47.30 : null, student_route_assignments: routeId ? [{ id: "a" + id, route_id: routeId, stop_id: "s1" }] : [] });
   await ctx.route(/supabase\.co\/(rest|auth|functions)\/v1\//, (r) => {
     const req = r.request(); const path = new URL(req.url()).pathname; const accept = req.headers().accept ?? "";
     const ok = (d) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
-    if (req.method() === "POST") calls.push({ path, body: req.postDataJSON?.() ?? null });
+    if (req.method() === "POST") calls.push({ path, body: req.postDataJSON?.() ?? null }); else gets.push(path);
     if (path.endsWith("/auth/v1/user")) return ok(session("school@example.com").user);
     if (path.endsWith("/rpc/my_access")) return ok({ ...ROLES.school, full_name: "school", privacy_version: "2026-10-b" });
     if (path.endsWith("/rpc/create_today_trips")) return ok({ created: 1, skipped: [{ route: "مسار بلا سائق", reason: "NO_DRIVER" }] });
@@ -218,6 +222,14 @@ for (const [role, access] of Object.entries(ROLES)) {
   await main.locator(".student-search input").fill("");
   await main.locator('select[aria-label="تصفية"]').selectOption("unassigned");
   check(await main.locator(".ops-student").count() === 1 && (await main.locator(".ops-student").innerText()).includes("فهد"), "المدرسة: تصفية الطلاب بلا مسار");
+  // إسناد جماعي لنتائج التصفية، وبعده يُعاد تحميل بيانات تبويب الطلاب فقط
+  await main.locator(".bulk-bar button", { hasText: "تحديد كل النتائج" }).click();
+  await main.locator('select[aria-label="مسار الإسناد الجماعي"]').selectOption("r1");
+  gets.length = 0;
+  await main.locator(".bulk-bar button", { hasText: "إسناد 1" }).click(); await page.waitForTimeout(800);
+  const bulk = calls.find((c) => c.path.endsWith("/rpc/school_bulk_assign"));
+  check(bulk?.body?.p_route === "r1" && JSON.stringify(bulk?.body?.p_students) === '["x3"]' && bulk?.body?.p_stop === null, "المدرسة: إسناد عدة طلاب لمسار مرة واحدة (لأقرب محطة)");
+  check(gets.some((g) => g.endsWith("/rest/v1/students")) && !gets.some((g) => /drivers|buses|onboarding_requests|\/trips$/.test(g)), "المدرسة: بعد العملية يُحمَّل ما يحتاجه التبويب فقط");
   await ctx.close();
 }
 // مدير النظام: «الدخول كـ» مدرسة ثم الرجوع، والمدرسة المختارة لمن يعمل في مدرستين

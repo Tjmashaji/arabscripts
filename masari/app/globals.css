@@ -402,3 +402,9 @@ html[lang="en"] [dir="rtl"], html[lang="en"] body { direction: ltr; }
 .drive-sos{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:68px;margin-top:auto;border:2px solid #ef4444;border-radius:18px;background:#7f1d1d;color:#fff;font-size:18px;font-weight:900;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}.drive-sos svg{width:24px}.drive-sos-fill{position:absolute;inset:0;width:0;background:#dc2626}.drive-sos.holding .drive-sos-fill{animation:drive-sos-fill linear forwards}.drive-sos-label{position:relative;display:flex;align-items:center;gap:10px}
 @keyframes drive-sos-fill{to{width:100%}}
 @media (prefers-reduced-motion:reduce){.drive-sos.holding .drive-sos-fill{animation:none;width:100%;opacity:.6}}
+/* المسارات: مكان الخريطة قبل ظهورها، والإسناد الجماعي للطلاب */
+.route-card-map-slot .map-placeholder{height:260px;border-radius:14px;background:#eef3f6}
+.student-pick{width:22px;height:22px;flex:none;accent-color:#176b87;cursor:pointer}
+.ops-student.picked{background:#eef7f9}
+.bulk-bar{align-items:center;flex-wrap:wrap;gap:8px;margin:6px 0 10px}.bulk-bar.active{position:sticky;top:74px;z-index:5;padding:10px 12px;border:1.5px solid #176b87;border-radius:14px;background:#f4fafb}.bulk-bar strong{font-size:14px}
+.later-trips{display:inline-block;margin-top:6px;padding:4px 10px;border-radius:999px;background:#e9f5f6;color:#176b87;font-size:12px;font-weight:700}

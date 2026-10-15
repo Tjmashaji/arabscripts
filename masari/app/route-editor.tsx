@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Archive, Clock, Combine, Copy, MapPin, Pencil, Plus, Printer, RotateCcw, Shuffle, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,19 @@ export type ERoute = { id: string; name: string; direction: string; scheduled_ti
 type Act = (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>, ok: string) => Promise<boolean>;
 const stopType: Record<string, string> = { pickup: "صعود", dropoff: "نزول", school: "المدرسة" };
 const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : "إلى المدرسة";
+
+// خريطة المسار تُنشأ عند ظهور البطاقة فقط: صفحة فيها عشرات المسارات لا تفتح عشرات الخرائط دفعة واحدة
+function WhenVisible({ children, className }: { children: React.ReactNode; className?: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [seen, setSeen] = useState(() => typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    if (seen || !box.current) return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { setSeen(true); io.disconnect(); } }, { rootMargin: "200px" });
+    io.observe(box.current);
+    return () => io.disconnect();
+  }, [seen]);
+  return <div ref={box} className={className}>{seen ? children : <div className="map-placeholder" aria-hidden />}</div>;
+}
 
 function StopEditor({ route, stop, index, count, studentsHere, editing, busy, act, onMove }: { route: ERoute; stop: EStop; index: number; count: number; studentsHere: number; editing: boolean; busy: boolean; act: Act; onMove: (dir: -1 | 1) => void }) {
   const [label, setLabel] = useState(stop.label);
@@ -161,7 +174,7 @@ export function RouteCard({ route, routes, buses, drivers, students, schoolName,
         <option value="">— بلا سائق —</option>{drivers.filter((d) => d.status === "active").map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
       </select></label>
     </div>}
-    {stops.some((s) => s.latitude != null) && <TripMap className="route-card-map" stops={stops.filter((s) => s.latitude != null && s.longitude != null).map((s) => ({ lat: s.latitude!, lng: s.longitude!, label: s.label }))} />}
+    {stops.some((s) => s.latitude != null) && <WhenVisible className="route-card-map-slot"><TripMap className="route-card-map" stops={stops.filter((s) => s.latitude != null && s.longitude != null).map((s) => ({ lat: s.latitude!, lng: s.longitude!, label: s.label }))} /></WhenVisible>}
     {!archived && <div className="route-tools">
       <Button size="sm" variant="outline" disabled={busy || !stopTimes(route)} title={stopTimes(route) ? "" : "يحتاج موعد انطلاق ومواقع لكل المحطات"} onClick={() => void act(() => saveStopTimes(route), "حُسبت أوقات المحطات وحُفظت، وأُبلغ أولياء الأمور.")}><Clock /> احسب أوقات المحطات</Button>
       {orderDiffers && <Button size="sm" variant="outline" disabled={busy} onClick={() => { if (window.confirm("ترتيب المحطات لأقصر طريق؟")) void act(() => supabase.rpc("school_reorder_stops", { p_route: route.id, p_stops: optimized }), "رُتبت المحطات لأقصر طريق. احسب أوقات المحطات من جديد."); }}><Shuffle /> رتّب لأقصر طريق</Button>}

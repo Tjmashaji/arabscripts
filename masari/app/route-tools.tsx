@@ -33,12 +33,8 @@ export function stopTimes(route: ERoute): string[] | null {
 export async function saveStopTimes(route: ERoute) {
   const times = stopTimes(route);
   if (!times) return { error: { message: "MISSING_LOCATION_OR_TIME" } };
-  for (let i = 0; i < route.route_stops.length; i++) {
-    const { error } = await supabase.from("route_stops").update({ scheduled_time: `${times[i]}:00` }).eq("id", route.route_stops[i].id);
-    if (error) return { error };
-  }
   const mins = Math.max(5, Math.round(((Number(times[times.length - 1].slice(0, 2)) * 60 + Number(times[times.length - 1].slice(3))) - (Number(times[0].slice(0, 2)) * 60 + Number(times[0].slice(3))) + 1440) % 1440));
-  return supabase.from("routes").update({ estimated_duration_minutes: mins }).eq("id", route.id);
+  return supabase.rpc("school_set_stop_times", { p_route: route.id, p_times: times.map((t) => `${t}:00`), p_minutes: mins });
 }
 
 // ───────── أقصر ترتيب ─────────
@@ -59,21 +55,9 @@ export function nearbyGroups(route: ERoute, radius = 300): { keep: EStop; merge:
   }
   return groups.filter((g) => g.merge.length > 0);
 }
-export async function mergeGroups(route: ERoute, groups: { keep: EStop; merge: EStop[] }[]) {
-  const removed = new Set<string>();
-  for (const g of groups) {
-    const all = [g.keep, ...g.merge];
-    const lat = all.reduce((a, s) => a + s.latitude!, 0) / all.length, lng = all.reduce((a, s) => a + s.longitude!, 0) / all.length;
-    const ids = g.merge.map((s) => s.id);
-    const a = await supabase.from("student_route_assignments").update({ stop_id: g.keep.id }).in("stop_id", ids);
-    if (a.error) return a;
-    const u = await supabase.from("route_stops").update({ latitude: +lat.toFixed(6), longitude: +lng.toFixed(6), label: g.keep.label.startsWith("نقطة تجمع") ? g.keep.label : `نقطة تجمع: ${g.keep.label}` }).eq("id", g.keep.id);
-    if (u.error) return u;
-    const d = await supabase.from("route_stops").delete().in("id", ids);
-    if (d.error) return d;
-    ids.forEach((id) => removed.add(id));
-  }
-  return supabase.rpc("school_reorder_stops", { p_route: route.id, p_stops: route.route_stops.map((s) => s.id).filter((id) => !removed.has(id)) });
+// كل الدمج في عملية واحدة على الخادم (نقل الطلاب، توسيط الموقع، حذف المدموجة، إعادة الترقيم)
+export function mergeGroups(route: ERoute, groups: { keep: EStop; merge: EStop[] }[]) {
+  return supabase.rpc("school_merge_stops", { p_route: route.id, p_groups: groups.map((g) => ({ keep: g.keep.id, merge: g.merge.map((s) => s.id) })) });
 }
 
 // ───────── الطلاب في المسار ونقلهم ─────────

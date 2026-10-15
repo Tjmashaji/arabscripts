@@ -33,11 +33,13 @@ const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riy
 const directionLabel = (d: string) => d === "to_home" ? "إلى المنزل" : "إلى المدرسة";
 const routeReasonText: Record<string, string> = {
   NO_DRIVER: "بلا سائق", DRIVER_SUSPENDED: "السائق موقوف", NO_BUS: "بلا باص", NOT_ENOUGH_STOPS: "محطات غير كافية", STOP_HAS_NO_LOCATION: "محطة بلا موقع",
-  NO_STUDENTS: "لا طلاب مسندين", DRIVER_OR_BUS_BUSY: "للسائق أو الباص رحلة أخرى اليوم بنفس الاتجاه", ROUTE_INACTIVE: "المسار غير نشط",
+  NO_STUDENTS: "لا طلاب مسندين", DRIVER_OR_BUS_BUSY: "للسائق أو الباص رحلة أخرى بنفس الوقت", ROUTE_INACTIVE: "المسار غير نشط",
 };
 const tripStatusLabel: Record<string, string> = { scheduled: "مجدولة", ready: "جاهزة", in_progress: "جارية", paused: "متوقفة", completed: "انتهت", cancelled: "ملغاة", emergency: "طارئ" };
-const errorText = (error: { message?: string; code?: string } | null) => {
+const errorText = (error: { message?: string; code?: string; details?: string } | null) => {
   const m = error?.message ?? "";
+  if (m.includes("BUS_SCHEDULE_OVERLAP")) return `وقت هذا المسار يتداخل مع مسار «${error?.details ?? "آخر"}» لنفس الباص. اجعل بين الفترتين وقتًا كافيًا أو غيّر الباص.`;
+  if (m.includes("DRIVER_SCHEDULE_OVERLAP")) return `وقت هذا المسار يتداخل مع مسار «${error?.details ?? "آخر"}» لنفس السائق. غيّر الوقت أو السائق.`;
   const blocker = Object.keys(blockerText).find((k) => m.includes(k));
   if (blocker) return blockerText[blocker];
   if (m.includes("SCHOOL_NOT_ACTIVE")) return "المدرسة موقوفة أو غير مفعّلة، فلا يمكن تعديل تشغيلها. تواصل مع إدارة مساري.";
@@ -50,8 +52,8 @@ const errorText = (error: { message?: string; code?: string } | null) => {
   if (m.includes("BUS_CAPACITY_EXCEEDED")) return "عدد الطلاب في المسار أكبر من مقاعد الباص.";
   if (m.includes("STOP_NOT_IN_ROUTE")) return "المحطة ليست من محطات هذا المسار.";
   if (m.includes("ROUTE_HAS_TRIPS")) return "للمسار رحلات مسجلة، فلا يمكن حذفه. أرشفه بدلًا من ذلك.";
-  if (m.includes("trips_driver_day")) return "للسائق رحلة أخرى اليوم بنفس الاتجاه.";
-  if (m.includes("trips_bus_day")) return "للباص رحلة أخرى اليوم بنفس الاتجاه.";
+  if (m.includes("NO_STOPS")) return "لا توجد محطات في هذا المسار بعد.";
+  if (m.includes("ROUTE_INACTIVE")) return "المسار غير نشط.";
   if (error?.code === "23505") return "يوجد سجل بنفس البيانات.";
   if (error?.code === "42501") return "ليست لديك صلاحية لهذا الإجراء.";
   return "تعذر الحفظ. حاول مرة أخرى.";
@@ -89,30 +91,32 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
   const [trips, setTrips] = useState<Trip[]>([]);
   const [autoTrips, setAutoTrips] = useState(true);
 
+  // يُحمَّل ما يحتاجه التبويب فقط، وكل عملية تعيد تحميله وحده (لا كل بيانات المدرسة)
   const load = useCallback(async () => {
+    const need = (...tabs: OpsTab[]) => tabs.includes(tab);
+    const skip = Promise.resolve(null);
     const [sc, sr, dr, dv, bs, rt, st, tr, auto] = await Promise.all([
-      supabase.from("schools").select("name,latitude,longitude").eq("id", schoolId).single(),
-      supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status,student_national_id,home_address,home_latitude,home_longitude,note,created_by").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at"),
-      supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at"),
-      supabase.from("drivers").select("id,full_name,status,user_id,license_expiry,phone,email,license_number").eq("school_id", schoolId).order("full_name"),
-      supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id,status,registration_expiry,insurance_expiry,inspection_expiry,next_service_on").eq("school_id", schoolId).order("bus_number"),
-      supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,days,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude,scheduled_time,radius_m)").eq("school_id", schoolId).order("name"),
-      supabase.from("students").select("id,full_name,grade,service_status,qr_token,photo_path,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name"),
-      supabase.from("trips").select("id,route_id,status,driver_id").eq("school_id", schoolId).eq("trip_date", riyadhToday()),
+      need("routes", "students") ? supabase.from("schools").select("name,latitude,longitude").eq("id", schoolId).single() : skip,
+      need("requests") ? supabase.from("student_onboarding_requests").select("id,student_name,grade,parent_name,parent_phone,parent_email,status,student_national_id,home_address,home_latitude,home_longitude,note,created_by").eq("school_id", schoolId).in("status", ["pending", "pending_parent_account"]).order("created_at") : skip,
+      need("requests") ? supabase.from("driver_onboarding_requests").select("id,driver_name,phone,email,vehicle_plate").eq("school_id", schoolId).eq("status", "pending").order("created_at") : skip,
+      need("fleet", "routes", "trips") ? supabase.from("drivers").select("id,full_name,status,user_id,license_expiry,phone,email,license_number").eq("school_id", schoolId).order("full_name") : skip,
+      need("fleet", "routes", "trips") ? supabase.from("buses").select("id,bus_number,plate_number,capacity,driver_id,status,registration_expiry,insurance_expiry,inspection_expiry,next_service_on").eq("school_id", schoolId).order("bus_number") : skip,
+      need("routes", "students", "trips") ? supabase.from("routes").select("id,name,direction,scheduled_time,estimated_duration_minutes,is_active,archived_at,days,bus_id,driver_id,route_stops(id,stop_order,label,stop_type,latitude,longitude,scheduled_time,radius_m)").eq("school_id", schoolId).order("name") : skip,
+      need("routes", "students", "trips") ? supabase.from("students").select("id,full_name,grade,service_status,qr_token,photo_path,home_latitude,home_longitude,student_route_assignments(id,route_id,stop_id)").eq("school_id", schoolId).order("full_name") : skip,
+      need("trips") ? supabase.from("trips").select("id,route_id,status,driver_id").eq("school_id", schoolId).eq("trip_date", riyadhToday()) : skip,
       // استعلام منفصل: إن لم يُطبَّق الترحيل بعد لا يتعطل تحميل بيانات المدرسة
-      supabase.from("schools").select("auto_daily_trips").eq("id", schoolId).maybeSingle(),
+      need("trips") ? supabase.from("schools").select("auto_daily_trips").eq("id", schoolId).maybeSingle() : skip,
     ]);
-    setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null });
-    setSchoolName(sc.data?.name ?? "");
-    setAutoTrips(auto.data?.auto_daily_trips ?? true);
-    setStudentRequests(sr.data ?? []);
-    setDriverRequests(dr.data ?? []);
-    setDrivers(dv.data ?? []);
-    setBuses(bs.data ?? []);
-    setRoutes((rt.data ?? []).map((r) => ({ ...r, route_stops: [...(r.route_stops ?? [])].sort((a, b) => a.stop_order - b.stop_order) })));
-    setStudents(st.data ?? []);
-    setTrips(tr.data ?? []);
-  }, [schoolId]);
+    if (sc) { setSchoolPoint({ lat: sc.data?.latitude ?? null, lng: sc.data?.longitude ?? null }); setSchoolName(sc.data?.name ?? ""); }
+    if (auto) setAutoTrips(auto.data?.auto_daily_trips ?? true);
+    if (sr) setStudentRequests(sr.data ?? []);
+    if (dr) setDriverRequests(dr.data ?? []);
+    if (dv) setDrivers(dv.data ?? []);
+    if (bs) setBuses(bs.data ?? []);
+    if (rt) setRoutes((rt.data ?? []).map((r) => ({ ...r, route_stops: [...(r.route_stops ?? [])].sort((a, b) => a.stop_order - b.stop_order) })));
+    if (st) setStudents(st.data ?? []);
+    if (tr) setTrips(tr.data ?? []);
+  }, [schoolId, tab]);
 
   useEffect(() => {
     let alive = true;
@@ -148,7 +152,7 @@ export function SchoolOps({ schoolId, tab, isAdmin = true }: { schoolId: string;
   </>;
 }
 
-type Act = (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null; data?: unknown }>, ok: string | ((data: unknown) => { text: string; ok: boolean })) => Promise<boolean>;
+type Act = (fn: () => PromiseLike<{ error: { message?: string; code?: string; details?: string } | null; data?: unknown }>, ok: string | ((data: unknown) => { text: string; ok: boolean })) => Promise<boolean>;
 
 // إضافة طالب أو سائق بالبريد: يُنشأ طلب يُعتمد أدناه، ويُربط الحساب عند تسجيل صاحبه بنفس البريد.
 function AddForms({ schoolId, busy, act }: { schoolId: string; busy: boolean; act: Act }) {
@@ -348,6 +352,8 @@ function StudentsTab({ schoolId, setMessage, reload, students, routes, schoolNam
   const [grade, setGrade] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const [profileFor, setProfileFor] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const togglePick = (id: string) => setPicked((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const grades = [...new Set(students.map((st) => st.grade).filter((g): g is string => Boolean(g)))].sort((a, b) => a.localeCompare(b, "ar"));
   const q = arabicKey(query);
   const shown = students.filter((st) => (!q || arabicKey(st.full_name).includes(q))
@@ -373,7 +379,10 @@ function StudentsTab({ schoolId, setMessage, reload, students, routes, schoolNam
       {grades.length > 1 && <select aria-label="الصف" value={grade} onChange={(e) => { setGrade(e.target.value); setLimit(PAGE); }}><option value="">كل الصفوف</option>{grades.map((g) => <option key={g} value={g}>{g}</option>)}</select>}
     </div>}
     {students.length > 0 && shown.length === 0 && <p className="muted-label">لا يوجد طلاب بهذا البحث.</p>}
-    {shown.slice(0, limit).map((student) => <div className="ops-row ops-student" key={student.id}>
+    {shown.length > 0 && <BulkAssign ids={[...picked].filter((id) => students.some((st) => st.id === id))} shownIds={shown.map((st) => st.id)} routes={routes} busy={busy} act={act}
+      onPickAll={(ids) => setPicked(new Set(ids))} onClear={() => setPicked(new Set())} />}
+    {shown.slice(0, limit).map((student) => <div className={`ops-row ops-student ${picked.has(student.id) ? "picked" : ""}`} key={student.id}>
+      <input type="checkbox" className="student-pick" aria-label={`تحديد ${student.full_name}`} checked={picked.has(student.id)} onChange={() => togglePick(student.id)} />
       <StudentAvatar url={student.photo_path ? photos[student.photo_path] : null} name={student.full_name} />
       <div><strong>{student.full_name}</strong>{student.service_status !== "active" && <Badge className="status-badge tone-1 req-badge">{studentStatusLabel[student.service_status] ?? student.service_status}</Badge>}<p>{student.grade ?? "—"}</p>
         <div className="ops-chips">{student.student_route_assignments.map((a) => <span className="ops-chip" key={a.id}>{routeName(a.route_id)} · {stopName(a.route_id, a.stop_id)}<button aria-label="إلغاء الإسناد" disabled={busy} onClick={() => void act(() => supabase.from("student_route_assignments").delete().eq("id", a.id), "تم إلغاء الإسناد.")}><X /></button></span>)}</div>
@@ -390,6 +399,25 @@ function StudentsTab({ schoolId, setMessage, reload, students, routes, schoolNam
     </div>)}
     {shown.length > limit && <Button className="wide-action" variant="outline" onClick={() => setLimit(limit + PAGE)}>عرض المزيد ({shown.length - limit} طالبًا)</Button>}
   </article>;
+}
+
+// إسناد عدة طلاب لمسار مرة واحدة: لمحطة محددة، أو كل طالب لأقرب محطة لمنزله
+function BulkAssign({ ids, shownIds, routes, busy, act, onPickAll, onClear }: { ids: string[]; shownIds: string[]; routes: RouteRow[]; busy: boolean; act: Act; onPickAll: (ids: string[]) => void; onClear: () => void }) {
+  const [routeId, setRouteId] = useState("");
+  const [stopId, setStopId] = useState("");
+  const active = routes.filter((r) => r.is_active && !r.archived_at);
+  const route = active.find((r) => r.id === routeId);
+  const stops = route?.route_stops.filter((s) => s.stop_type !== "school") ?? [];
+  if (!ids.length) return <div className="ops-actions bulk-bar"><button type="button" className="text-link" onClick={() => onPickAll(shownIds)}>تحديد كل النتائج ({shownIds.length}) لإسنادهم لمسار مرة واحدة</button></div>;
+  return <div className="ops-actions bulk-bar active" role="group" aria-label="إسناد جماعي">
+    <strong>{ids.length} طالب محدد</strong>
+    <select aria-label="مسار الإسناد الجماعي" value={routeId} onChange={(e) => { setRouteId(e.target.value); setStopId(""); }}><option value="">اختر المسار</option>{active.map((r) => <option key={r.id} value={r.id}>{r.name} ({directionLabel(r.direction)})</option>)}</select>
+    <select aria-label="محطة الإسناد الجماعي" value={stopId} disabled={!route} onChange={(e) => setStopId(e.target.value)}><option value="">أقرب محطة لمنزل كل طالب</option>{stops.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+    <Button size="sm" disabled={busy || !route || !stops.length} onClick={() => void act(() => supabase.rpc("school_bulk_assign", { p_route: routeId, p_students: ids, p_stop: stopId || null }),
+      (n) => ({ text: `أُسند ${Number(n) || ids.length} طالبًا إلى ${route?.name}، وأُبلغ أولياء أمورهم.`, ok: true })).then((ok) => { if (ok) { onClear(); setRouteId(""); setStopId(""); } })}>إسناد {ids.length}</Button>
+    {ids.length < shownIds.length && <button type="button" className="text-link" onClick={() => onPickAll(shownIds)}>تحديد كل النتائج ({shownIds.length})</button>}
+    <button type="button" className="text-link" onClick={onClear}>إلغاء التحديد</button>
+  </div>;
 }
 
 function AssignForm({ student, routes, busy, act }: { student: Student; routes: RouteRow[]; busy: boolean; act: Act }) {
