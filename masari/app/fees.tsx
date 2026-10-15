@@ -9,7 +9,7 @@ import { downloadCsv } from "./reports";
 
 // رسوم النقل: المدرسة تصدر الفواتير لأولياء الأمور وتتابع السداد، وولي الأمر يبلّغ عن التحويل.
 
-type Fee = { id: string; number: string; title: string; amount: number; vat_rate: number; total: number; due_date: string; status: string; payment_ref: string | null; paid_at: string | null; created_at: string; student_id: string; students: { full_name: string; grade: string | null } | null };
+type Fee = { id: string; number: string; title: string; note?: string | null; amount: number; vat_rate: number; total: number; due_date: string; status: string; payment_ref: string | null; paid_at: string | null; created_at: string; student_id: string; students: { full_name: string; grade: string | null } | null };
 const feeStatus: Record<string, [string, string]> = { unpaid: ["غير مدفوعة", "tone-1"], claimed: ["بانتظار تأكيد المدرسة", "tone-1"], paid: ["مدفوعة", "tone-0"], cancelled: ["ملغاة", "tone-2"] };
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
 const sar = (n: number) => `${Number(n).toLocaleString("ar-SA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
@@ -92,7 +92,7 @@ export function ParentFees() {
   const [ref, setRef] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const load = useCallback(async () => {
-    const { data } = await supabase.from("fee_invoices").select("id,number,title,amount,vat_rate,total,due_date,status,payment_ref,paid_at,created_at,student_id,students(full_name,grade)").neq("status", "cancelled").order("due_date", { ascending: false });
+    const { data } = await supabase.from("fee_invoices").select("id,number,title,note,amount,vat_rate,total,due_date,status,payment_ref,paid_at,created_at,student_id,students(full_name,grade)").neq("status", "cancelled").order("due_date", { ascending: false });
     setRows(((data ?? []) as unknown as Fee[]).map((r) => ({ ...r, students: one(r.students) })));
   }, []);
   useEffect(() => { let alive = true; void (async () => { if (alive) await load().catch(() => setRows([])); })(); return () => { alive = false; }; }, [load]);
@@ -109,7 +109,7 @@ export function ParentFees() {
     <article className="panel ops-panel">
       {rows?.length === 0 && <p className="muted-label">لا توجد فواتير.</p>}
       {rows?.map((r) => <div key={r.id}>
-        <div className="ops-row"><div><strong>{r.title}</strong><p>{r.students?.full_name} · {sar(r.total)}{Number(r.total) > Number(r.amount) ? " شامل الضريبة" : ""} · تستحق {r.due_date} · <span dir="ltr">{r.number}</span></p></div>
+        <div className="ops-row"><div><strong>{r.title}</strong><p>{r.students?.full_name} · {sar(r.total)}{Number(r.total) > Number(r.amount) ? " شامل الضريبة" : ""} · تستحق {r.due_date} · <span dir="ltr">{r.number}</span></p>{r.note && r.status !== "paid" && <p className="pay-note"><strong>طريقة الدفع:</strong> <bdi>{r.note}</bdi></p>}</div>
           <div className="ops-actions"><Badge className={`status-badge ${overdue(r) ? "tone-2" : feeStatus[r.status]?.[1] ?? "tone-1"}`}>{overdue(r) ? "متأخرة" : feeStatus[r.status]?.[0]}</Badge>
             {r.status === "unpaid" && <Button size="sm" onClick={() => { setRefFor(r.id); setRef(""); setMsg(null); }}>دفعت</Button>}</div></div>
         {refFor === r.id && <div className="inline-form"><label htmlFor={`ref-${r.id}`}>رقم مرجع التحويل</label><input id={`ref-${r.id}`} dir="ltr" value={ref} onChange={(e) => setRef(e.target.value)} maxLength={120} />
