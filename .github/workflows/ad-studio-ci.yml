@@ -1,0 +1,52 @@
+# فحوصات استوديو الإعلانات مع كل دفع أو طلب دمج يمس مجلد ad-studio:
+# الأنواع، ESLint، اختبارات الوحدات والتكامل على Postgres حقيقي مع FFmpeg، ثم بناء الإنتاج.
+name: ad-studio-ci
+
+on:
+  push:
+    paths: ["ad-studio/**", ".github/workflows/ad-studio-ci.yml"]
+  pull_request:
+    paths: ["ad-studio/**", ".github/workflows/ad-studio-ci.yml"]
+
+defaults:
+  run:
+    working-directory: ad-studio
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ad-studio/package-lock.json
+      - name: FFmpeg (libass + harfbuzz + fribidi)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg postgresql-client
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test database
+        run: ./tests/global-db.sh
+      - name: Unit + integration tests
+        run: npm test
+      - name: Build
+        env:
+          DATABASE_URL: postgres://studio_app:studio_app_dev@127.0.0.1:5432/ad_studio_test
+          FILE_SIGNING_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+        run: npm run build
