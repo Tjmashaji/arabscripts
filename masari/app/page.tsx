@@ -42,6 +42,7 @@ import { MapPicker } from "./school-form";
 import { AccountPage, LangToggle } from "./delete-account";
 import { MyFeedbackList, NotificationPrefs } from "./parent-extras";
 import { DriveMode } from "./drive-mode";
+import { useCaptcha } from "./captcha";
 import { onPushOpen } from "@/lib/push-open";
 import { DeleteAccountRequest } from "./delete-request";
 import { LocationDisclosure, hasLocationDisclosure } from "./location-disclosure";
@@ -857,14 +858,16 @@ function AuthPage({ onAuthenticated, initialMode = "login", initialRole, onBack 
   const [busy, setBusy] = useState(false);
   const signup = mode === "signup";
   const phoneOk = /^\+?[0-9\s-]{9,20}$/.test(phone.trim());
-  const canSubmit = !!email.trim() && password.length >= (signup ? 8 : 6) && (!signup || (!!selectedRole && name.trim().length >= 3 && phoneOk && agreed));
+  const captcha = useCaptcha();
+  const canSubmit = !!email.trim() && password.length >= (signup ? 8 : 6) && (!signup || (!!selectedRole && name.trim().length >= 3 && phoneOk && agreed)) && captcha.ready;
   const submitAuth = async () => {
     setBusy(true); setMessage("");
     const credentials = { email: email.trim(), password };
+    const captchaToken = captcha.token;
     const result = !signup
-      ? await supabase.auth.signInWithPassword(credentials)
-      : await supabase.auth.signUp({ ...credentials, options: { data: { full_name: name.trim(), phone: phone.trim(), requested_role: selectedRole, privacy_version: PRIVACY_VERSION } } });
-    setBusy(false);
+      ? await supabase.auth.signInWithPassword({ ...credentials, options: { captchaToken } })
+      : await supabase.auth.signUp({ ...credentials, options: { captchaToken, data: { full_name: name.trim(), phone: phone.trim(), requested_role: selectedRole, privacy_version: PRIVACY_VERSION } } });
+    setBusy(false); captcha.reset();
     if (result.error) {
       setMessage(!signup ? "البريد أو كلمة المرور غير صحيحة." : /registered|exists/i.test(result.error.message) ? "هذا البريد مسجّل مسبقًا. سجّل الدخول به." : "تعذر إنشاء الحساب. تأكد من البريد وأن كلمة المرور 8 أحرف على الأقل.");
       return;
@@ -887,6 +890,7 @@ function AuthPage({ onAuthenticated, initialMode = "login", initialRole, onBack 
         <label>البريد الإلكتروني<input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" dir="ltr" placeholder="name@example.com" autoComplete="email"/></label>
         <label>كلمة المرور<input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" placeholder="••••••••" autoComplete={signup?"new-password":"current-password"} onKeyDown={(e)=>{if(e.key==="Enter"&&canSubmit&&!busy)void submitAuth()}}/></label>
         {signup&&<label className="consent-check" htmlFor="signup-consent"><input id="signup-consent" type="checkbox" checked={agreed} onChange={(e)=>setAgreed(e.target.checked)}/> أوافق على <a href={PRIVACY_URL} target="_blank" rel="noreferrer">سياسة الخصوصية</a></label>}
+        {captcha.widget}
         {message&&<p className="auth-message">{message}</p>}
         <Button className="wide-action" onClick={submitAuth} disabled={busy || !canSubmit}>{busy ? "جارٍ التحقق…" : !signup ? "دخول" : "إنشاء الحساب والمتابعة"}</Button>
         {!signup ? <button className="text-link" onClick={()=>setForgot(true)}>نسيت كلمة المرور؟</button> : password.length > 0 && password.length < 8 && <p className="muted-label">كلمة المرور 8 أحرف على الأقل.</p>}

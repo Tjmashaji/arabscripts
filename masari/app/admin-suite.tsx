@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { PUBLIC_SITE } from "@/lib/site";
+import { useCaptcha } from "./captcha";
 
 // أدوات مدير النظام: صحة النظام، الدعم الفني، الإعلانات، سجل التدقيق القابل للبحث، الإيرادات، أدوات الحسابات والنقل،
 // ومن جهة المستخدم: تذاكر الدعم، شريط الإعلانات، وتنزيل بياناته. الصلاحيات يفرضها الخادم (admin_suite.sql).
@@ -347,12 +348,14 @@ export function UserTools({ user, onDone }: { user: { user_id: string; email: st
   const [into, setInto] = useState("");
   const { busy, run } = useRun();
   const done = (text: string, ok = true) => onDone({ text, ok });
+  // عند تفعيل التحقق في Supabase تحتاج هذه الطلبات رمز تحقق أيضًا
+  const captcha = useCaptcha();
   const reset = async () => {
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: PUBLIC_SITE });
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: PUBLIC_SITE, captchaToken: captcha.token }); captcha.reset();
     done(error ? "تعذر إرسال رابط كلمة المرور." : `أُرسل رابط تعيين كلمة المرور إلى ${user.email}.`, !error);
   };
   const resend = async () => {
-    const { error } = await supabase.auth.resend({ type: "signup", email: user.email, options: { emailRedirectTo: PUBLIC_SITE } });
+    const { error } = await supabase.auth.resend({ type: "signup", email: user.email, options: { emailRedirectTo: PUBLIC_SITE, captchaToken: captcha.token } }); captcha.reset();
     done(error ? "تعذر إعادة إرسال رابط التفعيل." : `أُعيد إرسال رابط التفعيل إلى ${user.email}.`, !error);
   };
   const revoke = async () => {
@@ -370,8 +373,9 @@ export function UserTools({ user, onDone }: { user: { user_id: string; email: st
   return <div className="user-panel">
     <p className="field-title">أدوات الحساب</p>
     <div className="ops-actions">
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => void reset()}><Send /> رابط تعيين كلمة المرور</Button>
-      {!user.email_confirmed && <Button size="sm" variant="outline" disabled={busy} onClick={() => void resend()}><Send /> إعادة إرسال التفعيل</Button>}
+      {captcha.widget}
+      <Button size="sm" variant="outline" disabled={busy || !captcha.ready} onClick={() => void reset()}><Send /> رابط تعيين كلمة المرور</Button>
+      {!user.email_confirmed && <Button size="sm" variant="outline" disabled={busy || !captcha.ready} onClick={() => void resend()}><Send /> إعادة إرسال التفعيل</Button>}
       <Button size="sm" variant="outline" disabled={busy} onClick={() => void revoke()}><LogOut /> خروج من كل الأجهزة</Button>
     </div>
     <p className="field-title">دمج حساب مكرر</p>

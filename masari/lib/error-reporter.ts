@@ -5,21 +5,24 @@ import { supabase } from "@/lib/supabase";
 export const APP_VERSION = "2026.10.12";
 const IGNORE = [/ResizeObserver loop/i, /^Script error\.?$/i, /Load failed/i, /Failed to fetch/i, /NetworkError/i, /AbortError/i];
 let installed = false;
+const sent = new Set<string>();
+
+/** يرسل خطأً إلى سجل الأعطال (مرة واحدة لكل رسالة في الجلسة). */
+export function reportError(message: string, stack?: string | null) {
+  const msg = (message || "").slice(0, 500);
+  if (typeof window === "undefined" || !msg || sent.has(msg) || IGNORE.some((r) => r.test(msg))) return;
+  sent.add(msg);
+  void supabase.rpc("log_client_error", {
+    p_message: msg, p_stack: stack?.slice(0, 4000) ?? null, // لا نرسل الـ hash: قد يحوي رموز الدخول (#access_token) أو رابط مشاركة
+    p_url: window.location.pathname,
+    p_user_agent: navigator.userAgent.slice(0, 300), p_version: APP_VERSION,
+  }).then(() => {}, () => {});
+}
 
 export function installErrorReporter() {
   if (installed || typeof window === "undefined") return;
   installed = true;
-  const sent = new Set<string>();
-  const report = (message: string, stack?: string | null) => {
-    const msg = (message || "").slice(0, 500);
-    if (!msg || sent.has(msg) || IGNORE.some((r) => r.test(msg))) return;
-    sent.add(msg);
-    void supabase.rpc("log_client_error", {
-      p_message: msg, p_stack: stack?.slice(0, 4000) ?? null, // لا نرسل الـ hash: قد يحوي رموز الدخول (#access_token) أو رابط مشاركة
-      p_url: window.location.pathname,
-      p_user_agent: navigator.userAgent.slice(0, 300), p_version: APP_VERSION,
-    }).then(() => {}, () => {});
-  };
+  const report = reportError;
   window.addEventListener("error", (e) => report(e.message, e.error instanceof Error ? e.error.stack : null));
   window.addEventListener("unhandledrejection", (e) => {
     const r = e.reason;
