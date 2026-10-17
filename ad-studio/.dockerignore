@@ -7,3 +7,6 @@ tests
 .env*
 !.env.example
 *.log
+docker-compose.yml
+start.*
+stop.*

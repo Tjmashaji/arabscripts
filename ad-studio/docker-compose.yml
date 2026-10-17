@@ -1,0 +1,44 @@
+# تشغيل المنصة على جهازك بـ Docker: قاعدة البيانات + المنصة (الويب والعامل وFFmpeg).
+# الأسهل: شغّل start.bat (ويندوز) أو ./start.sh (ماك ولينكس)، فهو يجهّز ملف .env ثم يشغّل هذا الملف.
+name: ad-studio
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?شغّل start.bat أو start.sh أولًا لإنشاء ملف .env}
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${STUDIO_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      POSTGRES_ADMIN_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      STUDIO_DB_SECRET: ${STUDIO_DB_SECRET:?}
+      FILE_SIGNING_SECRET: ${FILE_SIGNING_SECRET:?}
+      APP_URL: http://localhost:${STUDIO_PORT:-3000}
+      STORAGE_DIR: /data/storage
+      SIGNUP_LIMIT_PER_HOUR: "50"
+      ALLOW_SIMULATION: ${ALLOW_SIMULATION:-true}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      RUNWAY_API_KEY: ${RUNWAY_API_KEY:-}
+    volumes:
+      - files:/data
+    restart: unless-stopped
+
+volumes:
+  db:
+  files:

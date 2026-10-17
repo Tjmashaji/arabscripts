@@ -10,6 +10,7 @@
 | المتصفح (Playwright + Chromium) | `npm run test:e2e` | **2/2 ناجحة** |
 | بناء الإنتاج | `npm run build` | ناجح |
 | صورة Docker للنشر (17 أكتوبر) | `docker build` ثم تشغيلها مع Postgres 16، ثم `E2E_BASE_URL=… npm run test:e2e` | البناء ناجح، وتجهيز القاعدة تلقائي، و**2/2 ناجحة** على الحاوية (انظر `DEPLOY_RAILWAY.md`) |
+| التشغيل المحلي بـ Docker Compose | `start.sh` ثم `npm run test:e2e` على `http://localhost:3000` | تشغيل ناجح، و**2/2 ناجحة**، وإعادة التشغيل تحافظ على البيانات. `start.bat` لم يُشغَّل على ويندوز فعليًا |
 
 ## ما تغطيه الاختبارات
 

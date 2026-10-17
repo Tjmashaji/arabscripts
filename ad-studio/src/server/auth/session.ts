@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { anonymous } from "../db";
+import { env } from "../env";
 
 export const SESSION_COOKIE = "studio_session";
 const TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -17,7 +18,8 @@ export async function startSession(userId: string) {
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    // آمن فقط عند العمل عبر https، فيعمل التشغيل المحلي على http://localhost في كل المتصفحات
+    secure: env().APP_URL.startsWith("https://"),
     path: "/",
     maxAge: TTL_SECONDS,
   });
