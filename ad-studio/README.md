@@ -84,6 +84,7 @@ npm run cleanup                  # يوميًا عبر cron: سياسة الاح
 ```
 
 - العامل وFFmpeg يحتاجان خادمًا أو حاوية دائمة (Railway أو Fly.io أو VPS)، ولا يعملان على Vercel Serverless. يمكن تشغيل أكثر من عامل بأمان.
+- **Railway**: خطوات النشر كاملة في `DEPLOY_RAILWAY.md` (`Dockerfile` و`railway.json` جاهزان).
 - اجعل `ALLOW_SIMULATION=false` في الإنتاج.
 - ضع `APP_URL` بالرابط العام. يُستخدم للتحقق من أصل الطلبات (CSRF).
 
@@ -95,3 +96,4 @@ npm run cleanup                  # يوميًا عبر cron: سياسة الاح
 - `AI_PROVIDERS.md`: المزودون والمحاكاة وإضافة مزود
 - `DATABASE_SCHEMA.md`: الجداول والأدوار والصلاحيات
 - `TESTING.md`: الاختبارات ونتائجها
+- `DEPLOY_RAILWAY.md`: النشر على Railway

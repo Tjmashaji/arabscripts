@@ -122,7 +122,7 @@ test("رحلة إنشاء إعلان مطعم كاملة حتى التصدير",
   await snap(page, "11-settings");
 });
 
-test("لا يصل مستخدم إلى مشروع مستخدم آخر عبر الرابط أو الـ API", async ({ browser }) => {
+test("لا يصل مستخدم إلى مشروع مستخدم آخر عبر الرابط أو الـ API", async ({ browser, baseURL }) => {
   const a = await browser.newContext();
   const b = await browser.newContext();
   const pa = await a.newPage();
@@ -141,7 +141,7 @@ test("لا يصل مستخدم إلى مشروع مستخدم آخر عبر ال
   const id = pa.url().split("/projects/")[1].split("/")[0];
   const api = await pb.request.get(`/api/projects/${id}`);
   expect(api.status()).toBe(404);
-  const patch = await pb.request.patch(`/api/projects/${id}`, { data: { title: "x" }, headers: { origin: "http://localhost:3000" } });
+  const patch = await pb.request.patch(`/api/projects/${id}`, { data: { title: "x" }, headers: { origin: new URL(baseURL!).origin } });
   expect(patch.status()).toBe(404);
   await pb.goto(`/projects/${id}/script`);
   await expect(pb.getByText("تعذّر فتح المشروع")).toBeVisible();
