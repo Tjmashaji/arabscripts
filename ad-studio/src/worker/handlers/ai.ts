@@ -11,7 +11,7 @@ import { ffmpeg } from "../../server/media/ffmpeg";
 import { probe } from "../../server/media/probe";
 import { sniff } from "../../server/media/sniff";
 import { newKey, storage } from "../../server/media/storage";
-import { analysisProvider, directorProvider, imageProvider, speechProvider, videoProvider } from "../../server/providers/registry";
+import { analysisProvider, directorById, imageProvider, speechProvider, videoProvider } from "../../server/providers/registry";
 import { ProviderError, type DirectorBrief } from "../../server/providers/types";
 import { saveDirectorOutput } from "../../server/services/scenes";
 import type { ClaimedJob, StepResult } from "../types";
@@ -49,8 +49,7 @@ export async function storeFile(tx: Tx, job: ClaimedJob, src: { localFile?: stri
 }
 
 export async function directorStep(tx: Tx, job: ClaimedJob): Promise<StepResult> {
-  const provider = directorProvider();
-  if (!provider) throw new ProviderError("no director", false, "المخرج الإبداعي غير متصل.");
+  const provider = directorById(job.provider);
   const brief = (await tx.one<{ input: DirectorBrief }>("SELECT input FROM creative_briefs WHERE id = $1", [job.input.brief_id]))?.input;
   if (!brief) throw new ProviderError("brief missing", false, "ملخص الإعلان غير موجود.");
   if (job.input.mode === "ideas") {

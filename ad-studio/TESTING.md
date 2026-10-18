@@ -10,6 +10,8 @@
 | المتصفح (Playwright + Chromium) | `npm run test:e2e` | **2/2 ناجحة** |
 | بناء الإنتاج | `npm run build` | ناجح |
 | صورة Docker للنشر (17 أكتوبر) | `docker build` ثم تشغيلها مع Postgres 16، ثم `E2E_BASE_URL=… npm run test:e2e` | البناء ناجح، وتجهيز القاعدة تلقائي، و**2/2 ناجحة** على الحاوية (انظر `DEPLOY_RAILWAY.md`) |
+| المسار المجاني (18 أكتوبر) | `FREE_TTS=true npx vitest run tests/integration/free-path.test.ts`، و`E2E_FREE=1 npm run test:e2e` على حاوية بـ `ALLOW_SIMULATION=false` وبلا مفاتيح | ناجح: سيناريو من نص المستخدم، وصوت edge-tts حقيقي، وتصدير 1080×1920 مدته 15 ثانية بلا وسم محاكاة. كشف خللًا في FFmpeg 5.1 (صوت أحادي) وأُصلح |
+| المجموع بعد الإضافة | `npm test` | **33/33 ناجحة** (5 ملفات) |
 | التشغيل المحلي بـ Docker Compose | `start.sh` ثم `npm run test:e2e` على `http://localhost:3000` | تشغيل ناجح، و**2/2 ناجحة**، وإعادة التشغيل تحافظ على البيانات. `start.bat` لم يُشغَّل على ويندوز فعليًا |
 
 ## ما تغطيه الاختبارات

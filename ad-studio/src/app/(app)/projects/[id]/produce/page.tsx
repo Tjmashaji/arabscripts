@@ -10,7 +10,7 @@ import { VOICE_TONES } from "@/lib/domain";
 import { api, ApiError, fmtSec, newKey, useData } from "@/lib/client";
 import { sceneStarts } from "@/lib/timing";
 
-type Catalog = { provider: { id: string; label: string; mode: "live" | "simulation" } | null; voices: { id: string; name: string; gender: string; note?: string; previewUrl?: string }[]; dialects: string[] };
+type Catalog = { provider: { id: string; label: string; mode: "live" | "simulation"; free?: boolean } | null; voices: { id: string; name: string; gender: string; note?: string; previewUrl?: string }[]; dialects: string[] };
 type Caps = { capabilities: { capability: string; state: "live" | "simulation" | "unavailable"; provider: string; setup?: string }[] };
 
 function SceneProduction({ scene, start, canEdit }: { scene: Scene; start: number; canEdit: boolean }) {
@@ -132,6 +132,7 @@ function Voiceover({ canEdit }: { canEdit: boolean }) {
       </div>
       {catErr ? <Notice tone="danger">{catErr.message}</Notice> : null}
       {catalog && !catalog.provider ? <Notice tone="warn" title="خدمة الصوت غير متصلة">أضف مفتاح ElevenLabs من إعدادات الخادم، أو ارفع تسجيلك الصوتي من صفحة المواد واربطه بالمشاهد أدناه.</Notice> : null}
+      {catalog?.provider?.free ? <div className="mb-4"><Notice tone="info">صوت مجاني من أصوات Microsoft عبر خدمة غير رسمية: قد تتوقف دون إشعار، وشروط استخدامها التجاري غير محددة. للإعلانات التجارية المنشورة يُفضَّل ElevenLabs.</Notice></div> : null}
       {catalog?.provider?.mode === "simulation" ? <div className="mb-4"><Notice tone="warn">وضع المحاكاة يولّد نغمات بطول الجملة لاختبار التوقيت فقط، وليس صوتًا بشريًا.</Notice></div> : null}
       {catalog?.provider ? (
         <div className="grid gap-3 sm:grid-cols-4 items-end">

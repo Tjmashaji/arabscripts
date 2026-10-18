@@ -161,7 +161,8 @@ export async function render(plan: RenderPlan, outFile: string, onProgress?: (fr
     if (voiceMix) mixParts.push(`[${voiceMix}]`);
     mixParts.push(...sceneAudio);
     if (mixParts.length) {
-      filters.push(`${mixParts.join("")}amix=inputs=${mixParts.length}:normalize=0:dropout_transition=0,apad,atrim=duration=${total.toFixed(3)},loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[aout]`);
+      // الصيغة النهائية مثبّتة: FFmpeg 5.1 (Debian) يفشل في اختيار تخطيط القنوات بعد loudnorm مع صوت أحادي المصدر
+      filters.push(`${mixParts.join("")}amix=inputs=${mixParts.length}:normalize=0:dropout_transition=0,apad,atrim=duration=${total.toFixed(3)},loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[aout]`);
     } else {
       // منصات التواصل تفضّل وجود مسار صوت حتى لو صامت
       filters.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration=${total.toFixed(3)}[aout]`);

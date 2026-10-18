@@ -18,6 +18,8 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-opus-5-5"),
   ELEVENLABS_API_KEY: z.string().optional(),
+  // الصوت المجاني (edge-tts) عند غياب مفتاح ElevenLabs. اجعله false لتعطيله
+  FREE_TTS: z.enum(["true", "false"]).default("true"),
   ELEVENLABS_MODEL: z.string().default("eleven_multilingual_v2"),
   ELEVENLABS_CENTS_PER_1K_CHARS: z.coerce.number().nonnegative().default(30),
   RUNWAY_API_KEY: z.string().optional(),

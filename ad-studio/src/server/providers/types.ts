@@ -9,6 +9,8 @@ export type ProviderInfo = {
   id: string;
   label: string;
   mode: ProviderMode;
+  // خدمة حقيقية بلا تكلفة ولا مفتاح (مثل تقسيم نص المستخدم أو أصوات Edge)
+  free?: boolean;
   // ما يحتاجه المشغّل لتفعيل الخدمة الحقيقية (يظهر في صفحة الإعدادات)
   setup?: string;
 };

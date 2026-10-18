@@ -3,6 +3,7 @@
 import type { Tx } from "../db";
 import { errors } from "../http/errors";
 import { providerFor, type Capability } from "../providers/registry";
+import type { ProviderInfo } from "../providers/types";
 import { assertCanEdit, type Workspace } from "./core";
 
 export type JobType = "director" | "analyze_media" | "generate_video" | "generate_image" | "generate_speech" | "export";
@@ -46,7 +47,7 @@ export type JobRow = {
 
 export async function enqueueJob(
   tx: Tx,
-  args: { ws: Workspace; userId: string; projectId: string | null; type: JobType; input: Record<string, unknown>; idempotencyKey: string; estimatedCents?: number },
+  args: { ws: Workspace; userId: string; projectId: string | null; type: JobType; input: Record<string, unknown>; idempotencyKey: string; estimatedCents?: number; provider?: { info: ProviderInfo } },
 ): Promise<{ job: JobRow; created: boolean }> {
   assertCanEdit(args.ws);
   if (!/^[\w:.-]{8,200}$/.test(args.idempotencyKey)) throw errors.invalid("مفتاح منع التكرار غير صالح.");
@@ -59,7 +60,7 @@ export async function enqueueJob(
   let provider = "ffmpeg";
   let simulated = false;
   if (cap) {
-    const p = providerFor(cap);
+    const p = args.provider ?? providerFor(cap);
     if (!p) throw errors.unavailable(UNAVAILABLE[cap]);
     provider = p.info.id;
     simulated = p.info.mode === "simulation";

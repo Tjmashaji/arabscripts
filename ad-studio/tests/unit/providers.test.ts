@@ -104,3 +104,31 @@ describe("ElevenLabs (التعليق الصوتي)", () => {
     await expect(new ElevenLabsSpeech("k", "m", 30).voices()).rejects.toMatchObject({ retryable: false });
   });
 });
+
+describe("البدائل المجانية", () => {
+  it("مخرج «نصك أنت» يقسّم سيناريو المستخدم دون وسم محاكاة، ويرفض الأفكار والكتابة الآلية برسالة واضحة", async () => {
+    const { ManualDirector } = await import("@/server/providers/manual/director");
+    const d = new ManualDirector();
+    expect(d.info).toMatchObject({ mode: "live", free: true });
+    const own = { ...brief, settings: projectSettings.parse({ duration_s: 30, mode: "own_idea", own_idea: "شوف وش لقينا! أجواء تفتح النفس. زورونا اليوم." }) };
+    const r = await d.direct(own);
+    expect(r.output.scenes.map((s) => s.voiceover).filter(Boolean).join(" ")).toBe("شوف وش لقينا! أجواء تفتح النفس. زورونا اليوم.");
+    expect(r.output.scenes.reduce((a, s) => a + s.duration_s, 0)).toBe(30);
+    await expect(d.ideas()).rejects.toMatchObject({ retryable: false });
+    await expect(d.direct(brief)).rejects.toBeInstanceOf(ProviderError);
+  });
+
+  it("السجل يختار المخرج المجاني لنص المستخدم والصوت المجاني عند غياب المفاتيح", async () => {
+    vi.resetModules();
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("ELEVENLABS_API_KEY", "");
+    vi.stubEnv("ALLOW_SIMULATION", "true");
+    vi.stubEnv("FREE_TTS", "true");
+    const reg = await import("@/server/providers/registry");
+    expect(reg.directorProvider({ ownScript: true }).info.id).toBe("manual");
+    expect(reg.directorProvider().info.mode).toBe("simulation");
+    expect(reg.speechProvider()?.info).toMatchObject({ id: "edge-tts", mode: "live", free: true });
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+});

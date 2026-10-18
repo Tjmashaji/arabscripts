@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Badge, Button, Card, Field, Input, Notice, PageHeader } from "@/components/ui";
 import { api, ApiError, useData } from "@/lib/client";
 
-type Caps = { capabilities: { capability: string; label: string; state: "live" | "simulation" | "unavailable"; provider: string; setup?: string }[]; simulation_allowed: boolean };
+type Caps = { capabilities: { capability: string; label: string; state: "live" | "simulation" | "unavailable"; free?: boolean; provider: string; setup?: string }[]; simulation_allowed: boolean };
 type Usage = { workspace: { name: string; monthly_spend_cap_cents: number; plan_code: string; role: string } };
 const STATE = { live: { tone: "ok", label: "متصل" }, simulation: { tone: "warn", label: "محاكاة" }, unavailable: { tone: "danger", label: "غير متصل" } } as const;
 
@@ -61,7 +61,7 @@ function SettingsForm({ usage: u }: { usage: Usage }) {
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(caps.data?.capabilities ?? []).map((c) => (
               <li key={c.capability} className="rounded-2xl border border-line p-4">
-                <div className="flex items-center justify-between gap-2"><span className="font-bold text-sm">{c.label}</span><Badge tone={STATE[c.state].tone}>{STATE[c.state].label}</Badge></div>
+                <div className="flex items-center justify-between gap-2"><span className="font-bold text-sm">{c.label}</span><Badge tone={STATE[c.state].tone}>{c.free ? "مجاني" : STATE[c.state].label}</Badge></div>
                 <p className="text-xs text-muted mt-1 ltr text-start">{c.provider}</p>
                 {c.setup ? <p className="text-xs text-ink-2 mt-2">{c.setup}</p> : null}
               </li>
