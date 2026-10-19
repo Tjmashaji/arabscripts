@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* نظام الألوان: ورق كريمي، حبر كحلي، لون مميز بنفسجي مرح، وأصفر شمسي للتأكيد */
+:root {
+  --paper: #fdf9f1;
+  --surface: #ffffff;
+  --surface-2: #f5efe3;
+  --ink: #1f1a3d;
+  --ink-2: #4a4568;
+  --muted: #7b7695;
+  --line: #ebe3d3;
+  --accent: #6c4cf1;
+  --accent-ink: #ffffff;
+  --accent-soft: #ece7ff;
+  --sun: #ffc93c;
+  --sun-soft: #fff4d1;
+  --teal: #13867a;
+  --teal-soft: #dcf3ef;
+  --amber: #a86a06;
+  --amber-soft: #fbf0d6;
+  --danger: #c2341b;
+  --danger-soft: #fce4de;
+  --ok: #1d7f4c;
+  --ok-soft: #dcf3e6;
+  --yt: #ff0033;
+  --focus: #2f6bff;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-sun: var(--sun);
+  --color-sun-soft: var(--sun-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-yt: var(--yt);
+  --font-sans: var(--font-plex), "IBM Plex Sans Arabic", Tahoma, sans-serif;
+  --font-display: var(--font-kufi), var(--font-plex), Tahoma, sans-serif;
+  --radius-card: 22px;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+}
+body {
+  font-family: var(--font-sans);
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+::selection {
+  background: var(--accent-soft);
+}
+/* الأرقام والروابط اللاتينية داخل نص عربي */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+/* رسوم المعاينة: تمايل خفيف مثل الفيديو المصدَّر */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4%); }
+}
+.bob {
+  animation: bob 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

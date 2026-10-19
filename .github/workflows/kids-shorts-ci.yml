@@ -1,0 +1,40 @@
+# فحوصات استوديو شورتس الأطفال مع كل دفع أو طلب دمج يمس مجلد kids-shorts:
+# الأنواع، ESLint، الاختبارات مع FFmpeg حقيقي، ثم بناء الإنتاج.
+name: kids-shorts-ci
+
+on:
+  push:
+    paths: ["kids-shorts/**", ".github/workflows/kids-shorts-ci.yml"]
+  pull_request:
+    paths: ["kids-shorts/**", ".github/workflows/kids-shorts-ci.yml"]
+
+defaults:
+  run:
+    working-directory: kids-shorts
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: kids-shorts/package-lock.json
+      - name: FFmpeg (libass + harfbuzz + fribidi)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci
+      - name: Route types
+        run: npx next typegen
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Build
+        env:
+          TOKEN_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000001"
+        run: npm run build
