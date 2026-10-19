@@ -79,6 +79,13 @@ test("forgot-password is linked from sign in; reset-password needs a session", a
   await expect(page).toHaveURL(/\/login\?next=%2Freset-password$/);
 });
 
+test("an email link that lands on the home page goes through /auth/confirm", async ({ page }) => {
+  await page.goto("/?code=00000000-0000-0000-0000-000000000000");
+  await expect(page).toHaveURL(/\/login\?error=confirmFailed$/);
+  await page.goto("/?error=access_denied&error_code=otp_expired");
+  await expect(page).toHaveURL(/\/login\?error=confirmFailed$/);
+});
+
 test("unknown pages return 404", async ({ page }) => {
   const res = await page.goto("/does-not-exist");
   expect(res?.status()).toBe(404);
