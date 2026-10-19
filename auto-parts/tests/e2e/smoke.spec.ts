@@ -100,6 +100,18 @@ test("/auth/confirm forwards a # fragment link to the handler", async ({ page })
   await expect(page.locator("main [role=alert]")).toBeVisible();
 });
 
+test("partner and admin partner pages are protected; a bad invite link is explained", async ({ page, request }) => {
+  await page.goto("/invite/" + "0".repeat(64));
+  await expect(page.locator("main [role=alert]")).toBeVisible();
+  await noHorizontalScroll(page);
+  await page.goto("/partner");
+  await expect(page).toHaveURL(/\/login\?next=%2Fpartner$/);
+  await page.goto("/admin/partner-applications");
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin/);
+  const doc = await request.get("/api/documents/00000000-0000-0000-0000-000000000000", { maxRedirects: 0 });
+  expect(doc.status()).toBe(401);
+});
+
 test("unknown pages return 404", async ({ page }) => {
   const res = await page.goto("/does-not-exist");
   expect(res?.status()).toBe(404);

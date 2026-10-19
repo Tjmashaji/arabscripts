@@ -65,3 +65,30 @@ export function Alert({ tone, children }: { tone: "success" | "danger" | "info";
 export function PageTitle({ children }: { children: ReactNode }) {
   return <h1 className="text-2xl font-bold">{children}</h1>;
 }
+
+export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "success" | "danger" | "info"; children: ReactNode }) {
+  return (
+    <span
+      className={cx(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold",
+        tone === "neutral" && "bg-surface text-muted",
+        tone === "success" && "bg-success-soft text-success",
+        tone === "danger" && "bg-danger-soft text-danger",
+        tone === "info" && "bg-accent-soft text-accent-strong",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function statusTone(status: string): "neutral" | "success" | "danger" | "info" {
+  if (["approved", "accepted", "active"].includes(status)) return "success";
+  if (["rejected", "revoked", "expired", "suspended"].includes(status)) return "danger";
+  if (["changes_requested", "submitted_for_review", "resubmitted", "under_review", "requested", "opened"].includes(status)) return "info";
+  return "neutral";
+}
+
+export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
+  return <textarea className={cx(inputClass, "min-h-24 py-2", className)} {...props} />;
+}

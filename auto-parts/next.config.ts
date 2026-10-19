@@ -5,6 +5,8 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // رفع مستندات الشركاء يمر عبر Server Action (حد الملف 4 ميجابايت؛ حد Vercel لجسم الطلب 4.5).
+  experimental: { serverActions: { bodySizeLimit: "4.4mb" } },
   async headers() {
     return [
       {

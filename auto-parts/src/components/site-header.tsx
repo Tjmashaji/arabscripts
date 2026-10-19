@@ -29,6 +29,11 @@ export async function SiteHeader({ locale, path }: { locale: Locale; path: strin
                   {t("admin")}
                 </Link>
               )}
+              {session.organizations.length > 0 && (
+                <Link href="/partner" className="rounded-md px-3 py-2 hover:bg-white/10">
+                  {t("partner")}
+                </Link>
+              )}
               <Link href="/account" className="rounded-md px-3 py-2 hover:bg-white/10">
                 {t("account")}
               </Link>
