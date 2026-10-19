@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "title": "中国汽车配件",
+    "description": "汽车配件撮合平台，为您对接经过审核的奇瑞、长安、捷途、吉利、哈弗配件供应商和工厂，付款前提供明细报价。"
+  },
+  "brand": { "name": "中国汽车配件平台" },
+  "nav": {
+    "home": "首页",
+    "login": "登录",
+    "signup": "注册",
+    "account": "我的账户",
+    "admin": "管理后台",
+    "logout": "退出登录",
+    "language": "语言",
+    "skip": "跳至正文"
+  },
+  "home": {
+    "brandsLine": "奇瑞 · 长安 · 捷途 · 吉利 · 哈弗",
+    "title": "中国汽车配件，付款前价格明细清楚",
+    "subtitle": "我们为您对接经过审核的供应商和工厂。只有供应商近期确认过的配件才会显示为有货。",
+    "notice": "平台正在筹建中。首批供应商审核通过后，将开放配件搜索和询价。",
+    "brandsTitle": "支持的品牌",
+    "howTitle": "下单流程",
+    "steps": {
+      "s1": { "title": "搜索或询价", "body": "按名称或零件号搜索，或为未上架的配件提交询价。" },
+      "s2": { "title": "向供应商确认", "body": "我们请多家供应商确认库存、价格和供货周期。" },
+      "s3": { "title": "确认费用", "body": "您会收到费用明细：配件、运费和其他费用，每项标明已确认或预估。" },
+      "s4": { "title": "付款与备货", "body": "您确认后，供应商开始备货。" },
+      "s5": { "title": "发货与跟踪", "body": "随时查看订单和物流状态，直至签收。" }
+    },
+    "principlesTitle": "我们的承诺",
+    "principles": {
+      "p1": "明确标注配件类型：原厂件、副厂件、二手件或翻新件。",
+      "p2": "配件价格与运费、其他费用、税费和平台佣金分开列示。",
+      "p3": "只要还有未确定的必需费用，就不显示最终总价。"
+    },
+    "partnerTitle": "您是供应商、工厂或货运代理？",
+    "partnerBody": "目前合作伙伴通过邀请加入，每家企业在平台上开展业务前都需经过审核批准。"
+  },
+  "auth": {
+    "loginTitle": "登录",
+    "signupTitle": "注册",
+    "email": "电子邮箱",
+    "password": "密码",
+    "passwordHint": "至少 8 个字符。",
+    "fullName": "姓名",
+    "preferredLanguage": "界面语言偏好",
+    "submitLogin": "登录",
+    "submitSignup": "注册",
+    "noAccount": "还没有账户？",
+    "haveAccount": "已有账户？",
+    "checkEmailTitle": "请查收邮件",
+    "checkEmailBody": "我们已向您的邮箱发送激活链接，请在本设备上打开以完成注册。",
+    "confirmedTitle": "账户已激活",
+    "errors": {
+      "invalid": "邮箱或密码不正确。",
+      "notConfirmed": "邮箱尚未验证，请打开我们发送的激活链接。",
+      "weakPassword": "密码太短或强度不够。",
+      "invalidEmail": "请输入有效的邮箱地址。",
+      "nameRequired": "请输入姓名。",
+      "rateLimited": "尝试次数过多，请稍后再试。",
+      "confirmFailed": "激活链接无效或已过期。",
+      "generic": "操作失败，请重试。"
+    }
+  },
+  "account": {
+    "title": "我的账户",
+    "email": "电子邮箱",
+    "fullName": "姓名",
+    "phone": "手机号码",
+    "phoneHint": "请包含国家代码，例如 +86…",
+    "language": "界面语言",
+    "save": "保存",
+    "saved": "已保存。",
+    "saveFailed": "保存失败，请检查填写内容。",
+    "staffRoles": "您的管理角色",
+    "suspended": "此账户已被停用，请联系客服。"
+  },
+  "admin": {
+    "title": "管理后台",
+    "overview": "概览",
+    "access": "用户与角色",
+    "audit": "审计日志",
+    "signedInAs": "{name} · {role}",
+    "pendingOrgs": "待审核企业",
+    "pendingCapabilities": "待审核资质",
+    "activeOrgs": "已批准企业",
+    "staffCount": "管理团队成员",
+    "comingNext": "订单、询价、产品和物流将在对应阶段上线后显示在这里。",
+    "accessTitle": "用户与角色",
+    "accessHelp": "按邮箱查找用户（该用户需至少登录过一次），然后授予角色。",
+    "email": "电子邮箱",
+    "role": "角色",
+    "grant": "授予角色",
+    "revoke": "撤销",
+    "grantedAt": "授予时间",
+    "user": "用户",
+    "granted": "已授予角色。",
+    "revoked": "已撤销角色。",
+    "userNotFound": "平台上没有使用该邮箱的用户，对方需先登录一次。",
+    "lastSuperAdmin": "不能撤销最后一位超级管理员。",
+    "actionFailed": "操作失败。",
+    "auditTitle": "审计日志",
+    "auditEmpty": "暂无记录。",
+    "auditHelp": "最近 100 条敏感操作。日志只读，不能修改或删除。",
+    "when": "时间",
+    "actor": "操作人",
+    "action": "操作",
+    "entity": "记录",
+    "system": "系统"
+  },
+  "roles": {
+    "super_admin": "超级管理员",
+    "operations_admin": "运营管理员",
+    "finance_admin": "财务管理员",
+    "support_agent": "客服专员"
+  },
+  "common": {
+    "forbiddenTitle": "您没有权限访问此页面",
+    "forbiddenBody": "如认为有误，请联系平台管理员。",
+    "notFoundTitle": "页面不存在",
+    "backHome": "返回首页",
+    "footer": "撮合平台：每份报价都会注明实际卖家和开票方。"
+  }
+}
