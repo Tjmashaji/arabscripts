@@ -1,0 +1,44 @@
+# فحوصات منصة قطع الغيار مع كل دفع أو طلب دمج يمس مجلد auto-parts.
+name: auto-parts-ci
+
+on:
+  push:
+    paths: ["auto-parts/**", ".github/workflows/auto-parts-ci.yml"]
+  pull_request:
+    paths: ["auto-parts/**", ".github/workflows/auto-parts-ci.yml"]
+
+defaults:
+  run:
+    working-directory: auto-parts
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://yypwjmursrsoybuphcyb.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_Oe5DUKJQEHOCc4P-6y2ITg_IAA84nCI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: auto-parts/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser smoke tests (mobile and desktop, ar/en/zh)
+        run: npm run test:e2e
+
+  # يطبّق الترحيلات على Postgres 16 محلي ويشغّل اختبارات العزل والصلاحيات. لا يلمس Supabase الحقيقي.
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Database tests (RLS, roles, organization isolation)
+        run: bash supabase/tests/local/run.sh

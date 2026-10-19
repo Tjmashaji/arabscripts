@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "title": "Chinese Car Parts",
+    "description": "A brokerage platform connecting you with verified suppliers and manufacturers of Chery, Changan, Jetour, Geely and Haval parts, with an itemized price before you pay."
+  },
+  "brand": { "name": "Chinese Car Parts Platform" },
+  "nav": {
+    "home": "Home",
+    "login": "Sign in",
+    "signup": "Create account",
+    "account": "My account",
+    "admin": "Admin",
+    "logout": "Sign out",
+    "language": "Language",
+    "skip": "Skip to content"
+  },
+  "home": {
+    "brandsLine": "Chery · Changan · Jetour · Geely · Haval",
+    "title": "Parts for your Chinese car, with a clear itemized price before you pay",
+    "subtitle": "We connect you with verified suppliers and manufacturers. A part is shown as available only if the supplier confirmed it recently.",
+    "notice": "The platform is being set up. Part search and quote requests open once the first suppliers are approved.",
+    "brandsTitle": "Supported brands",
+    "howTitle": "How ordering works",
+    "steps": {
+      "s1": { "title": "Search or request", "body": "Search by name or part number, or request a part that isn't listed." },
+      "s2": { "title": "We check with suppliers", "body": "We ask more than one supplier to confirm availability, price and lead time." },
+      "s3": { "title": "Approve the cost", "body": "You get an itemized cost: part, shipping and fees, each marked confirmed or estimated." },
+      "s4": { "title": "Payment and preparation", "body": "After you approve, the supplier prepares the part." },
+      "s5": { "title": "Shipping and tracking", "body": "Follow your order and shipment until delivery." }
+    },
+    "principlesTitle": "Our commitments",
+    "principles": {
+      "p1": "We state the part type clearly: genuine, aftermarket, used or refurbished.",
+      "p2": "We separate the part price from shipping, fees, tax and the platform commission.",
+      "p3": "We never show a final total while a mandatory fee is still unknown."
+    },
+    "partnerTitle": "Supplier, manufacturer or freight agent?",
+    "partnerBody": "Partners join by invitation for now, and every company is reviewed and approved before any activity on the platform."
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "signupTitle": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "At least 8 characters.",
+    "fullName": "Full name",
+    "preferredLanguage": "Preferred interface language",
+    "submitLogin": "Sign in",
+    "submitSignup": "Create account",
+    "noAccount": "No account yet?",
+    "haveAccount": "Already have an account?",
+    "checkEmailTitle": "Check your email",
+    "checkEmailBody": "We sent an activation link to your email. Open it on this device to finish signing up.",
+    "confirmedTitle": "Your account is active",
+    "errors": {
+      "invalid": "Incorrect email or password.",
+      "notConfirmed": "Your email isn't confirmed yet. Open the activation link we sent you.",
+      "weakPassword": "The password is too short or too weak.",
+      "invalidEmail": "Enter a valid email address.",
+      "nameRequired": "Enter your name.",
+      "rateLimited": "Too many attempts. Wait a moment and try again.",
+      "confirmFailed": "The activation link is invalid or has expired.",
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "account": {
+    "title": "My account",
+    "email": "Email",
+    "fullName": "Full name",
+    "phone": "Mobile number",
+    "phoneHint": "With country code, e.g. +966…",
+    "language": "Interface language",
+    "save": "Save",
+    "saved": "Saved.",
+    "saveFailed": "Couldn't save. Check the fields.",
+    "staffRoles": "Your admin roles",
+    "suspended": "This account is suspended. Please contact support."
+  },
+  "admin": {
+    "title": "Admin",
+    "overview": "Overview",
+    "access": "Users and roles",
+    "audit": "Audit log",
+    "signedInAs": "{name} · {role}",
+    "pendingOrgs": "Companies awaiting approval",
+    "pendingCapabilities": "Capabilities awaiting review",
+    "activeOrgs": "Approved companies",
+    "staffCount": "Admin team members",
+    "comingNext": "Orders, quote requests, products and shipping appear here as their phases ship.",
+    "accessTitle": "Users and roles",
+    "accessHelp": "Find a user by email (they must have signed in at least once), then grant a role.",
+    "email": "Email",
+    "role": "Role",
+    "grant": "Grant role",
+    "revoke": "Revoke",
+    "grantedAt": "Granted",
+    "user": "User",
+    "granted": "Role granted.",
+    "revoked": "Role revoked.",
+    "userNotFound": "No user with this email on the platform. They need to sign in once first.",
+    "lastSuperAdmin": "The last super admin can't be removed.",
+    "actionFailed": "The action failed.",
+    "auditTitle": "Audit log",
+    "auditEmpty": "No recorded actions yet.",
+    "auditHelp": "The last 100 sensitive actions. The log is read-only and can't be edited or deleted.",
+    "when": "Time",
+    "actor": "By",
+    "action": "Action",
+    "entity": "Record",
+    "system": "System"
+  },
+  "roles": {
+    "super_admin": "Super admin",
+    "operations_admin": "Operations admin",
+    "finance_admin": "Finance admin",
+    "support_agent": "Support agent"
+  },
+  "common": {
+    "forbiddenTitle": "You don't have access to this page",
+    "forbiddenBody": "If you think this is a mistake, contact the platform administrator.",
+    "notFoundTitle": "Page not found",
+    "backHome": "Back to home",
+    "footer": "Brokerage platform: the actual seller and invoice issuer are named in every quote."
+  }
+}
