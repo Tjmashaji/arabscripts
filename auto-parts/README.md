@@ -15,7 +15,7 @@
 ## التشغيل محليًا
 
 ```bash
-cp .env.example .env.local   # القيم العامة لمشروع Supabase «10:55» موجودة فيه
+cp .env.example .env.local   # القيم العامة لمشروع Supabase المستقل «auto-parts» موجودة فيه
 npm install
 npm run dev                  # http://localhost:3000
 ```
@@ -47,8 +47,8 @@ npm run dev                  # http://localhost:3000
 
 ## قاعدة البيانات
 
-- الترحيلات في `supabase/migrations`. طُبّقت على مشروع «10:55» على أجزاء (`ap_foundation_1_tables` … `ap_foundation_5_rpc_organizations` و`ap_block_anonymous`) لأن أداة التطبيق كانت تتجاوز المهلة؛ المحتوى مطابق للملفات.
-- **المشروع مشترك مع تطبيقات أخرى**، لذلك كل الجداول والأنواع تبدأ بـ `ap_`، والدوال المساعدة في مخطط `ap_private` غير المنشور عبر API.
+- الترحيلات في `supabase/migrations`. تُطبّق على مشروع جديد دفعة واحدة عبر `supabase/manual/setup_new_project.sql` (SQL Editor ← Run).
+- كانت المنصة على مشروع مشترك، لذلك كل الجداول والأنواع تبدأ بـ `ap_`، والدوال المساعدة في مخطط `ap_private` غير المنشور عبر API.
 - لا يوجد مشغّل على `auth.users`؛ الملف الشخصي يُنشأ عند أول دخول عبر `ap_ensure_profile`.
 
 | الجدول | الغرض |
