@@ -92,7 +92,8 @@
     "confirmPassword": "确认密码",
     "resetSubmit": "保存密码",
     "passwordUpdated": "密码已修改。",
-    "backToLogin": "返回登录"
+    "backToLogin": "返回登录",
+    "verifying": "正在验证链接…"
   },
   "account": {
     "title": "我的账户",

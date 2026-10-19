@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SiteShell } from "@/components/site-shell";
-import { Alert, Button, Card, Field, Input, PageTitle, Select } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { Alert, Card, Field, Input, PageTitle, Select } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
 import { updateLanguage, updateProfile } from "@/server/account-actions";
 import { localeNames, locales, localeFrom } from "@/i18n/locales";
@@ -49,7 +50,7 @@ export default async function AccountPage({
               <Input id="phone" name="phone" type="tel" dir="ltr" defaultValue={session.phone ?? ""} pattern="\+?[0-9 ]{6,20}" autoComplete="tel" />
             </Field>
             <div>
-              <Button type="submit">{t("save")}</Button>
+              <SubmitButton>{t("save")}</SubmitButton>
             </div>
           </form>
         </Card>
@@ -68,9 +69,9 @@ export default async function AccountPage({
                 </Select>
               </Field>
             </div>
-            <Button type="submit" variant="secondary">
+            <SubmitButton variant="secondary">
               {t("save")}
-            </Button>
+            </SubmitButton>
           </form>
         </Card>
 

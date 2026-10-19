@@ -3,7 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
-import { Alert, Button, Card, Field, Input, PageTitle } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { getSession, localePath } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { signIn } from "@/server/auth-actions";
@@ -45,7 +46,7 @@ export default async function LoginPage({
             <Field label={t("password")} htmlFor="password">
               <Input id="password" name="password" type="password" autoComplete="current-password" dir="ltr" required minLength={8} maxLength={72} />
             </Field>
-            <Button type="submit">{t("submitLogin")}</Button>
+            <SubmitButton>{t("submitLogin")}</SubmitButton>
           </form>
           <Link href="/forgot-password" className="text-sm font-bold text-accent">
             {t("forgotLink")}

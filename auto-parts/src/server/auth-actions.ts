@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createEmailLinkClient } from "@/lib/supabase/implicit";
+import { isRecoveryToken } from "@/lib/auth-callback";
 import { env } from "@/lib/env";
 import { localePath } from "@/lib/auth";
 import { safeNextPath, stripLocalePrefix } from "@/lib/safe-redirect";
@@ -71,13 +73,11 @@ export async function signUp(form: FormData) {
     back(locale, "/signup", field === "fullName" ? "nameRequired" : field === "password" ? "weakPassword" : "invalidEmail", next);
   }
 
-  const supabase = await createClient();
-  const confirmUrl = `${env.siteUrl}/auth/confirm?next=${encodeURIComponent(localePath(preferred, stripLocalePrefix(next, locales)))}`;
-  const { error } = await supabase.auth.signUp({
+  const { error } = await createEmailLinkClient().auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     // لا نضع "role" في البيانات الوصفية: مشغّل تطبيق آخر في نفس المشروع يقرؤها.
-    options: { data: { full_name: parsed.data.fullName, locale: preferred, app: "auto_parts" }, emailRedirectTo: confirmUrl },
+    options: { data: { full_name: parsed.data.fullName, locale: preferred, app: "auto_parts" }, emailRedirectTo: `${env.siteUrl}${localePath(preferred, "/")}` },
   });
   if (error) back(locale, "/signup", authErrorKey(error), next);
 
@@ -111,10 +111,8 @@ export async function requestPasswordReset(form: FormData) {
   const email = z.email().max(254).safeParse(text(form, "email", 254));
   if (!email.success) redirect(`${localePath(locale, "/forgot-password")}?error=invalidEmail`);
 
-  const supabase = await createClient();
-  const next = localePath(locale, "/reset-password");
-  const { error } = await supabase.auth.resetPasswordForEmail(email.data, {
-    redirectTo: `${env.siteUrl}/auth/confirm?next=${encodeURIComponent(next)}`,
+  const { error } = await createEmailLinkClient().auth.resetPasswordForEmail(email.data, {
+    redirectTo: `${env.siteUrl}${localePath(locale, "/")}`,
   });
   if (error && authErrorKey(error) === "rateLimited") redirect(`${localePath(locale, "/forgot-password")}?error=rateLimited`);
   redirect(`${localePath(locale, "/forgot-password")}?sent=1`);
@@ -139,4 +137,28 @@ export async function updatePassword(form: FormData) {
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) redirect(`${page}?error=${error.code === "same_password" ? "samePassword" : authErrorKey(error)}`);
   redirect(`${localePath(locale, "/account")}?password=1`);
+}
+
+const emailLinkSchema = z.object({
+  accessToken: z.string().min(20).max(4096),
+  refreshToken: z.string().min(1).max(512),
+  type: z.string().max(32).nullable(),
+  locale: z.string().max(8),
+});
+
+// يحوّل رمز رابط البريد (تدفق implicit) إلى جلسة بكوكيز الخادم. Supabase يتحقق من الرمز قبل قبوله.
+export async function completeEmailLink(input: z.input<typeof emailLinkSchema>): Promise<string> {
+  const parsed = emailLinkSchema.safeParse(input);
+  const locale = isLocale(parsed.data?.locale) ? parsed.data.locale : "ar";
+  const failed = `${localePath(locale, "/login")}?error=confirmFailed`;
+  if (!parsed.success) return failed;
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.setSession({
+    access_token: parsed.data.accessToken,
+    refresh_token: parsed.data.refreshToken,
+  });
+  if (error) return failed;
+  const recovery = parsed.data.type === "recovery" || isRecoveryToken(parsed.data.accessToken);
+  return `${localePath(locale, recovery ? "/reset-password" : "/account")}?confirmed=1`;
 }

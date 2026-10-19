@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SiteShell } from "@/components/site-shell";
-import { Alert, Button, Card, Field, Input, PageTitle } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
 import { updatePassword } from "@/server/auth-actions";
 import { localeFrom } from "@/i18n/locales";
@@ -42,7 +43,7 @@ export default async function ResetPasswordPage({
             <Field label={t("confirmPassword")} htmlFor="confirm">
               <Input id="confirm" name="confirm" type="password" autoComplete="new-password" dir="ltr" required minLength={8} maxLength={72} />
             </Field>
-            <Button type="submit">{t("resetSubmit")}</Button>
+            <SubmitButton>{t("resetSubmit")}</SubmitButton>
           </form>
         </Card>
       </div>

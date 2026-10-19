@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
-import { Alert, Button, Card, Field, Input, PageTitle } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { requestPasswordReset } from "@/server/auth-actions";
 import { localeFrom } from "@/i18n/locales";
 
@@ -44,7 +45,7 @@ export default async function ForgotPasswordPage({
                 <Field label={t("email")} htmlFor="email">
                   <Input id="email" name="email" type="email" autoComplete="email" dir="ltr" required maxLength={254} />
                 </Field>
-                <Button type="submit">{t("forgotSubmit")}</Button>
+                <SubmitButton>{t("forgotSubmit")}</SubmitButton>
               </form>
             </>
           )}

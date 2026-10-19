@@ -14,6 +14,8 @@ export function authCallbackTarget(pathname: string, search: URLSearchParams): s
     params.set("token_hash", tokenHash);
     params.set("type", type);
   }
+  const flowId = search.get("sb_flow_id");
+  if (flowId) params.set("sb_flow_id", flowId);
   const next = search.get("next");
   if (next) params.set("next", next);
   return `/auth/confirm?${params.toString()}`;

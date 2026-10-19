@@ -3,7 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
-import { Alert, Button, Card, Field, Input, PageTitle, Select } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { Alert, Card, Field, Input, PageTitle, Select } from "@/components/ui";
 import { getSession, localePath } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { signUp } from "@/server/auth-actions";
@@ -64,7 +65,7 @@ export default async function SignupPage({
                     ))}
                   </Select>
                 </Field>
-                <Button type="submit">{t("submitSignup")}</Button>
+                <SubmitButton>{t("submitSignup")}</SubmitButton>
               </form>
               <p className="text-sm text-muted">
                 {t("haveAccount")}{" "}

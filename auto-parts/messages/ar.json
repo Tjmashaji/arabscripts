@@ -92,7 +92,8 @@
     "confirmPassword": "تأكيد كلمة المرور",
     "resetSubmit": "حفظ كلمة المرور",
     "passwordUpdated": "تم تغيير كلمة المرور.",
-    "backToLogin": "العودة لتسجيل الدخول"
+    "backToLogin": "العودة لتسجيل الدخول",
+    "verifying": "جارٍ التحقق من الرابط…"
   },
   "account": {
     "title": "حسابي",

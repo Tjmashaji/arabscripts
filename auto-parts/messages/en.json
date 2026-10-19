@@ -92,7 +92,8 @@
     "confirmPassword": "Confirm password",
     "resetSubmit": "Save password",
     "passwordUpdated": "Your password was changed.",
-    "backToLogin": "Back to sign in"
+    "backToLogin": "Back to sign in",
+    "verifying": "Verifying your link…"
   },
   "account": {
     "title": "My account",
