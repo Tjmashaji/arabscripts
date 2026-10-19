@@ -47,6 +47,9 @@ export default async function LoginPage({
             </Field>
             <Button type="submit">{t("submitLogin")}</Button>
           </form>
+          <Link href="/forgot-password" className="text-sm font-bold text-accent">
+            {t("forgotLink")}
+          </Link>
           <p className="text-sm text-muted">
             {t("noAccount")}{" "}
             <Link href={{ pathname: "/signup", query: { next } }} className="font-bold text-accent">

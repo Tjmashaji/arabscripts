@@ -16,12 +16,12 @@ export default async function AccountPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ saved?: string; error?: string; confirmed?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; confirmed?: string; password?: string }>;
 }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
   const session = await requireSession(locale, "/account");
-  const { saved, error, confirmed } = await searchParams;
+  const { saved, error, confirmed, password } = await searchParams;
   const t = await getTranslations("account");
   const tRoles = await getTranslations("roles");
   const tAuth = await getTranslations("auth");
@@ -32,6 +32,7 @@ export default async function AccountPage({
         <PageTitle>{t("title")}</PageTitle>
         {confirmed && <Alert tone="success">{tAuth("confirmedTitle")}</Alert>}
         {saved && <Alert tone="success">{t("saved")}</Alert>}
+        {password && <Alert tone="success">{tAuth("passwordUpdated")}</Alert>}
         {error && <Alert tone="danger">{t("saveFailed")}</Alert>}
         {session.status === "suspended" && <Alert tone="danger">{t("suspended")}</Alert>}
 
