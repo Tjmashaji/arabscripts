@@ -9,6 +9,7 @@ export const CATEGORIES = {
   shapes: { label: "الأشكال", icon: "🔺", builtin: true, hint: "دائرة، مربع، مثلث…" },
   animals: { label: "الحيوانات", icon: "🦁", builtin: true, hint: "حيوان ومعلومة بسيطة عنه" },
   manners: { label: "آداب وعادات", icon: "🤝", builtin: true, hint: "غسل اليدين، الشكر، المشاركة…" },
+  islam: { label: "ديني وإسلامي", icon: "🕌", builtin: true, hint: "الأركان، الوضوء، الصلاة، الأذكار" },
   custom: { label: "موضوع من اختيارك", icon: "✨", builtin: false, hint: "يكتبه المخرج الذكي (Claude)" },
 } as const;
 export type Category = keyof typeof CATEGORIES;

@@ -48,7 +48,7 @@ export default async function Landing() {
       </section>
       <section className="mx-auto max-w-6xl px-5 pb-16">
         <h2 className="font-display text-2xl mb-6">دروس جاهزة بلا أي إعداد</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {CATEGORY_IDS.map((c) => (
             <div key={c} className="rounded-2xl border border-line bg-surface p-4 text-center">
               <Emoji e={CATEGORIES[c].icon} size={40} className="mx-auto" />

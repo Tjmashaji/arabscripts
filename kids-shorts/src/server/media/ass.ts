@@ -44,7 +44,7 @@ export function buildAss(width: number, height: number, lines: AssLine[]) {
       .filter((l) => clean(l.text) && l.endMs > l.startMs)
       .map((l) => {
         // ظهور بقفزة صغيرة للعناوين، وتلاشٍ ناعم للترجمة
-        const fx = l.style === "Caption" ? "\\fad(120,80)" : `\\fad(120,120)\\fscx40\\fscy40\\t(0,260,\\fscx108\\fscy108)\\t(260,380,\\fscx100\\fscy100)${l.size ? `\\fs${px(l.size)}` : ""}`;
+        const fx = l.style === "Caption" ? "\\fad(120,80)" : `\\fad(120,120)\\fscx40\\fscy40\\t(0,260,\\fscx108\\fscy108)\\t(260,380,\\fscx100\\fscy100)${l.size ? `\\fs${px(l.size)}\\bord${px(Math.min(14, l.size * 0.05))}\\shad${px(Math.min(8, l.size * 0.03))}` : ""}`;
         return `Dialogue: 0,${ts(l.startMs)},${ts(l.endMs)},${l.style},,0,0,0,,{${fx}}${clean(l.text)}`;
       }),
     "",

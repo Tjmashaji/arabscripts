@@ -23,6 +23,8 @@ export function NewWizard({ services }: { services: Services }) {
 
   function pick(c: Category) {
     setCategory(c);
+    // كثير من الأهالي يفضّلون الدروس الدينية بلا موسيقى
+    if (c === "islam") setMusic("none");
     setSubject(subjectsFor(c)[0]?.value ?? "");
   }
 
@@ -42,7 +44,7 @@ export function NewWizard({ services }: { services: Services }) {
     <div className="grid gap-5 max-w-4xl">
       <Card>
         <h2 className="font-display text-lg mb-4">١. ماذا نتعلم اليوم؟</h2>
-        <div role="radiogroup" aria-label="المجال" className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+        <div role="radiogroup" aria-label="المجال" className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
           {CATEGORY_IDS.map((c) => {
             const on = c === category;
             return (
