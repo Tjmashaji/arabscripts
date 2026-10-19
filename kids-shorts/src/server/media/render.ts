@@ -15,8 +15,8 @@ export const EMOJI_DIR = path.resolve(process.cwd(), "assets", "emoji");
 export type RenderScene = { durationMs: number; bg: string; emoji: string[]; text: string; narration: string; voice: string | null; voiceMs: number | null };
 export type RenderPlan = { width: number; height: number; fps: number; scenes: RenderScene[]; music: "none" | "calm" | "happy"; captions: boolean };
 
-const TRANSITION_S = 0.4;
-const TRANSITIONS = ["fade", "slideleft", "circleopen", "smoothup", "radial"];
+// انتقال واحد ثابت بين كل المشاهد: تلاشٍ متقاطع قصير يمنع القفز دون أن يشتت الطفل
+const TRANSITION_S = 0.3;
 const VOICE_DELAY_MS = 250;
 
 export const totalMs = (p: Pick<RenderPlan, "scenes">) => p.scenes.reduce((a, s) => a + s.durationMs, 0);
@@ -73,13 +73,18 @@ async function renderSceneClip(s: RenderScene, i: number, W: number, H: number, 
     const spots = layout(s.emoji.length, W, H, hasTitle);
     s.emoji.forEach((e, k) => {
       const { x, y, size } = spots[k];
-      const delay = 0.12 + k * 0.15;
+      // ظهور متتابع بفارق 80ms، بعد بدء التلاشي بين المشهدين
+      const delay = 0.15 + k * 0.08;
       const phase = (k * 1.3 + i).toFixed(2);
+      // نابض مخمَّد (ارتداد ≈ 0.2): يبدأ من 65% من الحجم لا من الصفر، ويستقر خلال نصف ثانية تقريبًا
+      const p = `max(0,t-${delay})`;
+      const spring = `(1-0.35*exp(-9*${p})*cos(14*${p}))`;
       args.push("-loop", "1", "-framerate", String(fps), "-t", len.toFixed(3), "-i", path.join(EMOJI_DIR, `${emojiFile(e)}.png`));
       // ظهور بالتكبير ثم تمايل خفيف للأعلى والأسفل
       f.push(
-        `[${input}:v]format=rgba,scale=w='max(2,trunc(${size}*min(1,max(0,(t-${delay})/0.3))*(1+0.08*sin(min(1,max(0,(t-${delay})/0.3))*PI))/2)*2)':h=-2:eval=frame[e${k}]`,
-        `[${chain}][e${k}]overlay=x='${x.toFixed(1)}-w/2':y='${y.toFixed(1)}-h/2+${Math.round(size * 0.04)}*sin(2*PI*0.7*t+${phase})':eval=frame:format=auto[c${k}]`,
+        `[${input}:v]format=rgba,fade=t=in:st=${delay}:d=0.18:alpha=1,scale=w='trunc(${size}*${spring}/2)*2':h=-2:eval=frame[e${k}]`,
+        // تمايل هادئ ومستمر (حركة ثابتة الإيقاع) بعد الاستقرار
+        `[${chain}][e${k}]overlay=x='${x.toFixed(1)}-w/2':y='${y.toFixed(1)}-h/2+${Math.round(size * 0.025)}*sin(2*PI*0.5*t+${phase})':eval=frame:format=auto[c${k}]`,
       );
       chain = `c${k}`;
       input++;
@@ -114,7 +119,7 @@ export async function render(plan: RenderPlan, outFile: string, thumbFile: strin
     clips.forEach((c) => args.push("-i", c));
     let chain = "0:v";
     for (let i = 1; i < clips.length; i++) {
-      f.push(`[${chain}][${i}:v]xfade=transition=${TRANSITIONS[(i - 1) % TRANSITIONS.length]}:duration=${TRANSITION_S}:offset=${starts[i].toFixed(3)}[x${i}]`);
+      f.push(`[${chain}][${i}:v]xfade=transition=fade:duration=${TRANSITION_S}:offset=${starts[i].toFixed(3)}[x${i}]`);
       chain = `x${i}`;
     }
 
