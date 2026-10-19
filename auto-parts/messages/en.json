@@ -3,7 +3,9 @@
     "title": "Chinese Car Parts",
     "description": "A brokerage platform connecting you with verified suppliers and manufacturers of Chery, Changan, Jetour, Geely and Haval parts, with an itemized price before you pay."
   },
-  "brand": { "name": "Chinese Car Parts Platform" },
+  "brand": {
+    "name": "Chinese Car Parts Platform"
+  },
   "nav": {
     "home": "Home",
     "login": "Sign in",
@@ -22,11 +24,26 @@
     "brandsTitle": "Supported brands",
     "howTitle": "How ordering works",
     "steps": {
-      "s1": { "title": "Search or request", "body": "Search by name or part number, or request a part that isn't listed." },
-      "s2": { "title": "We check with suppliers", "body": "We ask more than one supplier to confirm availability, price and lead time." },
-      "s3": { "title": "Approve the cost", "body": "You get an itemized cost: part, shipping and fees, each marked confirmed or estimated." },
-      "s4": { "title": "Payment and preparation", "body": "After you approve, the supplier prepares the part." },
-      "s5": { "title": "Shipping and tracking", "body": "Follow your order and shipment until delivery." }
+      "s1": {
+        "title": "Search or request",
+        "body": "Search by name or part number, or request a part that isn't listed."
+      },
+      "s2": {
+        "title": "We check with suppliers",
+        "body": "We ask more than one supplier to confirm availability, price and lead time."
+      },
+      "s3": {
+        "title": "Approve the cost",
+        "body": "You get an itemized cost: part, shipping and fees, each marked confirmed or estimated."
+      },
+      "s4": {
+        "title": "Payment and preparation",
+        "body": "After you approve, the supplier prepares the part."
+      },
+      "s5": {
+        "title": "Shipping and tracking",
+        "body": "Follow your order and shipment until delivery."
+      }
     },
     "principlesTitle": "Our commitments",
     "principles": {
@@ -60,8 +77,22 @@
       "nameRequired": "Enter your name.",
       "rateLimited": "Too many attempts. Wait a moment and try again.",
       "confirmFailed": "The activation link is invalid or has expired.",
-      "generic": "Something went wrong. Please try again."
-    }
+      "generic": "Something went wrong. Please try again.",
+      "mismatch": "The passwords don't match.",
+      "samePassword": "Choose a password different from your current one."
+    },
+    "forgotLink": "Forgot your password?",
+    "forgotTitle": "Reset your password",
+    "forgotHelp": "Enter your email and we'll send you a link to set a new password.",
+    "forgotSubmit": "Send link",
+    "forgotSentTitle": "Check your email",
+    "forgotSentBody": "If this email is registered, you'll receive a message with a link to set a new password. Open it on this device.",
+    "resetTitle": "New password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "resetSubmit": "Save password",
+    "passwordUpdated": "Your password was changed.",
+    "backToLogin": "Back to sign in"
   },
   "account": {
     "title": "My account",

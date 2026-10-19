@@ -104,3 +104,39 @@ export async function switchLocale(form: FormData) {
   (await cookies()).set("NEXT_LOCALE", target, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
   redirect(localePath(target, path));
 }
+
+// يرسل رابط تعيين كلمة مرور جديدة. النتيجة نفسها دائمًا حتى لا تكشف الصفحة أي بريد مسجّل.
+export async function requestPasswordReset(form: FormData) {
+  const locale = formLocale(form);
+  const email = z.email().max(254).safeParse(text(form, "email", 254));
+  if (!email.success) redirect(`${localePath(locale, "/forgot-password")}?error=invalidEmail`);
+
+  const supabase = await createClient();
+  const next = localePath(locale, "/reset-password");
+  const { error } = await supabase.auth.resetPasswordForEmail(email.data, {
+    redirectTo: `${env.siteUrl}/auth/confirm?next=${encodeURIComponent(next)}`,
+  });
+  if (error && authErrorKey(error) === "rateLimited") redirect(`${localePath(locale, "/forgot-password")}?error=rateLimited`);
+  redirect(`${localePath(locale, "/forgot-password")}?sent=1`);
+}
+
+const newPasswordSchema = z
+  .object({ password: z.string().min(8).max(72), confirm: z.string() })
+  .refine((v) => v.password === v.confirm, { path: ["confirm"] });
+
+// يعمل فقط بجلسة فتحها رابط الاستعادة (أو جلسة دخول عادية).
+export async function updatePassword(form: FormData) {
+  const locale = formLocale(form);
+  const page = localePath(locale, "/reset-password");
+  const parsed = newPasswordSchema.safeParse({ password: form.get("password"), confirm: form.get("confirm") });
+  if (!parsed.success) {
+    redirect(`${page}?error=${parsed.error.issues[0]?.path[0] === "confirm" ? "mismatch" : "weakPassword"}`);
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) redirect(`${localePath(locale, "/login")}?next=${encodeURIComponent("/reset-password")}`);
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) redirect(`${page}?error=${error.code === "same_password" ? "samePassword" : authErrorKey(error)}`);
+  redirect(`${localePath(locale, "/account")}?password=1`);
+}

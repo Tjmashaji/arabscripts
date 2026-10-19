@@ -69,6 +69,16 @@ test.describe("browser language", () => {
   });
 });
 
+test("forgot-password is linked from sign in; reset-password needs a session", async ({ page }) => {
+  await page.goto("/login");
+  await page.locator('a[href="/forgot-password"]').click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.locator('input[name="email"]')).toBeVisible();
+  await noHorizontalScroll(page);
+  await page.goto("/reset-password");
+  await expect(page).toHaveURL(/\/login\?next=%2Freset-password$/);
+});
+
 test("unknown pages return 404", async ({ page }) => {
   const res = await page.goto("/does-not-exist");
   expect(res?.status()).toBe(404);
