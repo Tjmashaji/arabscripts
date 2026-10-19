@@ -15,6 +15,7 @@ export type Session = {
   locale: Locale;
   staffRoles: StaffRole[];
   permissions: ReadonlySet<string>;
+  organizations: { id: string; role: string }[];
 };
 
 // جلسة المستخدم الحالية مع ملفه وأدواره وصلاحياته. تُحسب مرة واحدة لكل طلب.
@@ -41,9 +42,10 @@ export const getSession = cache(async (): Promise<Session | null> => {
     profile = data;
   }
 
-  const [{ data: prefs }, { data: roles }] = await Promise.all([
+  const [{ data: prefs }, { data: roles }, { data: memberships }] = await Promise.all([
     supabase.from("ap_user_preferences").select("locale").eq("user_id", user.id).maybeSingle(),
     supabase.from("ap_staff_roles").select("role").eq("user_id", user.id),
+    supabase.from("ap_organization_members").select("organization_id, member_role").eq("user_id", user.id).eq("status", "active"),
   ]);
   const staffRoles = (roles ?? []).map((r) => r.role as StaffRole);
   let permissions: string[] = [];
@@ -61,6 +63,7 @@ export const getSession = cache(async (): Promise<Session | null> => {
     locale: isLocale(prefs?.locale) ? prefs.locale : defaultLocale,
     staffRoles,
     permissions: new Set(permissions),
+    organizations: (memberships ?? []).map((m) => ({ id: m.organization_id as string, role: m.member_role as string })),
   };
 });
 

@@ -81,6 +81,11 @@ export async function signUp(form: FormData) {
   });
   if (error) back(locale, "/signup", authErrorKey(error), next);
 
+  // بعد تفعيل البريد يعود المستخدم للصفحة التي جاء منها (مثل رابط دعوة شريك).
+  const afterConfirm = stripLocalePrefix(next, locales);
+  if (afterConfirm !== "/account") {
+    (await cookies()).set("ap_after_confirm", afterConfirm, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 });
+  }
   // نفس الرسالة سواء كان البريد مسجلًا من قبل أم لا، حتى لا تكشف الصفحة من لديه حساب.
   redirect(`${localePath(locale, "/signup")}?sent=1`);
 }
@@ -160,5 +165,9 @@ export async function completeEmailLink(input: z.input<typeof emailLinkSchema>):
   });
   if (error) return failed;
   const recovery = parsed.data.type === "recovery" || isRecoveryToken(parsed.data.accessToken);
-  return `${localePath(locale, recovery ? "/reset-password" : "/account")}?confirmed=1`;
+  if (recovery) return `${localePath(locale, "/reset-password")}?confirmed=1`;
+  const jar = await cookies();
+  const after = safeNextPath(jar.get("ap_after_confirm")?.value, "/account");
+  jar.delete("ap_after_confirm");
+  return `${localePath(locale, after)}${after.includes("?") ? "&" : "?"}confirmed=1`;
 }
