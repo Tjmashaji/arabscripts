@@ -2,12 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import createIntlMiddleware from "next-intl/middleware";
 import { createServerClient } from "@supabase/ssr";
 import { routing } from "@/i18n/routing";
+import { authCallbackTarget } from "@/lib/auth-callback";
 
 const intl = createIntlMiddleware(routing);
 
 // 1) next-intl يحدد اللغة ويعيد التوجيه عند الحاجة. 2) Supabase يجدد جلسة الدخول ويكتب الكوكيز في نفس الاستجابة.
 // لا قرارات صلاحيات هنا: كل صفحة محمية تتحقق في الخادم، وقاعدة البيانات تتحقق مرة أخرى عبر RLS.
 export async function proxy(request: NextRequest) {
+  const callback = authCallbackTarget(request.nextUrl.pathname, request.nextUrl.searchParams);
+  if (callback) return NextResponse.redirect(new URL(callback, request.url));
+
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth/");
   const response = isAuthRoute ? NextResponse.next() : intl(request);
 
