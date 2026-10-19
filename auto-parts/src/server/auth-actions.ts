@@ -77,7 +77,7 @@ export async function signUp(form: FormData) {
     email: parsed.data.email,
     password: parsed.data.password,
     // لا نضع "role" في البيانات الوصفية: مشغّل تطبيق آخر في نفس المشروع يقرؤها.
-    options: { data: { full_name: parsed.data.fullName, locale: preferred, app: "auto_parts" }, emailRedirectTo: `${env.siteUrl}${localePath(preferred, "/")}` },
+    options: { data: { full_name: parsed.data.fullName, locale: preferred, app: "auto_parts" }, emailRedirectTo: `${env.siteUrl}/auth/confirm` },
   });
   if (error) back(locale, "/signup", authErrorKey(error), next);
 
@@ -112,7 +112,7 @@ export async function requestPasswordReset(form: FormData) {
   if (!email.success) redirect(`${localePath(locale, "/forgot-password")}?error=invalidEmail`);
 
   const { error } = await createEmailLinkClient().auth.resetPasswordForEmail(email.data, {
-    redirectTo: `${env.siteUrl}${localePath(locale, "/")}`,
+    redirectTo: `${env.siteUrl}/auth/confirm`,
   });
   if (error && authErrorKey(error) === "rateLimited") redirect(`${localePath(locale, "/forgot-password")}?error=rateLimited`);
   redirect(`${localePath(locale, "/forgot-password")}?sent=1`);

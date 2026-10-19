@@ -94,6 +94,12 @@ test("email links carried in the # fragment are handled on any page", async ({ p
   await expect(page.locator("main [role=alert]")).toBeVisible();
 });
 
+test("/auth/confirm forwards a # fragment link to the handler", async ({ page }) => {
+  await page.goto("/auth/confirm#access_token=bad.token.value-that-is-long-enough&refresh_token=bad&type=recovery");
+  await expect(page).toHaveURL(/\/login\?error=confirmFailed$/);
+  await expect(page.locator("main [role=alert]")).toBeVisible();
+});
+
 test("unknown pages return 404", async ({ page }) => {
   const res = await page.goto("/does-not-exist");
   expect(res?.status()).toBe(404);

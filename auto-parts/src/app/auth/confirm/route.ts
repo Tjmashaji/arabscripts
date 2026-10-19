@@ -12,6 +12,13 @@ export async function GET(request: NextRequest) {
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
 
+  // تدفق implicit: الجلسة في جزء # الذي لا يصل للخادم. نحوّل للرئيسية والمتصفح يحتفظ بالجزء #،
+  // فيلتقطه معالج روابط البريد هناك. (المسار ثابت بلا معاملات ليطابق قائمة Redirect URLs حرفيًا.)
+  if (!code && !(tokenHash && type)) {
+    const failed = url.searchParams.has("error") || url.searchParams.has("error_code");
+    return NextResponse.redirect(new URL(failed ? "/login?error=confirmFailed" : "/", url.origin));
+  }
+
   const supabase = await createClient();
   let ok = false;
   let accessToken: string | undefined;
