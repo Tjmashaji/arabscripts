@@ -6,6 +6,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { directionOf } from "@/i18n/locales";
 import { plex } from "../fonts";
+import { EmailLinkHandler } from "@/components/email-link-handler";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -21,11 +22,15 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  const verifying = (await getTranslations({ locale, namespace: "auth" }))("verifying");
 
   return (
     <html lang={locale} dir={directionOf(locale)} className={plex.variable}>
       <body className="antialiased">
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          <EmailLinkHandler locale={locale} verifyingLabel={verifying} />
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

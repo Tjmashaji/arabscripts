@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   let ok = false;
   let accessToken: string | undefined;
   if (code) {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const flowId = url.searchParams.get("sb_flow_id") ?? undefined;
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code, flowId ? { flowId } : undefined);
     ok = !error;
     accessToken = data.session?.access_token;
   } else if (tokenHash && type) {
