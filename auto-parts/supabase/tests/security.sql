@@ -12,7 +12,7 @@ declare
     'ap_organizations.registered_address', 'ap_organizations.operating_country', 'ap_organizations.website',
     'ap_organizations.activity_description', 'ap_organizations.billing_currency', 'ap_organizations.preferred_locale'];
   -- الدوال الوحيدة المتاحة للزائر: البحث والعروض العامة وفحص رابط الدعوة.
-  allowed_anon text[] := array['ap_search_products', 'ap_public_offers', 'ap_invitation_lookup'];
+  allowed_anon text[] := array['ap_search_products', 'ap_public_offers', 'ap_invitation_lookup', 'ap_track_order'];
 begin
   select array_agg(c.relname order by c.relname) into bad from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'ap\_%' and not c.relrowsecurity;
@@ -36,7 +36,7 @@ begin
   select array_agg(distinct p.proname) into bad from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname like 'ap\_%' and has_function_privilege('anon', p.oid, 'execute')
       and not p.proname = any (allowed_anon);
-  out := array_append(out, (case when bad is null then 'PASS' else 'FAIL' end) || ' S5 الزائر لا ينفّذ إلا البحث والعروض العامة وفحص الدعوة' || coalesce(': ' || array_to_string(bad, ', '), ''));
+  out := array_append(out, (case when bad is null then 'PASS' else 'FAIL' end) || ' S5 الزائر لا ينفّذ إلا البحث والعروض العامة وفحص الدعوة وتتبع الطلب' || coalesce(': ' || array_to_string(bad, ', '), ''));
 
   select array_agg(id) into bad from storage.buckets where id like 'ap-%' and public and id <> 'ap-product-media';
   out := array_append(out, (case when bad is null then 'PASS' else 'FAIL' end) || ' S6 كل مستودعات الملفات خاصة عدا صور المنتجات' || coalesce(': ' || array_to_string(bad, ', '), ''));

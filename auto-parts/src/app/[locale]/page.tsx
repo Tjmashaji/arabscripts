@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { env } from "@/lib/env";
+import { alternates, jsonLd, localizedPath } from "@/lib/seo";
 import { SiteShell } from "@/components/site-shell";
 import { PartSearchForm } from "@/components/part-search-form";
 import { Link } from "@/i18n/navigation";
@@ -10,6 +13,10 @@ import { localeFrom } from "@/i18n/locales";
 const stepKeys = ["s1", "s2", "s3", "s4", "s5"] as const;
 const principleKeys = ["p1", "p2", "p3"] as const;
 
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  return { alternates: alternates(await localeFrom(params), "/") };
+}
+
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
@@ -18,6 +25,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   return (
     <SiteShell locale={locale} path="/">
+      {/* بيانات منظمة لمحركات البحث: اسم الموقع وصندوق البحث. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd({
+        "@context": "https://schema.org", "@type": "WebSite", name: env.platformName ?? (await getTranslations("meta"))("title"),
+        url: `${env.siteUrl}${localizedPath(locale, "/")}`, inLanguage: locale,
+        potentialAction: { "@type": "SearchAction", target: `${env.siteUrl}${localizedPath(locale, "/products")}?q={search_term_string}`, "query-input": "required name=search_term_string" },
+      }) }} />
       <section className="bg-ink text-white">
         <div className="mx-auto max-w-6xl px-4 pb-12 pt-10">
           <p className="text-sm font-bold text-accent">{t("brandsLine")}</p>
@@ -38,7 +51,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {brands.map((b) => (
               <li key={b.id}>
-                <Link href={{ pathname: "/products", query: { brand: b.id } }} className="block rounded-xl border border-line bg-card px-4 py-5 text-center hover:border-accent">
+                <Link href={`/brands/${b.slug}`} className="block rounded-xl border border-line bg-card px-4 py-5 text-center hover:border-accent">
                   <span className="block font-bold">{localName(b, locale)}</span>
                   {locale !== "en" && <span className="ltr-value mt-1 block text-xs text-muted">{b.name_en}</span>}
                 </Link>

@@ -211,5 +211,20 @@ begin
   select count(*) into n from public.ap_audit_logs where entity_type = 'ap_payments';
   out := array_append(out, (case when n >= 1 then 'PASS' else 'FAIL' end) || ' G5 تسجيل الدفع في سجل التدقيق');
 
+  -- ───────── التتبع العام (بلا تسجيل دخول) ─────────
+  select reference into x from public.ap_orders where id = ord;
+  set local role anon; perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  j := public.ap_track_order(lower(x), '+966500000001');
+  out := array_append(out, (case when j->>'reference' = x and j->'shipment'->>'status' = 'delivered'
+    and jsonb_array_length(j->'shipment'->'events') = 6 then 'PASS' else 'FAIL' end) || ' T1 الزائر يتتبع طلبه برقم الطلب والجوال');
+  out := array_append(out, (case when j::text !~ '(total|amount|price|recipient|address|contact|عميل|حي الشاطئ|966)' then 'PASS' else 'FAIL' end)
+    || ' T2 لا أسعار ولا أسماء ولا عناوين ولا جوال في نتيجة التتبع');
+  out := array_append(out, (case when public.ap_track_order(x, '+966511111111') is null then 'PASS' else 'FAIL' end) || ' T3 جوال خاطئ لا يكشف شيئًا');
+  out := array_append(out, (case when public.ap_track_order('ORD-1', '+966500000001') is null then 'PASS' else 'FAIL' end) || ' T4 رقم بصيغة غير صحيحة');
+  for n in 1..9 loop perform public.ap_track_order(x, '+9667' || lpad(n::text, 8, '0')); end loop;
+  ok := false; begin perform public.ap_track_order(x, '+966500000001'); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' T5 بعد 10 محاولات خاطئة يُقفل التتبع لهذا الطلب حتى بالجوال الصحيح');
+  reset role;
+
   raise exception 'RESULT%', E'\n' || array_to_string(out, E'\n');
 end $$;

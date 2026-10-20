@@ -211,3 +211,57 @@ test("health endpoint reports the database", async ({ request }) => {
   expect(res.status()).toBe(body.db ? 200 : 503);
   expect(body).toHaveProperty("latencyMs");
 });
+
+for (const [path, lang] of [["/about", "ar"], ["/en/how-it-works", "en"], ["/zh/faq", "zh"], ["/privacy", "ar"], ["/en/terms", "en"]] as const) {
+  test(`trust page ${path} renders with hreflang and no horizontal scroll`, async ({ page }) => {
+    await page.goto(path);
+    await expect(page.locator("html")).toHaveAttribute("lang", lang);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.locator('link[rel="alternate"][hreflang="zh"]')).toHaveCount(1);
+    await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
+    await noHorizontalScroll(page);
+  });
+}
+
+test("the footer links to the trust pages", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('footer a[href="/faq"]').click();
+  await expect(page).toHaveURL(/\/faq$/);
+  await page.locator("details").first().click();
+  await expect(page.locator("details").first()).toHaveAttribute("open", "");
+});
+
+test("public tracking validates input and never puts the phone in the URL", async ({ page }) => {
+  await page.goto("/track");
+  await page.fill('input[name="reference"]', "ORD-1");
+  await page.fill('input[name="phone"]', "0501234567");
+  await page.getByRole("button", { name: "تتبع" }).click();
+  await expect(page.locator("main [role=alert]")).toBeVisible();
+  // الحقول تبقى بعد الإرسال؛ تصحيح الرقم فقط يكفي لإعادة المحاولة.
+  await expect(page.locator('input[name="phone"]')).toHaveValue("0501234567");
+  await page.fill('input[name="reference"]', "ORD-999999");
+  await page.getByRole("button", { name: "تتبع" }).click();
+  // وصل الطلب لقاعدة البيانات (لم يعد خطأ صيغة): «لم نجد» بعد تطبيق ترحيل التتبع على المشروع.
+  await expect(page.locator("main [role=alert]")).not.toContainText("تحقق من رقم الطلب");
+  expect(page.url()).not.toContain("0501234567");
+  await noHorizontalScroll(page);
+});
+
+test("brand pages exist for SEO and unknown brands are 404", async ({ page }) => {
+  await page.goto("/brands/chery");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("شيري");
+  await page.goto("/en/brands/geely");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Geely");
+  const res = await page.goto("/brands/not-a-brand");
+  expect(res!.status()).toBe(404);
+});
+
+test("sitemap and robots are published", async ({ request }) => {
+  const sitemap = await (await request.get("/sitemap.xml")).text();
+  expect(sitemap).toContain("/brands/chery");
+  expect(sitemap).toContain("/en/faq");
+  expect(sitemap).toContain('hreflang="zh"');
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).toContain("Disallow: /admin");
+  expect(robots).toContain("Sitemap:");
+});

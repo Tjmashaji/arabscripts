@@ -144,8 +144,9 @@ begin
   perform set_config('request.jwt.claims', '{"role":"anon"}', true);
   select count(*) into n from public.ap_locales;
   out := array_append(out, (case when n = 3 then 'PASS' else 'FAIL' end) || ' H1 الزائر يرى اللغات المفعّلة');
-  select count(*) into n from public.ap_platform_settings;
-  out := array_append(out, (case when n = 3 then 'PASS' else 'FAIL' end) || ' H2 الزائر يرى الإعدادات العامة فقط');
+  select count(*) filter (where not is_public) into n from public.ap_platform_settings;
+  out := array_append(out, (case when n = 0 and exists (select 1 from public.ap_platform_settings where key = 'default_locale')
+    then 'PASS' else 'FAIL' end) || ' H2 الزائر يرى الإعدادات العامة فقط');
   ok := false; begin select count(*) into n from public.ap_profiles; exception when others then ok := true; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' H3 الزائر لا يقرأ الملفات الشخصية');
   ok := false; begin perform public.ap_ensure_profile('x', 'ar'); exception when others then ok := true; end;

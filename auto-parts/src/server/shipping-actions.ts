@@ -1,7 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { editableSettings, parseSetting } from "@/lib/site";
+import { SETTINGS_TAG } from "@/lib/site-data";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { localePath, requireSession, requireStaff } from "@/lib/auth";
@@ -241,16 +243,11 @@ export async function updateSetting(form: FormData) {
   await requireStaff(locale, "/admin/settings", "settings.edit");
   const back = localePath(locale, "/admin/settings");
   const key = text(form, "key", 60);
-  const raw = text(form, "value", 200);
-  // القيمة الرقمية تُحفظ رقمًا، والنص يُحفظ نصًا (jsonb).
-  const value = /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw;
-  if (!/^[a-z_]+$/.test(key) || raw === "") redirect(withQuery(back, "error=invalid"));
-  if (key === "service_fee_percent" && (typeof value !== "number" || value < 0 || value > 50)) redirect(withQuery(back, "error=invalid"));
-  if (key === "availability_max_age_hours" && (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 720)) {
-    redirect(withQuery(back, "error=invalid"));
-  }
+  const value = (editableSettings as string[]).includes(key) ? parseSetting(key, text(form, "value", 200)) : null;
+  if (value === null) redirect(withQuery(back, `error=invalid&key=${encodeURIComponent(key)}`));
   const supabase = await createClient();
   const { error } = await supabase.rpc("ap_admin_update_setting", { p_key: key, p_value: value });
+  updateTag(SETTINGS_TAG);
   redirect(withQuery(back, error ? fail(error.message) : "saved=1"));
 }
 
