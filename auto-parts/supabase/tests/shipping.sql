@@ -193,14 +193,14 @@ begin
 
   -- ───────── التقارير ─────────
   perform set_config('request.jwt.claims', json_build_object('sub', sup, 'role', 'authenticated')::text, true);
-  ok := false; begin perform public.ap_report_summary(current_date - 1, current_date); exception when others then ok := true; end;
+  ok := false; begin perform public.ap_report_summary((now() at time zone 'Asia/Riyadh')::date - 1, (now() at time zone 'Asia/Riyadh')::date); exception when others then ok := true; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' G1 الدعم لا يقرأ التقارير');
   perform set_config('request.jwt.claims', json_build_object('sub', fin, 'role', 'authenticated')::text, true);
-  j := public.ap_report_summary(current_date - 1, current_date);
+  j := public.ap_report_summary((now() at time zone 'Asia/Riyadh')::date - 1, (now() at time zone 'Asia/Riyadh')::date);
   out := array_append(out, (case when (j->'money'->0->>'gmv')::numeric = 570 and (j->'money'->0->>'service_fee')::numeric = 40
     and (j->'money'->0->>'net_service_income')::numeric = 30 and (j->>'orders')::int = 1 then 'PASS' else 'FAIL' end)
     || ' G2 التقرير يفصل قيمة الطلبات عن رسوم الخدمة وصافيها');
-  select to_jsonb(t) into j from public.ap_report_orders(current_date - 1, current_date) t;
+  select to_jsonb(t) into j from public.ap_report_orders((now() at time zone 'Asia/Riyadh')::date - 1, (now() at time zone 'Asia/Riyadh')::date) t;
   out := array_append(out, (case when (j->>'total')::numeric = 570 and (j->>'shipping_amount')::numeric = 140 and not (j ? 'contact_phone')
     and not (j ? 'customer_id') then 'PASS' else 'FAIL' end) || ' G3 تصدير الطلبات بلا بيانات شخصية');
 
@@ -210,6 +210,21 @@ begin
   reset role;
   select count(*) into n from public.ap_audit_logs where entity_type = 'ap_payments';
   out := array_append(out, (case when n >= 1 then 'PASS' else 'FAIL' end) || ' G5 تسجيل الدفع في سجل التدقيق');
+
+  -- ───────── التتبع العام (بلا تسجيل دخول) ─────────
+  select reference into x from public.ap_orders where id = ord;
+  set local role anon; perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  j := public.ap_track_order(lower(x), '+966500000001');
+  out := array_append(out, (case when j->>'reference' = x and j->'shipment'->>'status' = 'delivered'
+    and jsonb_array_length(j->'shipment'->'events') = 6 then 'PASS' else 'FAIL' end) || ' T1 الزائر يتتبع طلبه برقم الطلب والجوال');
+  out := array_append(out, (case when j::text !~ '(total|amount|price|recipient|address|contact|عميل|حي الشاطئ|966)' then 'PASS' else 'FAIL' end)
+    || ' T2 لا أسعار ولا أسماء ولا عناوين ولا جوال في نتيجة التتبع');
+  out := array_append(out, (case when public.ap_track_order(x, '+966511111111') is null then 'PASS' else 'FAIL' end) || ' T3 جوال خاطئ لا يكشف شيئًا');
+  out := array_append(out, (case when public.ap_track_order('ORD-1', '+966500000001') is null then 'PASS' else 'FAIL' end) || ' T4 رقم بصيغة غير صحيحة');
+  for n in 1..9 loop perform public.ap_track_order(x, '+9667' || lpad(n::text, 8, '0')); end loop;
+  ok := false; begin perform public.ap_track_order(x, '+966500000001'); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' T5 بعد 10 محاولات خاطئة يُقفل التتبع لهذا الطلب حتى بالجوال الصحيح');
+  reset role;
 
   raise exception 'RESULT%', E'\n' || array_to_string(out, E'\n');
 end $$;

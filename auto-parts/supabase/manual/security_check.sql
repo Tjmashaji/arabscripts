@@ -6,7 +6,7 @@ with allowed_updates(col) as (values
   ('ap_notifications.read_at'), ('ap_organizations.trade_name'), ('ap_organizations.entity_type'),
   ('ap_organizations.registered_address'), ('ap_organizations.operating_country'), ('ap_organizations.website'),
   ('ap_organizations.activity_description'), ('ap_organizations.billing_currency'), ('ap_organizations.preferred_locale')
-), allowed_anon(fn) as (values ('ap_search_products'), ('ap_public_offers'), ('ap_invitation_lookup'))
+), allowed_anon(fn) as (values ('ap_search_products'), ('ap_public_offers'), ('ap_invitation_lookup'), ('ap_track_order'))
 select 'S1 RLS غير مفعّل' as check, c.relname::text as object
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'ap\_%' and not c.relrowsecurity

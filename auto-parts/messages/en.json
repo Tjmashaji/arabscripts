@@ -873,6 +873,307 @@
     "service_fee_percent": "Suggested service fee (%)",
     "service_fee_percent_help": "Shown as a suggestion in the quote editor (of the part price). Never added automatically. 0 to 50.",
     "availability_max_age_hours": "Availability confirmation validity (hours)",
-    "availability_max_age_hours_help": "After this, offers show as awaiting confirmation to visitors. 1 to 720."
+    "availability_max_age_hours_help": "After this, offers show as awaiting confirmation to visitors. 1 to 720.",
+    "operatorTitle": "Operator and contact details",
+    "operatorHelp": "Shown in every page footer and on “About us” only once filled in. Leave empty until ready.",
+    "operationsTitle": "Operations",
+    "legal_entity_name": "Operator legal name",
+    "legal_entity_name_help": "As in the commercial registration.",
+    "commercial_register": "Commercial registration number",
+    "commercial_register_help": "10 digits.",
+    "contact_email": "Contact email",
+    "contact_email_help": "Visible to visitors. Preferably on the platform's domain.",
+    "contact_whatsapp": "WhatsApp number",
+    "contact_whatsapp_help": "International format, e.g. +9665XXXXXXXX."
+  },
+  "footer": {
+    "platform": "Platform",
+    "services": "Services",
+    "legal": "Policies",
+    "about": "About us",
+    "howItWorks": "How it works",
+    "faq": "FAQ",
+    "products": "Find a part",
+    "requestPart": "Request a part",
+    "track": "Track your order",
+    "privacy": "Privacy policy",
+    "terms": "Terms & conditions",
+    "whatsapp": "WhatsApp",
+    "cr": "Commercial registration"
+  },
+  "brandPage": {
+    "title": "{brand} spare parts",
+    "description": "Genuine and aftermarket {brand} parts from verified suppliers, with an itemized price and availability check before you pay.",
+    "intro": "Search {brand} parts by part number, model or year. Every offer shows the part type and when availability was last confirmed, and anything you can't find we source from approved suppliers.",
+    "models": "{brand} models",
+    "parts": "Latest {brand} parts",
+    "all": "All results ({count})",
+    "none": "No {brand} parts published yet.",
+    "request": "Request a part"
+  },
+  "track": {
+    "title": "Track your order",
+    "description": "See your order status and shipment stages with your order number and the mobile number on the order.",
+    "reference": "Order number",
+    "phone": "Mobile number",
+    "submit": "Track",
+    "help": "Order numbers start with ORD and appear under “My orders”. Tracking never shows prices or personal data.",
+    "error_invalid": "Check the order number (e.g. ORD-100001) and mobile number.",
+    "error_notFound": "No order matches that number and mobile.",
+    "error_locked": "Too many attempts for this order. Try again in an hour.",
+    "error_failed": "Tracking is unavailable right now. Try later.",
+    "noShipment": "The shipment hasn't been created yet. Its status will appear here once your order ships.",
+    "carrier": "Carrier",
+    "tracking": "Tracking number",
+    "eta": "Expected arrival",
+    "deliveredAt": "Delivered on"
+  },
+  "errorPage": {
+    "title": "Something went wrong",
+    "body": "Sorry, this page couldn't be displayed. Please try again, and contact us with the reference if it keeps happening.",
+    "reference": "Reference",
+    "retry": "Try again",
+    "home": "Home"
+  },
+  "pages": {
+    "updated": "Last updated: {date}",
+    "ctaTitle": "Looking for a part for your car?",
+    "ctaSearch": "Search",
+    "ctaRequest": "Request a part",
+    "operator": "Operator",
+    "entity": "Legal name",
+    "cr": "Commercial registration",
+    "email": "Email",
+    "whatsapp": "WhatsApp",
+    "about": {
+      "title": "About us",
+      "description": "A Saudi brokerage platform for Chinese car parts connecting customers with verified suppliers, manufacturers and carriers.",
+      "intro": "A brokerage platform for Chinese car parts — Chery, Changan, Jetour, Geely and Haval — connecting customers in Saudi Arabia with suppliers, manufacturers and carriers that are reviewed and approved before any activity.",
+      "sections": [
+        {
+          "title": "Why we exist",
+          "body": [
+            "Finding the right part for a Chinese car at a clear price isn't easy: multiple part numbers, unverified sources, and shipping costs and fees that appear late.",
+            "We make it simple: we verify the supplier, confirm availability and price, and send you an itemized cost before you commit to anything."
+          ]
+        },
+        {
+          "title": "What makes us different",
+          "body": [
+            "We state each part's type: genuine, aftermarket, used or refurbished.",
+            "We separate the part price from international and local shipping, customs, tax and service fees, and mark what's confirmed and what's estimated.",
+            "We only show a part as available when the supplier confirmed it recently, and we show when."
+          ]
+        },
+        {
+          "title": "Our role as a broker",
+          "body": [
+            "We don't buy stock for our own account. The actual seller, the invoice issuer and who handles returns and warranty are stated in every quote before you accept."
+          ]
+        }
+      ]
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "description": "Order steps from search to delivery, and how suppliers, manufacturers and carriers join.",
+      "intro": "From finding the part to receiving it: every step is clear, and every amount is itemized before you accept.",
+      "sections": [
+        {
+          "title": "1. Search or request",
+          "body": [
+            "Search by name, part number, or model and year. If you can't find it, send a request with the part description and your vehicle details; you can attach photos and the VIN."
+          ]
+        },
+        {
+          "title": "2. We check suppliers",
+          "body": [
+            "We send your request to approved suppliers only. They see the part description and vehicle details without your name or number, and see the VIN only when needed to confirm fitment.",
+            "We compare offers on price, fitment, availability and lead time, and get a shipping quote."
+          ]
+        },
+        {
+          "title": "3. You get an itemized cost",
+          "body": [
+            "Your quote lists each line separately: part, shipping, customs, tax, service fee and any discount. Each line is marked confirmed or estimated, and the quote has a validity date, cancellation terms and the responsible seller.",
+            "If anything changes before you accept, we issue a new version instead of editing the old one."
+          ]
+        },
+        {
+          "title": "4. You accept, then your order is prepared",
+          "body": [
+            "When you accept, a fixed copy of the quote is saved exactly as you accepted it, and your order is created. Online payment isn't enabled yet; we contact you to complete payment to the responsible seller, then the supplier starts preparing."
+          ]
+        },
+        {
+          "title": "5. Shipping, tracking and delivery",
+          "body": [
+            "The order is assigned to an approved carrier, and you follow the stages and tracking number from your account or the “Track your order” page. After delivery you confirm receipt and the order is completed."
+          ]
+        },
+        {
+          "title": "For suppliers, manufacturers and carriers",
+          "body": [
+            "Joining is by invitation for now. Each organization submits its details and documents, and each capability (seller, supplier, manufacturer, carrier) is reviewed and approved separately before any activity. Products are published only after admin review."
+          ]
+        }
+      ]
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "description": "Answers about part types, availability, pricing, the VIN, payment, cancellation and tracking.",
+      "intro": "Didn't find your answer? Contact us using the details at the bottom of the page.",
+      "items": [
+        {
+          "q": "What's the difference between genuine, aftermarket, used and refurbished?",
+          "a": "Genuine comes from the vehicle maker or its approved supplier, aftermarket from another maker to matching specs, used was previously installed, and refurbished was restored. The part type appears on every offer and in the quote."
+        },
+        {
+          "q": "What does “available” mean on a part page?",
+          "a": "The supplier confirmed availability within the platform's window (48 hours by default), and we show the date of the last confirmation. After that the offer shows “awaiting confirmation” and we check again before quoting."
+        },
+        {
+          "q": "Why are some quote lines “estimated”?",
+          "a": "Some costs, like customs or shipping, may not be final before shipping. We mark every estimated line, the total shows as estimated while any line is unconfirmed, and we tell you before any change."
+        },
+        {
+          "q": "Can suppliers see my details?",
+          "a": "Suppliers don't see your name or mobile number. They see the part description, vehicle details and city, and the VIN only when needed to confirm fitment. Carriers see only the delivery details of shipments assigned to them."
+        },
+        {
+          "q": "How do I pay?",
+          "a": "Online payment isn't enabled on the platform yet. After you accept the quote, your order is created as “awaiting payment” and we contact you to complete payment to the responsible seller named in the quote."
+        },
+        {
+          "q": "Can I cancel or return?",
+          "a": "You can cancel a quote request any time before accepting. After accepting, the cancellation and return terms stated in the quote apply, and the responsible seller handles returns and warranty accordingly."
+        },
+        {
+          "q": "How long is a quote valid?",
+          "a": "Every quote has a clear validity date. After it, the quote can't be accepted, and you can ask for an update."
+        },
+        {
+          "q": "How do I track my order?",
+          "a": "From “My orders” in your account, or from the “Track your order” page using the order number and the mobile number on the order."
+        }
+      ]
+    },
+    "privacy": {
+      "title": "Privacy policy",
+      "updated": "October 20, 2026",
+      "description": "What data we collect, why, who can see it, how we protect it, and your rights.",
+      "intro": "We collect the minimum data needed to fulfil your order and limit access to those who need it to do so.",
+      "sections": [
+        {
+          "title": "Data we collect",
+          "body": [
+            "Account: name, email, mobile number and preferred language.",
+            "Part requests: vehicle details (brand, model, year, engine), the VIN if you enter it, the part description and photos, and the city and contact details for the request.",
+            "Orders and shipping: the quote you accepted, the order status, and the delivery address and recipient details.",
+            "Partners: organization and representative details and verification documents."
+          ]
+        },
+        {
+          "title": "Why we use it",
+          "body": [
+            "To quote your request and contact you about it, fulfil and ship the order, approve partners, protect the platform from abuse, and meet legal requirements."
+          ]
+        },
+        {
+          "title": "Who can see it",
+          "body": [
+            "Suppliers: only the part description, vehicle details and city — never your name or mobile — and the VIN only when needed.",
+            "Carriers: only the delivery details needed for shipments assigned to them, without part prices.",
+            "Platform team: according to role and permission; every access to private documents is logged.",
+            "We don't sell your data or share it for advertising."
+          ]
+        },
+        {
+          "title": "Where it's stored and how we protect it",
+          "body": [
+            "Data is stored with cloud service providers (the database is in the European Union). Connections are encrypted, access is restricted per record, private files open only through temporary links, sensitive operations are recorded in an audit log, and we keep encrypted backups."
+          ]
+        },
+        {
+          "title": "Cookies",
+          "body": [
+            "We use essential cookies only: your sign-in session and language preference. No advertising or third-party tracking cookies."
+          ]
+        },
+        {
+          "title": "Your rights",
+          "body": [
+            "You can update your name, number and language from your account, and request a copy of your data or deletion of your account by contacting us. Some order and transaction records may be retained for legally required periods."
+          ]
+        },
+        {
+          "title": "Changes",
+          "body": [
+            "We may update this policy and show the last-updated date at the top of the page."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms & conditions",
+      "updated": "October 20, 2026",
+      "description": "Terms of use for customers and partners: the brokerage role, pricing, orders, payment and responsibilities.",
+      "intro": "By using the platform you agree to these terms. Read them together with the privacy policy.",
+      "sections": [
+        {
+          "title": "The platform's role",
+          "body": [
+            "The platform is a broker connecting customers with approved suppliers, manufacturers and carriers, and doesn't buy stock for its own account. The actual seller, invoice issuer and party responsible for returns and warranty are stated in every quote."
+          ]
+        },
+        {
+          "title": "Your account",
+          "body": [
+            "You're responsible for accurate details and keeping your password secret. We may suspend any account that misuses the platform or provides false information."
+          ]
+        },
+        {
+          "title": "Pricing and acceptance",
+          "body": [
+            "A quote is valid until the date stated in it; estimated lines may change and we'll tell you first. You accept the latest valid version, and a fixed copy of it is saved. Any change after acceptance requires a new version and a new acceptance."
+          ]
+        },
+        {
+          "title": "Payment",
+          "body": [
+            "Online payment isn't currently enabled, and the platform doesn't hold customer funds. Payment is made to the responsible seller named in the quote, and preparation or shipping doesn't start before payment is confirmed."
+          ]
+        },
+        {
+          "title": "Cancellation, returns and warranty",
+          "body": [
+            "Before accepting you can cancel a quote request. After accepting, the cancellation and return terms in the quote apply, and the responsible seller handles returns and warranty accordingly."
+          ]
+        },
+        {
+          "title": "Partner obligations",
+          "body": [
+            "Partners must keep their organization details, documents, products and offers accurate, update availability honestly, and not contact customers outside the platform about its orders. Carriers may not change part prices or platform fees."
+          ]
+        },
+        {
+          "title": "Prohibited use",
+          "body": [
+            "Providing misleading information, attempting to access others' data, disrupting the platform, or using it for any unlawful purpose is prohibited."
+          ]
+        },
+        {
+          "title": "Limitation of liability",
+          "body": [
+            "We take reasonable care in verifying partners and presenting information; the responsible seller remains responsible for the part's fitment and quality as stated in the quote."
+          ]
+        },
+        {
+          "title": "Changes and contact",
+          "body": [
+            "We may update these terms and show the last-updated date at the top of the page. For questions, contact us using the details at the bottom of the page."
+          ]
+        }
+      ]
+    }
   }
 }
