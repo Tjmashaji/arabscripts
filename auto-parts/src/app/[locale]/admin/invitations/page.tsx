@@ -37,7 +37,7 @@ export default async function InvitationsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ created?: string; error?: string; revoked?: string }>;
+  searchParams: Promise<{ created?: string; error?: string; revoked?: string; mail?: string; to?: string }>;
 }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
@@ -56,11 +56,13 @@ export default async function InvitationsPage({
     <div className="flex flex-col gap-5">
       <PageTitle>{t("invitations")}</PageTitle>
       {q.error && <Alert tone="danger">{t("actionFailed")}</Alert>}
+      {link && q.mail === "sent" && <Alert tone="success">{t("emailSent", { email: q.to ?? "" })}</Alert>}
+      {link && q.mail === "failed" && <Alert tone="danger">{t("emailFailed")}</Alert>}
       {link && (
-        <Alert tone="success">
-          <span className="mb-2 block">{t("linkReady")}</span>
+        <Alert tone={q.mail === "sent" ? "info" : "success"}>
+          <span className="mb-2 block">{q.mail === "sent" ? t("linkBackup") : t("linkReady")}</span>
           <CopyField value={link} />
-          <span className="mt-2 block text-xs">{t("emailNotConfigured")}</span>
+          {q.mail !== "sent" && q.mail !== "failed" && <span className="mt-2 block text-xs">{t("emailNotConfigured")}</span>}
         </Alert>
       )}
 

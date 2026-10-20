@@ -288,7 +288,7 @@
     "validDays": "Valid for (days)",
     "create": "Create invitation",
     "linkReady": "The invitation link is ready. Copy it and send it to the invitee; it won't be shown again.",
-    "emailNotConfigured": "Email sending isn't set up yet (needs an email provider). Send the link yourself.",
+    "emailNotConfigured": "Email sending isn't enabled yet (needs an email service). Send the link yourself.",
     "revoke": "Revoke",
     "expires": "Expires",
     "status": "Status",
@@ -322,7 +322,10 @@
     "notReviewable": "The application isn't under review.",
     "contact": "Contact",
     "checklist": "Checklist",
-    "checklistNote": "Check manually: legal name matches the document, documents are valid, the representative's role. There is no automatic government-registry check."
+    "checklistNote": "Check manually: legal name matches the document, documents are valid, the representative's role. There is no automatic government-registry check.",
+    "emailSent": "The invitation was emailed to {email}.",
+    "emailFailed": "The email couldn't be sent. Copy the link and send it yourself.",
+    "linkBackup": "Backup copy of the link (in case the email doesn't arrive or lands in spam):"
   },
   "partTypes": {
     "genuine": "Genuine",
@@ -1175,5 +1178,17 @@
         }
       ]
     }
+  },
+  "inviteEmail": {
+    "subject": "Invitation to join {brand} as a partner",
+    "heading": "You're invited to join as a partner",
+    "intro": "You've been invited to join {brand}, a brokerage platform for Chinese car parts. After accepting, you complete your organization's details and documents, which the team reviews before any activity.",
+    "capabilities": "Proposed capabilities",
+    "message": "Message from the platform team",
+    "button": "Accept invitation",
+    "expires": "This invitation expires on {date}.",
+    "sameEmail": "Sign up or sign in with the same email the invitation was sent to ({email}).",
+    "ignore": "If you weren't expecting this invitation, you can ignore this email.",
+    "linkHint": "If the button doesn't work, copy this link into your browser:"
   }
 }

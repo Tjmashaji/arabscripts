@@ -288,7 +288,7 @@
     "validDays": "有效期（天）",
     "create": "创建邀请",
     "linkReady": "邀请链接已生成。请复制并发送给受邀人；链接不会再次显示。",
-    "emailNotConfigured": "尚未配置邮件发送（需接入邮件服务）。请自行发送链接。",
+    "emailNotConfigured": "尚未开通邮件发送（需要接入邮件服务）。请自行发送链接。",
     "revoke": "撤销",
     "expires": "到期",
     "status": "状态",
@@ -322,7 +322,10 @@
     "notReviewable": "该申请不在审核阶段。",
     "contact": "联系人",
     "checklist": "核查清单",
-    "checklistNote": "请人工核查：法定名称与文件一致、文件有效、代表人身份。系统不会自动查询政府登记信息。"
+    "checklistNote": "请人工核查：法定名称与文件一致、文件有效、代表人身份。系统不会自动查询政府登记信息。",
+    "emailSent": "邀请已通过邮件发送至 {email}。",
+    "emailFailed": "邮件发送失败。请复制链接自行发送。",
+    "linkBackup": "链接备份（以防邮件未送达或进入垃圾邮件）："
   },
   "partTypes": {
     "genuine": "原厂件",
@@ -1175,5 +1178,17 @@
         }
       ]
     }
+  },
+  "inviteEmail": {
+    "subject": "邀请您作为合作伙伴加入 {brand}",
+    "heading": "诚邀您成为合作伙伴",
+    "intro": "您受邀加入 {brand}——中国汽车配件中介平台。接受邀请后，请完善贵公司的资料和文件，平台团队审核通过后即可开展业务。",
+    "capabilities": "拟定资格",
+    "message": "平台团队留言",
+    "button": "接受邀请",
+    "expires": "邀请将于 {date} 过期。",
+    "sameEmail": "请使用收到邀请的邮箱（{email}）注册或登录。",
+    "ignore": "如果您没有预期收到此邀请，可忽略本邮件。",
+    "linkHint": "如果按钮无法使用，请将此链接复制到浏览器："
   }
 }
