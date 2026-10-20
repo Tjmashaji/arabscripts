@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
@@ -23,12 +24,13 @@ type Offer = {
 const select = `id, name, description, status, brand_id, category_id, original_language,
   ap_product_identifiers(kind, value), ap_vehicle_fitments(id, model_id, year_from, year_to, engine), ap_product_media(id, storage_path, sort_order)`;
 
-async function loadProduct(id: string) {
+// مرة واحدة لكل طلب (تستخدمها generateMetadata والصفحة معًا).
+const loadProduct = cache(async (id: string) => {
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
   const supabase = await createClient();
   const { data } = await supabase.from("ap_products").select(select).eq("id", id).maybeSingle();
   return data as Product | null;
-}
+});
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -49,9 +51,11 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
   const ta = await getTranslations("availability");
   const tk = await getTranslations("identifierKinds");
   const tq = await getTranslations("quotes");
-  const { brands, models, categories } = await getCatalog();
   const supabase = await createClient();
-  const { data: offerRows } = await supabase.rpc("ap_public_offers", { p_product: product.id });
+  const [{ brands, models, categories }, { data: offerRows }] = await Promise.all([
+    getCatalog(),
+    supabase.rpc("ap_public_offers", { p_product: product.id }),
+  ]);
   const offers = (offerRows ?? []) as Offer[];
   const brand = brands.find((b) => b.id === product.brand_id);
   const category = categories.find((c) => c.id === product.category_id);

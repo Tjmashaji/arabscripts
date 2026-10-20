@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { CATALOG_TAG } from "@/lib/catalog-data";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { localePath, requireSession, requireStaff } from "@/lib/auth";
@@ -204,6 +205,7 @@ export async function saveModel(form: FormData) {
     p_year_from: intOrNull(text(form, "yearFrom", 4)), p_year_to: intOrNull(text(form, "yearTo", 4)),
     p_enabled: form.get("enabled") === "on",
   });
+  updateTag(CATALOG_TAG);
   revalidatePath("/[locale]/products", "layout");
   redirect(`${back}?${error ? fail(error.message) : "done=1"}`);
 }
