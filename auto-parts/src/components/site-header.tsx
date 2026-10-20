@@ -22,6 +22,9 @@ export async function SiteHeader({ locale, path }: { locale: Locale; path: strin
         </Link>
         <nav className="flex flex-wrap items-center gap-2 text-sm">
           <LanguageSwitcher current={locale} path={path} label={t("language")} />
+          <Link href="/products" className="rounded-md px-3 py-2 hover:bg-white/10">
+            {t("products")}
+          </Link>
           {session ? (
             <>
               {isStaff(session) && (

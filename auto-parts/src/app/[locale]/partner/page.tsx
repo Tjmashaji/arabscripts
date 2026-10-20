@@ -37,7 +37,12 @@ export default async function PartnerHome({ params }: { params: Promise<{ locale
   return (
     <SiteShell locale={locale} path="/partner">
       <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-10">
-        <PageTitle>{t("portal")}</PageTitle>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PageTitle>{t("portal")}</PageTitle>
+          <Link href="/partner/products" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
+            {(await getTranslations("partnerProducts"))("title")}
+          </Link>
+        </div>
         {(apps ?? []).length === 0 && session.organizations.length === 0 && <Alert tone="info">{t("noOrg")}</Alert>}
 
         {(apps ?? []).map((app) => {

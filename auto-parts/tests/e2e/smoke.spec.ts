@@ -112,6 +112,19 @@ test("partner and admin partner pages are protected; a bad invite link is explai
   expect(doc.status()).toBe(401);
 });
 
+test("catalog: home search goes to /products, which works on mobile; partner products are protected", async ({ page }) => {
+  await page.goto("/");
+  await page.fill('input[name="q"]', "فلتر");
+  await page.locator('form[action="/products"] button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/products\?q=/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await noHorizontalScroll(page);
+  const res = await page.goto("/products/00000000-0000-0000-0000-000000000000");
+  expect(res?.status()).toBe(404);
+  await page.goto("/partner/products");
+  await expect(page).toHaveURL(/\/login\?next=%2Fpartner/);
+});
+
 test("unknown pages return 404", async ({ page }) => {
   const res = await page.goto("/does-not-exist");
   expect(res?.status()).toBe(404);
