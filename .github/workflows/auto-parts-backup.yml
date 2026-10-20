@@ -1,0 +1,59 @@
+# نسخة احتياطية يومية مشفّرة لقاعدة بيانات المنصة + اختبار استعادة فعلي لكل نسخة.
+# يحتاج سرّين في GitHub (Settings ← Secrets and variables ← Actions):
+#   SUPABASE_DB_URL     رابط Session pooler من Supabase (Connect ← Session pooler) مع كلمة مرور قاعدة البيانات
+#   BACKUP_PASSPHRASE   عبارة تشفير طويلة تحفظها خارج GitHub؛ بدونها لا يمكن فك أي نسخة
+name: auto-parts-backup
+
+on:
+  schedule:
+    - cron: "15 0 * * *" # 03:15 بتوقيت الرياض
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: auto-parts-backup
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: auto-parts
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::أضف SUPABASE_DB_URL وBACKUP_PASSPHRASE في أسرار المستودع (انظر README ← النسخ الاحتياطي)"; exit 1
+          fi
+      - name: Install PostgreSQL 17 (pg_dump must be at least the server version)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-17 postgresql-client-17
+      - name: Back up
+        run: |
+          mkdir -p "$RUNNER_TEMP/backup"
+          archive="$(OUT="$RUNNER_TEMP/backup" PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump PSQL=/usr/lib/postgresql/17/bin/psql bash supabase/backup/backup.sh)"
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
+      - name: Restore test (temporary database, row counts, schema drift, security checks)
+        run: PG_BIN=/usr/lib/postgresql/17/bin bash supabase/backup/restore-check.sh "$ARCHIVE"
+      - name: Encrypt
+        if: always() && env.ARCHIVE != ''
+        run: |
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 \
+            -o "$ARCHIVE.gpg" "$ARCHIVE" <<< "$BACKUP_PASSPHRASE"
+          rm -f "$ARCHIVE"
+      - uses: actions/upload-artifact@v4
+        if: always() && env.ARCHIVE != ''
+        with:
+          name: auto-parts-backup-${{ github.run_id }}
+          path: ${{ env.ARCHIVE }}.gpg
+          retention-days: 14
+          if-no-files-found: error
