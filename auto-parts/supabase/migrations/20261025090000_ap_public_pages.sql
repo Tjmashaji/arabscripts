@@ -16,6 +16,8 @@ create table ap_private.track_attempts (
 );
 create index track_attempts_idx on ap_private.track_attempts (reference, attempted_at);
 revoke all on ap_private.track_attempts from public, anon, authenticated;
+-- طبقة إضافية: المخطط غير منشور عبر API أصلًا، والدالة (مالكة الجدول) تتجاوز RLS.
+alter table ap_private.track_attempts enable row level security;
 
 create or replace function public.ap_track_order(p_reference text, p_phone text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
