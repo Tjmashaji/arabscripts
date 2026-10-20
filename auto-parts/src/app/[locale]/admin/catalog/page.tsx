@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, Field, Input, PageTitle, Select } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
-import { getCatalog, type Model } from "@/lib/catalog-data";
+import { getCatalogForStaff, type Model } from "@/lib/catalog-data";
 import { localName } from "@/lib/catalog";
 import { saveModel } from "@/server/catalog-actions";
 import { localeFrom } from "@/i18n/locales";
@@ -26,7 +26,7 @@ export default async function AdminCatalog({
   const q = await searchParams;
   const t = await getTranslations("adminCatalog");
   const tc = await getTranslations("catalog");
-  const { brands, models, categories } = await getCatalog();
+  const { brands, models, categories } = await getCatalogForStaff();
 
   const modelForm = (m?: Model) => (
     <form action={saveModel} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_6rem_6rem_auto_auto] sm:items-end">

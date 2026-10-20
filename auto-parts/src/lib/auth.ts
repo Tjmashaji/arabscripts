@@ -18,52 +18,62 @@ export type Session = {
   organizations: { id: string; role: string }[];
 };
 
+type ProfileRow = {
+  full_name: string | null; phone: string | null; status: string;
+  ap_user_preferences: { locale: string } | null;
+  ap_staff_roles: { role: string }[];
+  ap_organization_members: { organization_id: string; member_role: string; status: string }[];
+};
+
+const profileSelect = `full_name, phone, status, ap_user_preferences(locale), ap_staff_roles(role),
+  ap_organization_members(organization_id, member_role, status)`;
+
 // جلسة المستخدم الحالية مع ملفه وأدواره وصلاحياته. تُحسب مرة واحدة لكل طلب.
+// الهوية من getClaims: توقيع الجلسة يُتحقق منه محليًا بمفتاح المشروع العام (ES256) دون رحلة لخادم الدخول،
+// ثم الملف والأدوار والعضويات في استعلام واحد، والصلاحيات بالتوازي معه.
 // الواجهة تستخدمها لإظهار ما يناسب المستخدم فقط؛ الحماية الفعلية في قاعدة البيانات (RLS والدوال).
 export const getSession = cache(async (): Promise<Session | null> => {
   const supabase = await createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth.user;
-  if (!user || user.is_anonymous) return null;
+  const { data: auth } = await supabase.auth.getClaims();
+  const claims = auth?.claims;
+  if (!claims?.sub || claims.is_anonymous) return null;
+  const userId = claims.sub;
 
-  let { data: profile } = await supabase
-    .from("ap_profiles")
-    .select("full_name, phone, status")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const loadProfile = () => supabase.from("ap_profiles").select(profileSelect).eq("user_id", userId).maybeSingle();
+  const [first, { data: rolePerms }] = await Promise.all([
+    loadProfile(),
+    supabase.from("ap_roles_permissions").select("role, permission"),
+  ]);
+  let profile = first.data;
   if (!profile) {
     // أول دخول لهذا الحساب على المنصة (المشروع مشترك، فلا ننشئ الملف بمشغّل على auth.users).
-    const meta = user.user_metadata ?? {};
-    const { data, error } = await supabase.rpc("ap_ensure_profile", {
+    const meta = (claims.user_metadata ?? {}) as Record<string, unknown>;
+    const { error } = await supabase.rpc("ap_ensure_profile", {
       p_full_name: typeof meta.full_name === "string" ? meta.full_name : null,
       p_locale: typeof meta.locale === "string" ? meta.locale : null,
     });
-    if (error || !data) throw new Error(`ap_ensure_profile failed: ${error?.message ?? "no data"}`);
-    profile = data;
+    if (error) throw new Error(`ap_ensure_profile failed: ${error.message}`);
+    ({ data: profile } = await loadProfile());
+    if (!profile) throw new Error("ap_ensure_profile failed: no profile");
   }
+  const row = profile as unknown as ProfileRow;
 
-  const [{ data: prefs }, { data: roles }, { data: memberships }] = await Promise.all([
-    supabase.from("ap_user_preferences").select("locale").eq("user_id", user.id).maybeSingle(),
-    supabase.from("ap_staff_roles").select("role").eq("user_id", user.id),
-    supabase.from("ap_organization_members").select("organization_id, member_role").eq("user_id", user.id).eq("status", "active"),
-  ]);
-  const staffRoles = (roles ?? []).map((r) => r.role as StaffRole);
-  let permissions: string[] = [];
-  if (staffRoles.length > 0 && profile!.status === "active") {
-    const { data: perms } = await supabase.from("ap_roles_permissions").select("permission").in("role", staffRoles);
-    permissions = (perms ?? []).map((p) => p.permission as string);
-  }
+  const staffRoles = row.ap_staff_roles.map((r) => r.role as StaffRole);
+  const permissions = row.status === "active"
+    ? (rolePerms ?? []).filter((p) => staffRoles.includes(p.role as StaffRole)).map((p) => p.permission as string)
+    : [];
 
   return {
-    userId: user.id,
-    email: user.email ?? "",
-    fullName: profile!.full_name ?? "",
-    phone: profile!.phone ?? null,
-    status: profile!.status as Session["status"],
-    locale: isLocale(prefs?.locale) ? prefs.locale : defaultLocale,
+    userId,
+    email: typeof claims.email === "string" ? claims.email : "",
+    fullName: row.full_name ?? "",
+    phone: row.phone ?? null,
+    status: row.status as Session["status"],
+    locale: isLocale(row.ap_user_preferences?.locale) ? row.ap_user_preferences.locale : defaultLocale,
     staffRoles,
     permissions: new Set(permissions),
-    organizations: (memberships ?? []).map((m) => ({ id: m.organization_id as string, role: m.member_role as string })),
+    organizations: row.ap_organization_members.filter((m) => m.status === "active")
+      .map((m) => ({ id: m.organization_id, role: m.member_role })),
   };
 });
 

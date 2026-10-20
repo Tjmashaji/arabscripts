@@ -45,6 +45,7 @@ npm run dev                  # http://localhost:3000
 2. إضافة متغيرات البيئة أعلاه، و`NEXT_PUBLIC_SITE_URL` = النطاق الفعلي.
 3. في Supabase ← Authentication ← URL Configuration: إضافة `https://<النطاق>/auth/confirm` إلى Redirect URLs.
 4. إعداد SMTP خاص (Authentication ← SMTP). البريد الافتراضي في Supabase محدود جدًا ولا يصلح لمستخدمين حقيقيين.
+5. **المنطقة:** دوال Vercel يجب أن تعمل في نفس منطقة قاعدة البيانات، وإلا تتكرر رحلة بين القارات مع كل استعلام. `vercel.json` يحددها `syd1` لأن مشروع Supabase الحالي في سيدني. عند نقل قاعدة البيانات (مثلًا إلى فرانكفورت) غيّرها إلى `fra1`.
 
 ## قاعدة البيانات
 

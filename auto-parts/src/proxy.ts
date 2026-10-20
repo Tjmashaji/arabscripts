@@ -28,7 +28,8 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  await supabase.auth.getUser();
+  // يجدد الجلسة المنتهية ويتحقق من توقيعها محليًا (ES256) دون رحلة لخادم الدخول في كل طلب.
+  await supabase.auth.getClaims();
   return response;
 }
 
