@@ -83,9 +83,10 @@ export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "succ
 }
 
 export function statusTone(status: string): "neutral" | "success" | "danger" | "info" {
-  if (["approved", "accepted", "active"].includes(status)) return "success";
-  if (["rejected", "revoked", "expired", "suspended"].includes(status)) return "danger";
-  if (["changes_requested", "submitted_for_review", "resubmitted", "under_review", "requested", "opened"].includes(status)) return "info";
+  if (["approved", "accepted", "active", "selected"].includes(status)) return "success";
+  if (["rejected", "revoked", "expired", "suspended", "declined", "cancelled", "withdrawn"].includes(status)) return "danger";
+  if (["changes_requested", "submitted_for_review", "resubmitted", "under_review", "requested", "opened", "quoted", "issued",
+       "awaiting_payment", "sourcing"].includes(status)) return "info";
   return "neutral";
 }
 

@@ -84,6 +84,7 @@ export default async function ProductsPage({ params, searchParams }: { params: P
           <Card>
             <p>{t("noResults")}</p>
             <p className="mt-2 text-sm text-muted">{t("requestHint")}</p>
+            <Link href="/request-part" className="mt-3 inline-flex rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white">{t("requestCta")}</Link>
           </Card>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -14,6 +14,7 @@ export default async function AdminLayout({ children, params }: { children: Reac
   const t = await getTranslations("admin");
   const tp = await getTranslations("adminPartners");
   const tcat = await getTranslations("adminCatalog");
+  const tquo = await getTranslations("adminQuotes");
   const tRoles = await getTranslations("roles");
   const tNav = await getTranslations("nav");
   const brand = env.platformName ?? (await getTranslations("brand"))("name");
@@ -22,6 +23,7 @@ export default async function AdminLayout({ children, params }: { children: Reac
     { href: "/admin", label: t("overview"), show: true },
     { href: "/admin/partner-applications", label: tp("applications"), show: session.permissions.has("accounts.approve") },
     { href: "/admin/invitations", label: tp("invitations"), show: session.permissions.has("accounts.approve") },
+    { href: "/admin/quotes", label: tquo("title"), show: session.permissions.has("quotes.manage") },
     { href: "/admin/products", label: tcat("products"), show: session.permissions.has("products.publish") },
     { href: "/admin/catalog", label: tcat("catalog"), show: session.permissions.has("products.publish") },
     { href: "/admin/access", label: t("access"), show: session.permissions.has("roles.manage") },
