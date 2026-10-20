@@ -39,9 +39,14 @@ export default async function PartnerHome({ params }: { params: Promise<{ locale
       <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PageTitle>{t("portal")}</PageTitle>
-          <Link href="/partner/products" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
-            {(await getTranslations("partnerProducts"))("title")}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/partner/requests" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
+              {(await getTranslations("supplierRequests"))("title")}
+            </Link>
+            <Link href="/partner/products" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
+              {(await getTranslations("partnerProducts"))("title")}
+            </Link>
+          </div>
         </div>
         {(apps ?? []).length === 0 && session.organizations.length === 0 && <Alert tone="info">{t("noOrg")}</Alert>}
 

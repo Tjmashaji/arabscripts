@@ -25,6 +25,9 @@ export async function SiteHeader({ locale, path }: { locale: Locale; path: strin
           <Link href="/products" className="rounded-md px-3 py-2 hover:bg-white/10">
             {t("products")}
           </Link>
+          <Link href="/request-part" className="rounded-md px-3 py-2 hover:bg-white/10">
+            {t("requestPart")}
+          </Link>
           {session ? (
             <>
               {isStaff(session) && (

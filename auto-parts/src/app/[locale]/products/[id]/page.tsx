@@ -48,6 +48,7 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
   const tp = await getTranslations("partTypes");
   const ta = await getTranslations("availability");
   const tk = await getTranslations("identifierKinds");
+  const tq = await getTranslations("quotes");
   const { brands, models, categories } = await getCatalog();
   const supabase = await createClient();
   const { data: offerRows } = await supabase.rpc("ap_public_offers", { p_product: product.id });
@@ -130,7 +131,12 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
           <h2 id="offers" className="text-xl font-bold">{t("offersTitle")}</h2>
           <Alert tone="info">{t("orderNotice")}</Alert>
           {offers.length === 0 ? (
-            <Card><p className="text-muted">{t("noOffers")}</p></Card>
+            <Card className="flex flex-col items-start gap-3">
+              <p className="text-muted">{t("noOffers")}</p>
+              <Link href={{ pathname: "/request-part", query: { product: product.id } }} className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white">
+                {tq("confirmCta")}
+              </Link>
+            </Card>
           ) : (
             <ul className="grid gap-3 md:grid-cols-2">
               {offers.map((o) => (
@@ -152,6 +158,10 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
                       {o.last_confirmed_at ? t("lastConfirmed", { date: dateFmt.format(new Date(o.last_confirmed_at)) }) : t("neverConfirmed")}
                       {o.valid_until && <> · {t("validUntil", { date: dateFmt.format(new Date(o.valid_until)) })}</>}
                     </p>
+                    <Link href={{ pathname: "/request-part", query: { product: product.id, offer: o.id } }}
+                      className="mt-auto self-start rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white">
+                      {tq("confirmCta")}
+                    </Link>
                   </Card>
                 </li>
               ))}

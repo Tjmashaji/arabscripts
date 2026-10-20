@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, Field, Input, PageTitle, Select } from "@/components/ui";
@@ -26,11 +27,17 @@ export default async function AccountPage({
   const t = await getTranslations("account");
   const tRoles = await getTranslations("roles");
   const tAuth = await getTranslations("auth");
+  const tq = await getTranslations("quotes");
 
   return (
     <SiteShell locale={locale} path="/account">
       <div className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-10">
         <PageTitle>{t("title")}</PageTitle>
+        <nav className="flex flex-wrap gap-2">
+          <Link href="/account/requests" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">{tq("myRequests")}</Link>
+          <Link href="/account/orders" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">{tq("myOrders")}</Link>
+          <Link href="/request-part" className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white">{tq("newRequest")}</Link>
+        </nav>
         {confirmed && <Alert tone="success">{tAuth("confirmedTitle")}</Alert>}
         {saved && <Alert tone="success">{t("saved")}</Alert>}
         {password && <Alert tone="success">{tAuth("passwordUpdated")}</Alert>}

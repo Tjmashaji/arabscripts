@@ -135,3 +135,28 @@ test("the invalid activation link is rejected", async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?error=confirmFailed$/);
   await expect(page.locator("main [role=alert]")).toBeVisible();
 });
+
+test("quote request, orders, supplier and admin quote pages require sign-in", async ({ page }) => {
+  for (const [path, next] of [
+    ["/request-part", "%2Frequest-part"],
+    ["/account/requests", "%2Faccount%2Frequests"],
+    ["/account/orders", "%2Faccount%2Forders"],
+    ["/partner/requests", "%2Fpartner"],
+    ["/en/admin/quotes", "%2Fadmin"],
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`/login\\?next=${next}$`));
+  }
+});
+
+test("request media requires sign-in", async ({ request }) => {
+  const res = await request.get("/api/request-media/00000000-0000-0000-0000-000000000000?request=00000000-0000-0000-0000-000000000000", { maxRedirects: 0 });
+  expect(res.status()).toBe(401);
+});
+
+test("the header links to the part request form", async ({ page }) => {
+  await page.goto("/products");
+  await page.locator('header a[href="/request-part"]').click();
+  await expect(page).toHaveURL(/\/login\?next=%2Frequest-part$/);
+  await noHorizontalScroll(page);
+});
