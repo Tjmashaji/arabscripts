@@ -193,14 +193,14 @@ begin
 
   -- ───────── التقارير ─────────
   perform set_config('request.jwt.claims', json_build_object('sub', sup, 'role', 'authenticated')::text, true);
-  ok := false; begin perform public.ap_report_summary(current_date - 1, current_date); exception when others then ok := true; end;
+  ok := false; begin perform public.ap_report_summary((now() at time zone 'Asia/Riyadh')::date - 1, (now() at time zone 'Asia/Riyadh')::date); exception when others then ok := true; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' G1 الدعم لا يقرأ التقارير');
   perform set_config('request.jwt.claims', json_build_object('sub', fin, 'role', 'authenticated')::text, true);
-  j := public.ap_report_summary(current_date - 1, current_date);
+  j := public.ap_report_summary((now() at time zone 'Asia/Riyadh')::date - 1, (now() at time zone 'Asia/Riyadh')::date);
   out := array_append(out, (case when (j->'money'->0->>'gmv')::numeric = 570 and (j->'money'->0->>'service_fee')::numeric = 40
     and (j->'money'->0->>'net_service_income')::numeric = 30 and (j->>'orders')::int = 1 then 'PASS' else 'FAIL' end)
     || ' G2 التقرير يفصل قيمة الطلبات عن رسوم الخدمة وصافيها');
-  select to_jsonb(t) into j from public.ap_report_orders(current_date - 1, current_date) t;
+  select to_jsonb(t) into j from public.ap_report_orders((now() at time zone 'Asia/Riyadh')::date - 1, (now() at time zone 'Asia/Riyadh')::date) t;
   out := array_append(out, (case when (j->>'total')::numeric = 570 and (j->>'shipping_amount')::numeric = 140 and not (j ? 'contact_phone')
     and not (j ? 'customer_id') then 'PASS' else 'FAIL' end) || ' G3 تصدير الطلبات بلا بيانات شخصية');
 
