@@ -19,13 +19,14 @@ export default async function AdminOverview({ params }: { params: Promise<{ loca
   const supabase = await createClient();
 
   const count = async (query: PromiseLike<{ count: number | null }>) => (await query).count ?? 0;
-  const [pendingOrgs, activeOrgs, pendingCaps, staff] = await Promise.all([
+  const [pendingOrgs, activeOrgs, pendingCaps, staff, pendingProducts] = await Promise.all([
     count(supabase.from("ap_organizations").select("id", { count: "exact", head: true }).eq("status", "pending")),
     count(supabase.from("ap_organizations").select("id", { count: "exact", head: true }).eq("status", "active")),
     count(supabase.from("ap_organization_verifications").select("organization_id", { count: "exact", head: true }).eq("status", "requested")),
     session.permissions.has("roles.manage")
       ? count(supabase.from("ap_staff_roles").select("user_id", { count: "exact", head: true }))
       : Promise.resolve(null),
+    count(supabase.from("ap_products").select("id", { count: "exact", head: true }).eq("status", "pending_review")),
   ]);
 
   const fmt = new Intl.NumberFormat(locale === "ar" ? "ar-SA" : locale);
@@ -33,6 +34,7 @@ export default async function AdminOverview({ params }: { params: Promise<{ loca
     { label: t("pendingOrgs"), value: pendingOrgs },
     { label: t("pendingCapabilities"), value: pendingCaps },
     { label: t("activeOrgs"), value: activeOrgs },
+    { label: (await getTranslations("productStatus"))("pending_review"), value: pendingProducts },
     ...(staff === null ? [] : [{ label: t("staffCount"), value: staff }]),
   ];
 

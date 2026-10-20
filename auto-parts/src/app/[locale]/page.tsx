@@ -1,16 +1,11 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SiteShell } from "@/components/site-shell";
+import { PartSearchForm } from "@/components/part-search-form";
+import { Link } from "@/i18n/navigation";
+import { getCatalog } from "@/lib/catalog-data";
+import { localName } from "@/lib/catalog";
 import { Card } from "@/components/ui";
 import { localeFrom } from "@/i18n/locales";
-
-// الأسماء التجارية للعلامات كما تُكتب رسميًا؛ لا تُترجم.
-const brands = [
-  { latin: "Chery", ar: "شيري", zh: "奇瑞" },
-  { latin: "Changan", ar: "شانجان", zh: "长安" },
-  { latin: "Jetour", ar: "جيتور", zh: "捷途" },
-  { latin: "Geely", ar: "جيلي", zh: "吉利" },
-  { latin: "Haval", ar: "هافال", zh: "哈弗" },
-];
 
 const stepKeys = ["s1", "s2", "s3", "s4", "s5"] as const;
 const principleKeys = ["p1", "p2", "p3"] as const;
@@ -19,6 +14,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const locale = await localeFrom(params);
   setRequestLocale(locale);
   const t = await getTranslations("home");
+  const { brands } = await getCatalog();
 
   return (
     <SiteShell locale={locale} path="/">
@@ -27,24 +23,29 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <p className="text-sm font-bold text-accent">{t("brandsLine")}</p>
           <h1 className="mt-3 max-w-3xl text-3xl font-bold leading-snug sm:text-4xl">{t("title")}</h1>
           <p className="mt-4 max-w-2xl text-white/75">{t("subtitle")}</p>
-          <p className="mt-6 max-w-2xl rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/85">{t("notice")}</p>
+          <div className="mt-6 max-w-4xl">
+            <PartSearchForm locale={locale} action={locale === "ar" ? "/products" : `/${locale}/products`} dark />
+            <p className="mt-3 text-sm text-white/70">{t("notice")}</p>
+          </div>
         </div>
       </section>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10">
-        <section aria-labelledby="brands">
+        {brands.length > 0 && <section aria-labelledby="brands">
           <h2 id="brands" className="text-xl font-bold">
             {t("brandsTitle")}
           </h2>
           <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {brands.map((b) => (
-              <li key={b.latin} className="rounded-xl border border-line bg-card px-4 py-5 text-center">
-                <span className="block font-bold">{locale === "ar" ? b.ar : locale === "zh" ? b.zh : b.latin}</span>
-                {locale !== "en" && <span className="ltr-value mt-1 block text-xs text-muted">{b.latin}</span>}
+              <li key={b.id}>
+                <Link href={{ pathname: "/products", query: { brand: b.id } }} className="block rounded-xl border border-line bg-card px-4 py-5 text-center hover:border-accent">
+                  <span className="block font-bold">{localName(b, locale)}</span>
+                  {locale !== "en" && <span className="ltr-value mt-1 block text-xs text-muted">{b.name_en}</span>}
+                </Link>
               </li>
             ))}
           </ul>
-        </section>
+        </section>}
 
         <section aria-labelledby="how">
           <h2 id="how" className="text-xl font-bold">
