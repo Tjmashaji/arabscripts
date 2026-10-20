@@ -13,6 +13,11 @@ import { adminSettableStatuses, costLineCodes, isExpired, lineStatuses, linesTot
 import {
   createCustomerQuote, issueCustomerQuote, saveQuoteLines, sendToSuppliers, updateRequestStatus,
 } from "@/server/quote-actions";
+import { addShippingQuote, applyShippingQuote, requestShippingQuote } from "@/server/shipping-actions";
+import { chargeableWeight, shippingModes } from "@/lib/shipping";
+import { currencies } from "@/lib/catalog";
+import { countries } from "@/lib/partners";
+import { errorMessage } from "@/lib/errors";
 import { localeFrom } from "@/i18n/locales";
 
 type SupplierQuote = {
@@ -24,6 +29,11 @@ type CustomerQuote = {
   id: string; version: number; status: string; currency: string; total: string | null; valid_until: string | null; issued_at: string | null;
   supplier_quote_id: string | null; estimated_delivery_days: number | null; cancellation_terms: string | null; seller_of_record: string | null;
   notes: string | null; ap_customer_quote_lines: QuoteLineRow[];
+};
+type ShippingQuote = {
+  id: string; carrier_id: string | null; carrier_name: string | null; mode: string; origin_country: string; origin_city: string | null;
+  destination_city: string; pieces: number; weight_kg: string; volumetric_weight_kg: string | null; price: string | null; currency: string | null;
+  delivery_estimate_days: number | null; valid_until: string | null; provider_quote_reference: string | null; pricing_source: string; status: string;
 };
 type Org = { id: string; legal_name: string; trade_name: string | null; country_code: string; ap_organization_verifications: { capability: string; status: string }[] };
 
@@ -50,7 +60,6 @@ export default async function AdminQuote({
   setRequestLocale(locale);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  await requireStaff(locale, `/admin/quotes/${id}`, "quotes.manage");
   const q = await searchParams;
   const t = await getTranslations("adminQuotes");
   const tq = await getTranslations("quotes");
@@ -60,6 +69,11 @@ export default async function AdminQuote({
   const tcq = await getTranslations("customerQuoteStatus");
   const tl = await getTranslations("costLines");
   const tp = await getTranslations("partTypes");
+  const tsh = await getTranslations("shipping");
+  const tm = await getTranslations("shippingModes");
+  const tshq = await getTranslations("shippingQuoteStatus");
+  const session = await requireStaff(locale, `/admin/quotes/${id}`, "quotes.manage");
+  const canShip = session.permissions.has("shipping.manage");
   const supabase = await createClient();
 
   const { data: req } = await supabase
@@ -68,14 +82,19 @@ export default async function AdminQuote({
     .eq("id", id)
     .maybeSingle();
   if (!req) notFound();
-  const [{ data: sqRows }, { data: cqRows }, { data: orgRows }, { data: product }] = await Promise.all([
+  const [{ data: sqRows }, { data: cqRows }, { data: orgRows }, { data: product }, { data: shqRows }, { data: feeRow }] = await Promise.all([
     supabase.from("ap_supplier_quotes").select("*").eq("request_id", id).order("unit_price"),
     supabase.from("ap_customer_quotes")
       .select("id, version, status, currency, total, valid_until, issued_at, supplier_quote_id, estimated_delivery_days, cancellation_terms, seller_of_record, notes, ap_customer_quote_lines(id, code, description, quantity, unit_amount, amount, status, source, beneficiary, sort_order)")
       .eq("request_id", id).order("version", { ascending: false }),
     supabase.from("ap_organizations").select("id, legal_name, trade_name, country_code, ap_organization_verifications(capability, status)").eq("status", "active").order("legal_name"),
     req.product_id ? supabase.from("ap_products").select("id, name").eq("id", req.product_id).maybeSingle() : Promise.resolve({ data: null }),
+    supabase.from("ap_shipping_quotes").select("*").eq("request_id", id).order("created_at"),
+    supabase.from("ap_platform_settings").select("value").eq("key", "service_fee_percent").maybeSingle(),
   ]);
+  const shippingQuotes = (shqRows ?? []) as ShippingQuote[];
+  const feePercent = Number(feeRow?.value ?? 0) || 0;
+  const carriers = ((orgRows ?? []) as Org[]).filter((o) => o.ap_organization_verifications.some((v) => v.status === "approved" && v.capability === "carrier"));
   const supplierQuotes = (sqRows ?? []) as SupplierQuote[];
   const customerQuotes = (cqRows ?? []) as CustomerQuote[];
   const orgs = ((orgRows ?? []) as Org[]).filter((o) =>
@@ -98,6 +117,17 @@ export default async function AdminQuote({
       <input type="hidden" name="requestId" value={req.id} />
     </>
   );
+  const parcelFields = (
+    <>
+      <Select name="mode" aria-label={tsh("mode")} defaultValue="air">{shippingModes.map((m) => <option key={m} value={m}>{tm(m)}</option>)}</Select>
+      <Select name="originCountry" aria-label={tsh("originCountry")} defaultValue="CN">{countries.map((c) => <option key={c} value={c}>{c}</option>)}</Select>
+      <Input name="originCity" placeholder={tsh("originCity")} aria-label={tsh("originCity")} maxLength={80} />
+      <Input name="destinationCity" placeholder={tsh("destinationCity")} aria-label={tsh("destinationCity")} defaultValue={req.city} maxLength={80} />
+      <Input name="pieces" type="number" min={1} defaultValue={1} placeholder={tsh("piecesLabel")} aria-label={tsh("piecesLabel")} />
+      <Input name="weightKg" required inputMode="decimal" dir="ltr" placeholder={tsh("weightKg")} aria-label={tsh("weightKg")} />
+      <Input name="volumetricKg" inputMode="decimal" dir="ltr" placeholder={tsh("volumetricKg")} aria-label={tsh("volumetricKg")} />
+    </>
+  );
   const draftLines = draft ? [...draft.ap_customer_quote_lines].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) : [];
   const rows = draftLines.length + EXTRA_ROWS;
 
@@ -110,7 +140,7 @@ export default async function AdminQuote({
       </div>
       {(q.done || q.saved) && <Alert tone="success">{t("done")}</Alert>}
       {q.issued && <Alert tone="success">{t("issued")}</Alert>}
-      {q.error && <Alert tone="danger">{t.has(`error_${q.error}`) ? t(`error_${q.error}`) : `${t("failed")}${q.error}`}</Alert>}
+      {q.error && <Alert tone="danger">{await errorMessage(q.error)}</Alert>}
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
@@ -244,6 +274,95 @@ export default async function AdminQuote({
         {supplierQuotes.some((s) => s.currency !== "SAR") && <p className="text-xs text-muted">{t("currencyNote")}</p>}
       </Card>
 
+      <Card id="shipping" className="flex flex-col gap-3">
+        <h2 className="font-bold">{tsh("quotesTitle")}</h2>
+        {shippingQuotes.length === 0 ? (
+          <p className="text-sm text-muted">{tsh("noQuotes")}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {shippingQuotes.map((s) => {
+              const expired = isExpired(s.valid_until, now);
+              const usable = draft && !expired && ["submitted", "selected"].includes(s.status) && s.price;
+              return (
+                <li key={s.id} className="flex flex-col gap-2 rounded-lg border border-line p-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold">{s.carrier_id ? orgName.get(s.carrier_id) ?? "—" : s.carrier_name} · {tm(s.mode)}</span>
+                    <Badge tone={expired && s.status !== "requested" ? "danger" : statusTone(s.status === "requested" ? "opened" : s.status)}>
+                      {expired && s.status !== "requested" ? tshq("expired") : tshq(s.status)}
+                    </Badge>
+                  </div>
+                  <p className="text-muted">
+                    <span className="ltr-value">{s.origin_country}</span>{s.origin_city && ` ${s.origin_city}`} → {s.destination_city} ·{" "}
+                    {tsh("kg", { value: chargeableWeight(s.weight_kg, s.volumetric_weight_kg) ?? 0 })} · {tsh("pieces", { count: s.pieces })}
+                    {s.provider_quote_reference && <> · <span className="ltr-value">{s.provider_quote_reference}</span></>}
+                  </p>
+                  {s.price && s.currency && (
+                    <p>
+                      <span className="font-bold ltr-value">{formatMoney(s.price, s.currency, locale)}</span>
+                      {s.delivery_estimate_days != null && <> · {tc("days", { count: s.delivery_estimate_days })}</>}
+                      {s.valid_until && <> · {tq("validUntil")} {dateFmt.format(new Date(s.valid_until))}</>}
+                    </p>
+                  )}
+                  {usable && (
+                    <form action={applyShippingQuote} className="flex flex-wrap items-end gap-2">
+                      {hidden}
+                      <input type="hidden" name="shippingQuoteId" value={s.id} />
+                      <input type="hidden" name="quoteId" value={draft.id} />
+                      {s.currency !== draft.currency && (
+                        <>
+                          <Input name="amountSar" required inputMode="decimal" dir="ltr" placeholder={tsh("amountSar")} aria-label={tsh("amountSar")} className="w-36" />
+                          <Input name="fxNote" required placeholder={tsh("fxNote")} aria-label={tsh("fxNote")} maxLength={150} className="min-w-48 flex-1" />
+                        </>
+                      )}
+                      <SubmitButton variant="secondary" className="min-h-9">{tsh("applyToQuote")}</SubmitButton>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {!draft && shippingQuotes.some((s) => s.price) && <p className="text-xs text-muted">{tsh("needDraft")}</p>}
+        {canShip && isOpen && (
+          <div className="grid gap-3 border-t border-line pt-3 lg:grid-cols-2">
+            <details className="rounded-lg border border-line p-3">
+              <summary className="cursor-pointer text-sm font-bold">{tsh("requestFromCarrier")}</summary>
+              {carriers.length === 0 ? (
+                <p className="mt-2 text-sm text-muted">{tsh("noCarriers")}</p>
+              ) : (
+                <form action={requestShippingQuote} className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {hidden}
+                  <Select name="carrierId" aria-label={tsh("carrier")} className="sm:col-span-2">
+                    {carriers.map((c) => <option key={c.id} value={c.id}>{c.trade_name || c.legal_name}</option>)}
+                  </Select>
+                  {parcelFields}
+                  <Input name="lengthCm" inputMode="decimal" dir="ltr" placeholder={tsh("lengthCm")} aria-label={tsh("lengthCm")} />
+                  <Input name="widthCm" inputMode="decimal" dir="ltr" placeholder={tsh("widthCm")} aria-label={tsh("widthCm")} />
+                  <Input name="heightCm" inputMode="decimal" dir="ltr" placeholder={tsh("heightCm")} aria-label={tsh("heightCm")} />
+                  <Input name="notes" placeholder={tsh("note")} aria-label={tsh("note")} maxLength={1000} />
+                  <div><SubmitButton variant="secondary">{tsh("sendRequest")}</SubmitButton></div>
+                </form>
+              )}
+            </details>
+            <details className="rounded-lg border border-line p-3">
+              <summary className="cursor-pointer text-sm font-bold">{tsh("addManual")}</summary>
+              <form action={addShippingQuote} className="mt-3 grid gap-2 sm:grid-cols-2">
+                {hidden}
+                <Input name="carrierName" required placeholder={tsh("carrierName")} aria-label={tsh("carrierName")} maxLength={120} className="sm:col-span-2" />
+                {parcelFields}
+                <Input name="price" required inputMode="decimal" dir="ltr" placeholder={tsh("price")} aria-label={tsh("price")} />
+                <Select name="currency" aria-label={tsh("currency")} defaultValue="SAR">{currencies.map((c) => <option key={c} value={c}>{c}</option>)}</Select>
+                <Input name="days" type="number" min={1} max={365} placeholder={tsh("etaDays")} aria-label={tsh("etaDays")} />
+                <Input name="validUntil" type="date" required dir="ltr" aria-label={tq("validUntil")} />
+                <Input name="reference" dir="ltr" placeholder={tsh("reference")} aria-label={tsh("reference")} maxLength={120} />
+                <Input name="notes" placeholder={tsh("note")} aria-label={tsh("note")} maxLength={1000} />
+                <div><SubmitButton variant="secondary">{tsh("save")}</SubmitButton></div>
+              </form>
+            </details>
+          </div>
+        )}
+      </Card>
+
       <Card id="draft" className="flex flex-col gap-4">
         <h2 className="font-bold">{t("draftTitle")}</h2>
         {!draft ? (
@@ -264,6 +383,12 @@ export default async function AdminQuote({
               <input type="hidden" name="quoteId" value={draft.id} />
               <input type="hidden" name="rows" value={rows} />
               <p className="text-xs text-muted">{t("linesHelp")}</p>
+              {feePercent > 0 && draftLines.some((l) => l.code === "part") && (
+                <p className="text-xs text-accent-strong">
+                  {t("feeSuggestion", { percent: feePercent, amount: formatMoney(Math.round(draftLines.filter((l) => l.code === "part")
+                    .reduce((s, l) => s + Number(l.amount), 0) * feePercent) / 100, draft.currency, locale) })}
+                </p>
+              )}
               <ol className="flex flex-col gap-3">
                 {Array.from({ length: rows }, (_, i) => {
                   const l = draftLines[i];

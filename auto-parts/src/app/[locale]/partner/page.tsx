@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Alert, Badge, Card, PageTitle, statusTone } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getCarrierOrganizations } from "@/lib/partner-data";
 import { markNotificationsRead } from "@/server/partner-actions";
 import { localeFrom } from "@/i18n/locales";
 
@@ -23,6 +24,7 @@ export default async function PartnerHome({ params }: { params: Promise<{ locale
   const tcs = await getTranslations("capStatus");
   const tas = await getTranslations("appStatus");
   const supabase = await createClient();
+  const carrierOrgs = await getCarrierOrganizations();
 
   const [{ data: apps }, { data: notes }] = await Promise.all([
     supabase
@@ -40,6 +42,14 @@ export default async function PartnerHome({ params }: { params: Promise<{ locale
         <div className="flex flex-wrap items-center justify-between gap-3">
           <PageTitle>{t("portal")}</PageTitle>
           <div className="flex flex-wrap gap-2">
+            <Link href="/partner/orders" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
+              {(await getTranslations("supplierOrders"))("title")}
+            </Link>
+            {carrierOrgs.length > 0 && (
+              <Link href="/carrier" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
+                {(await getTranslations("carrier"))("title")}
+              </Link>
+            )}
             <Link href="/partner/requests" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">
               {(await getTranslations("supplierRequests"))("title")}
             </Link>

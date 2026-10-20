@@ -10,6 +10,7 @@ import { getCatalog, modelLabel } from "@/lib/catalog-data";
 import { currencies, formatMoney, localName, partTypes } from "@/lib/catalog";
 import { countries } from "@/lib/partners";
 import { submitSupplierQuote, withdrawSupplierQuote } from "@/server/quote-actions";
+import { errorMessage } from "@/lib/errors";
 import { localeFrom } from "@/i18n/locales";
 
 type Row = {
@@ -78,7 +79,7 @@ export default async function SupplierRequest({
           <Badge tone={statusTone(row.status)}>{ts(row.status)}</Badge>
         </div>
         {q.saved && <Alert tone="success">{tpp("saved")}</Alert>}
-        {q.error && <Alert tone="danger">{tpp("failed")}{q.error}</Alert>}
+        {q.error && <Alert tone="danger">{await errorMessage(q.error)}</Alert>}
 
         <Card>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">

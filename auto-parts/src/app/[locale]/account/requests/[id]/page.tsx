@@ -12,6 +12,7 @@ import { getCatalog, modelLabel } from "@/lib/catalog-data";
 import { localName } from "@/lib/catalog";
 import { isExpired, openRequestStatuses, type RequestStatus } from "@/lib/quotes";
 import { acceptCustomerQuote, cancelQuoteRequest, declineCustomerQuote } from "@/server/quote-actions";
+import { errorMessage } from "@/lib/errors";
 import { localeFrom } from "@/i18n/locales";
 
 type Quote = {
@@ -86,7 +87,7 @@ export default async function MyRequest({
         </div>
         {q.created && <Alert tone="success">{t("created")}</Alert>}
         {q.done && <Alert tone="success">{t("done")}</Alert>}
-        {q.error && <Alert tone="danger">{knownErrors.includes(q.error) ? t(`error_${q.error}`) : `${t("failed")}${q.error}`}</Alert>}
+        {q.error && <Alert tone="danger">{knownErrors.includes(q.error) ? t(`error_${q.error}`) : await errorMessage(q.error)}</Alert>}
         {order && (
           <Alert tone="success">
             {t("orderCreated")} <Link href="/account/orders" className="font-bold underline ltr-value">{order.reference}</Link>

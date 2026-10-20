@@ -160,3 +160,27 @@ test("the header links to the part request form", async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Frequest-part$/);
   await noHorizontalScroll(page);
 });
+
+test("carrier, supplier orders and admin operations pages require sign-in", async ({ page }) => {
+  for (const [path, next] of [
+    ["/carrier", "%2Fcarrier"],
+    ["/carrier/shipments/00000000-0000-0000-0000-000000000000", "%2Fcarrier"],
+    ["/partner/orders", "%2Fpartner"],
+    ["/en/admin/orders", "%2Fadmin"],
+    ["/admin/shipping", "%2Fadmin"],
+    ["/admin/reports", "%2Fadmin"],
+    ["/zh/admin/settings", "%2Fadmin"],
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`/login\\?next=${next}$`));
+  }
+});
+
+test("shipment documents and the orders CSV export require sign-in", async ({ request }) => {
+  const doc = await request.get("/api/shipment-documents/00000000-0000-0000-0000-000000000000", { maxRedirects: 0 });
+  expect(doc.status()).toBe(401);
+  const csv = await request.get("/api/reports/orders?from=2026-01-01&to=2026-01-31", { maxRedirects: 0 });
+  expect(csv.status()).toBe(401);
+  const bad = await request.get("/api/reports/orders?from=x&to=y", { maxRedirects: 0 });
+  expect(bad.status()).toBe(400);
+});
