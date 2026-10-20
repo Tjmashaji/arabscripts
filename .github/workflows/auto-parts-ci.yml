@@ -42,3 +42,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Database tests (RLS, roles, organization isolation)
         run: bash supabase/tests/local/run.sh
+      - name: Backup and restore scripts (local database, healthy and broken backups)
+        run: bash supabase/backup/test.sh

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:db": "bash supabase/tests/local/run.sh",
+    "test:backup": "bash supabase/backup/test.sh",
     "test:e2e": "playwright test"
   },
   "dependencies": {

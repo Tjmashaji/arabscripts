@@ -184,3 +184,30 @@ test("shipment documents and the orders CSV export require sign-in", async ({ re
   const bad = await request.get("/api/reports/orders?from=x&to=y", { maxRedirects: 0 });
   expect(bad.status()).toBe(400);
 });
+
+test("security headers are set and no page breaks under the content security policy", async ({ page }) => {
+  const violations: string[] = [];
+  page.on("console", (m) => { if (/Content Security Policy|Refused to/i.test(m.text())) violations.push(m.text()); });
+  const res = await page.goto("/products");
+  const headers = res!.headers();
+  expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
+  expect(headers["content-security-policy"]).toContain("object-src 'none'");
+  expect(headers["strict-transport-security"]).toContain("max-age=");
+  expect(headers["x-frame-options"]).toBe("DENY");
+  for (const path of ["/", "/en/login", "/zh/signup", "/products"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+  }
+  // تبديل اللغة يعمل عبر Server Action (fetch إلى الموقع نفسه) ولا يُحجب.
+  await page.goto("/login");
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page).toHaveURL(/\/en\/login$/);
+  expect(violations).toEqual([]);
+});
+
+test("health endpoint reports the database", async ({ request }) => {
+  const res = await request.get("/api/health");
+  const body = await res.json();
+  expect(res.status()).toBe(body.db ? 200 : 503);
+  expect(body).toHaveProperty("latencyMs");
+});
