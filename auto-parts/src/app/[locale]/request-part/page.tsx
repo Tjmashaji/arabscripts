@@ -9,6 +9,7 @@ import { getCatalog, modelLabel } from "@/lib/catalog-data";
 import { localName } from "@/lib/catalog";
 import { MAX_REQUEST_IMAGES } from "@/lib/quotes";
 import { createQuoteRequest } from "@/server/quote-actions";
+import { errorMessage } from "@/lib/errors";
 import { localeFrom } from "@/i18n/locales";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -52,7 +53,7 @@ export default async function RequestPart({
         <PageTitle>{product ? t("confirmTitle") : t("requestTitle")}</PageTitle>
         <p className="text-muted">{product ? t("confirmHelp") : t("requestHelp")}</p>
         {q.error && (
-          <Alert tone="danger">{knownErrors.includes(q.error) ? t(`error_${q.error}`) : `${t("failed")}${q.error}`}</Alert>
+          <Alert tone="danger">{knownErrors.includes(q.error) ? t(`error_${q.error}`) : await errorMessage(q.error)}</Alert>
         )}
         {product && (
           <Alert tone="info">

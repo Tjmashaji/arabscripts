@@ -10,7 +10,8 @@ import { adminSettableStatuses, endOfDayRiyadh, MAX_REQUEST_IMAGES, normalizePho
 import { formLocale, text } from "./form";
 
 const uuid = z.uuid();
-const fail = (message: string) => `error=${encodeURIComponent(message.replace(/^ap: /, ""))}`;
+// رمز الخطأ من قاعدة البيانات ("ap: tracking required" → tracking_required) يُترجم في الواجهة إن وُجد في errors.
+const fail = (message: string) => `error=${encodeURIComponent(message.replace(/^ap: /, "").replace(/\s+/g, "_"))}`;
 const intOrNull = (v: string) => (/^\d{1,4}$/.test(v) ? Number(v) : null);
 const optionalUuid = (v: string) => (uuid.safeParse(v).success ? v : null);
 

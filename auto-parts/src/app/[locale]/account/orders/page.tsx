@@ -3,14 +3,19 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { QuoteBreakdown, type QuoteLineRow } from "@/components/quote-breakdown";
+import { ShipmentPanel, type ShipmentRow } from "@/components/shipment-panel";
+import { SubmitButton } from "@/components/submit-button";
+import { SHIPMENT_SELECT } from "@/lib/shipping";
+import { confirmDelivery } from "@/server/shipping-actions";
 import { Alert, Badge, Card, PageTitle, statusTone } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { errorMessage } from "@/lib/errors";
 import { localeFrom } from "@/i18n/locales";
 
 type Order = {
   id: string; reference: string; status: string; payment_status: string; total: string; currency: string; created_at: string;
-  request_id: string; ap_order_items: QuoteLineRow[];
+  request_id: string; ap_order_items: QuoteLineRow[]; ap_shipments: ShipmentRow[];
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -19,21 +24,21 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 // طلبات الشراء: تُنشأ عند الموافقة على التسعيرة، وتبقى بانتظار الدفع (الدفع غير مفعّل في المنصة بعد).
-export default async function MyOrders({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ created?: string }> }) {
+export default async function MyOrders({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ created?: string; confirmed?: string; error?: string }> }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
   const session = await requireSession(locale, "/account/orders");
-  const { created } = await searchParams;
+  const { created, confirmed, error } = await searchParams;
   const t = await getTranslations("quotes");
   const to = await getTranslations("orderStatus");
   const supabase = await createClient();
   const { data } = await supabase
     .from("ap_orders")
-    .select("id, reference, status, payment_status, total, currency, created_at, request_id, ap_order_items(id, code, description, quantity, unit_amount, amount, status, sort_order)")
+    .select(`id, reference, status, payment_status, total, currency, created_at, request_id, ap_order_items(id, code, description, quantity, unit_amount, amount, status, sort_order), ap_shipments(${SHIPMENT_SELECT})`)
     .eq("customer_id", session.userId)
     .order("created_at", { ascending: false })
     .limit(100);
-  const orders = (data ?? []) as Order[];
+  const orders = (data ?? []) as unknown as Order[];
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-SA" : locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" });
 
   return (
@@ -44,6 +49,8 @@ export default async function MyOrders({ params, searchParams }: { params: Promi
           <Link href="/account/requests" className="rounded-lg border border-line bg-card px-4 py-2 text-sm font-bold">{t("myRequests")}</Link>
         </div>
         {created && <Alert tone="success">{t("orderCreated")}</Alert>}
+        {confirmed && <Alert tone="success">{t("deliveryConfirmed")}</Alert>}
+        {error && <Alert tone="danger">{await errorMessage(error)}</Alert>}
         <Alert tone="info">{t("paymentNotice")}</Alert>
         {orders.length === 0 ? (
           <Card><p className="text-muted">{t("noOrders")}</p></Card>
@@ -66,6 +73,19 @@ export default async function MyOrders({ params, searchParams }: { params: Promi
                     <summary className="cursor-pointer text-sm text-accent">{t("breakdown")}</summary>
                     <div className="mt-2"><QuoteBreakdown lines={o.ap_order_items} currency={o.currency} total={o.total} locale={locale} /></div>
                   </details>
+                  {o.ap_shipments.map((s) => (
+                    <div key={s.id} className="rounded-lg border border-line p-3">
+                      <ShipmentPanel shipment={s} locale={locale} manage={false} back="/account/orders" />
+                    </div>
+                  ))}
+                  {o.status === "delivered" && (
+                    <form action={confirmDelivery} className="flex flex-col gap-2 border-t border-line pt-3">
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="orderId" value={o.id} />
+                      <p className="text-sm">{t("confirmDeliveryHelp")}</p>
+                      <div><SubmitButton>{t("confirmDelivery")}</SubmitButton></div>
+                    </form>
+                  )}
                   <Link href={`/account/requests/${o.request_id}`} className="text-sm text-accent">{t("viewRequest")}</Link>
                 </Card>
               </li>

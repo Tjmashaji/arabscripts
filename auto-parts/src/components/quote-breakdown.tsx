@@ -12,6 +12,8 @@ export type QuoteLineRow = {
 export async function QuoteBreakdown({ lines, currency, total, locale, showInternal = false }: {
   lines: QuoteLineRow[]; currency: string; total: string | number | null; locale: string; showInternal?: boolean;
 }) {
+  // لا يُعرض الإجمالي نهائيًا إن بقي بند تقديري.
+  const estimated = lines.some((l) => l.status === "estimated");
   const t = await getTranslations("quotes");
   const tl = await getTranslations("costLines");
   const money = (v: string | number) => formatMoney(v, currency, locale);
@@ -43,7 +45,7 @@ export async function QuoteBreakdown({ lines, currency, total, locale, showInter
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={2} className="py-2 font-bold">{t("total")}</td>
+            <td colSpan={2} className="py-2 font-bold">{estimated ? t("totalEstimated") : t("total")}</td>
             <td className="py-2 text-end text-lg font-bold ltr-value">{money(total ?? linesTotal(lines))}</td>
           </tr>
         </tfoot>

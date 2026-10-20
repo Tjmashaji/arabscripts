@@ -11,6 +11,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 // أرقام حقيقية من قاعدة البيانات فقط؛ لا توجد مؤشرات لمراحل لم تُبنَ بعد.
+async function loadNowIso() {
+  return new Date().toISOString();
+}
+
 export default async function AdminOverview({ params }: { params: Promise<{ locale: string }> }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
@@ -19,7 +23,9 @@ export default async function AdminOverview({ params }: { params: Promise<{ loca
   const supabase = await createClient();
 
   const count = async (query: PromiseLike<{ count: number | null }>) => (await query).count ?? 0;
-  const [pendingOrgs, activeOrgs, pendingCaps, staff, pendingProducts, newRequests] = await Promise.all([
+  const can = (p: string) => session.permissions.has(p);
+  const nowIso = await loadNowIso();
+  const [pendingOrgs, activeOrgs, pendingCaps, staff, pendingProducts, newRequests, awaitingPayment, lateShipments, sourcing, expiredOffers] = await Promise.all([
     count(supabase.from("ap_organizations").select("id", { count: "exact", head: true }).eq("status", "pending")),
     count(supabase.from("ap_organizations").select("id", { count: "exact", head: true }).eq("status", "active")),
     count(supabase.from("ap_organization_verifications").select("organization_id", { count: "exact", head: true }).eq("status", "requested")),
@@ -30,6 +36,19 @@ export default async function AdminOverview({ params }: { params: Promise<{ loca
     session.permissions.has("quotes.manage")
       ? count(supabase.from("ap_quote_requests").select("id", { count: "exact", head: true }).eq("status", "submitted"))
       : Promise.resolve(null),
+    can("orders.manage_all") || can("finance.manage")
+      ? count(supabase.from("ap_orders").select("id", { count: "exact", head: true }).eq("status", "awaiting_payment"))
+      : Promise.resolve(null),
+    can("shipping.manage")
+      ? count(supabase.from("ap_shipments").select("id", { count: "exact", head: true })
+          .not("status", "in", "(delivered,cancelled,returned,failed)").lt("estimated_delivery_at", nowIso))
+      : Promise.resolve(null),
+    can("quotes.manage")
+      ? count(supabase.from("ap_quote_requests").select("id", { count: "exact", head: true }).eq("status", "sourcing"))
+      : Promise.resolve(null),
+    can("products.publish")
+      ? count(supabase.from("ap_product_offers").select("id", { count: "exact", head: true }).eq("status", "active").lt("valid_until", nowIso))
+      : Promise.resolve(null),
   ]);
 
   const fmt = new Intl.NumberFormat(locale === "ar" ? "ar-SA" : locale);
@@ -39,6 +58,10 @@ export default async function AdminOverview({ params }: { params: Promise<{ loca
     { label: t("activeOrgs"), value: activeOrgs },
     { label: (await getTranslations("productStatus"))("pending_review"), value: pendingProducts },
     ...(newRequests === null ? [] : [{ label: t("newRequests"), value: newRequests }]),
+    ...(sourcing === null ? [] : [{ label: t("awaitingSuppliers"), value: sourcing }]),
+    ...(awaitingPayment === null ? [] : [{ label: t("awaitingPayment"), value: awaitingPayment }]),
+    ...(lateShipments === null ? [] : [{ label: t("lateShipments"), value: lateShipments }]),
+    ...(expiredOffers === null ? [] : [{ label: t("expiredOffers"), value: expiredOffers }]),
     ...(staff === null ? [] : [{ label: t("staffCount"), value: staff }]),
   ];
 
