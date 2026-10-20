@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* ورق فاتح، حبر أخضر مزرق داكن، ولون مميز كهرماني لكل ما هو «صاعد» */
+:root {
+  --paper: #f7f6f2;
+  --surface: #ffffff;
+  --surface-2: #eeede6;
+  --ink: #0f2a2a;
+  --ink-2: #3d5555;
+  --muted: #6f8080;
+  --line: #e1e0d8;
+  --brand: #0d5c55;
+  --brand-ink: #ffffff;
+  --brand-soft: #dcefeb;
+  --hot: #c9661a;
+  --hot-soft: #fbead9;
+  --ok: #1d7f4c;
+  --ok-soft: #dcf3e6;
+  --warn: #9a6a00;
+  --warn-soft: #fbf1d6;
+  --danger: #b5321b;
+  --danger-soft: #fbe3dd;
+  --focus: #2f5fd0;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-hot: var(--hot);
+  --color-hot-soft: var(--hot-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-plex), "IBM Plex Sans Arabic", Tahoma, sans-serif;
+  --font-display: var(--font-kufi), var(--font-plex), Tahoma, sans-serif;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+}
+body {
+  font-family: var(--font-sans);
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
