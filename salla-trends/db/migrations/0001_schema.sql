@@ -1,16 +1,18 @@
 -- المخطط الأساسي لمنصة ترند سلة.
 -- مبدأ الخصوصية: لا نخزن أي بيانات عملاء (لا أسماء ولا جوالات ولا عناوين)، فقط المدينة لحساب المنطقة.
--- ولا يظهر أي منتج في الترند إلا إذا باعه عدد كافٍ من المتاجر المختلفة (انظر app.compute_trends).
+-- ولا يظهر أي منتج في الترند إلا إذا باعه عدد كافٍ من المتاجر المختلفة (انظر trends.compute_trends).
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE SCHEMA IF NOT EXISTS app;
+-- كل شيء في مخطط trends مستقل، فتعمل المنصة داخل مشروع Supabase مشترك دون أن تتداخل مع جداوله.
+-- لا إضافات (extensions): gen_random_uuid مدمجة في Postgres 13+، فلا نحتاج صلاحيات على مخطط extensions في Supabase.
+CREATE SCHEMA IF NOT EXISTS trends;
+SET search_path = trends;
 
 -- المتاجر: كل متجر في سلة ثبّت التطبيق
 CREATE TABLE stores (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   salla_merchant_id bigint NOT NULL UNIQUE,
   -- معرف عام عشوائي لصفحة التوثيق والشارة، حتى لا يُكشف المعرف الداخلي
-  public_id text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(9), 'hex'),
+  public_id text NOT NULL UNIQUE DEFAULT substr(replace(gen_random_uuid()::text, '-', ''), 1, 18),
   name text NOT NULL DEFAULT '',
   domain text,
   email text,

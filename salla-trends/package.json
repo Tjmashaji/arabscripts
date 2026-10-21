@@ -11,6 +11,7 @@
     "db:setup": "./db/setup-local.sh",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:demo": "tsx scripts/seed-demo.ts",
+    "db:supabase-sql": "tsx scripts/supabase-sql.ts",
     "test": "vitest run"
   },
   "dependencies": {

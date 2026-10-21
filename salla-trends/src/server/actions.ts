@@ -24,7 +24,7 @@ export async function setConsent(formData: FormData) {
   const v = await requireStore();
   const on = formData.get("contributes") === "on";
   await asStore(v.storeId, async (tx) => {
-    await tx.q("UPDATE stores SET contributes = $1, consent_at = CASE WHEN $1 THEN now() ELSE NULL END, updated_at = now() WHERE id = app.current_store()", [on]);
+    await tx.q("UPDATE stores SET contributes = $1, consent_at = CASE WHEN $1 THEN now() ELSE NULL END, updated_at = now() WHERE id = trends.current_store()", [on]);
     await tx.q("INSERT INTO audit_log (actor, action, target) VALUES ($1, $2, $1)", [`store:${v.storeId}`, on ? "consent.grant" : "consent.revoke"]);
   });
   revalidatePath("/", "layout");
@@ -36,9 +36,9 @@ export async function deleteMyData(_: FormState, formData: FormData): Promise<Fo
   const v = await requireStore();
   if (formData.get("confirm") !== "حذف") return { error: "اكتب كلمة «حذف» للتأكيد." };
   await asStore(v.storeId, async (tx) => {
-    await tx.q("DELETE FROM order_lines WHERE store_id = app.current_store()");
-    await tx.q("DELETE FROM products WHERE store_id = app.current_store()");
-    await tx.q("UPDATE stores SET contributes = false, consent_at = NULL, updated_at = now() WHERE id = app.current_store()");
+    await tx.q("DELETE FROM order_lines WHERE store_id = trends.current_store()");
+    await tx.q("DELETE FROM products WHERE store_id = trends.current_store()");
+    await tx.q("UPDATE stores SET contributes = false, consent_at = NULL, updated_at = now() WHERE id = trends.current_store()");
     await tx.q("INSERT INTO audit_log (actor, action, target) VALUES ($1, 'data.delete', $1)", [`store:${v.storeId}`]);
   });
   revalidatePath("/", "layout");
@@ -69,7 +69,7 @@ export async function submitVerification(_: FormState, formData: FormData): Prom
     await asStore(v.storeId, async (tx) => {
       await tx.q(
         `INSERT INTO verification_requests (store_id, kind, number, legal_name, document, document_mime, document_name)
-         VALUES (app.current_store(), $1, $2, $3, $4, $5, $6)`,
+         VALUES (trends.current_store(), $1, $2, $3, $4, $5, $6)`,
         [parsed.data.kind, number, parsed.data.legal_name, Buffer.from(bytes), mime, safeFileName(file.name)],
       );
       await tx.q("INSERT INTO audit_log (actor, action, target, details) VALUES ($1, 'verification.submit', $1, $2)", [
@@ -89,7 +89,7 @@ export async function adminLogin(_: FormState, formData: FormData): Promise<Form
   const password = String(formData.get("password") ?? "");
   const ip = await clientIp(await headers());
   if (await rateLimited(`admin-login:${ip}`, env().LOGIN_LIMIT_PER_15MIN, 900)) return { error: "محاولات كثيرة. انتظر ربع ساعة.", values: { email } };
-  const row = await anonymous((tx) => tx.one<{ id: string; password_hash: string }>("SELECT * FROM app.admin_credentials($1)", [email]));
+  const row = await anonymous((tx) => tx.one<{ id: string; password_hash: string }>("SELECT * FROM trends.admin_credentials($1)", [email]));
   // نتحقق دائمًا من هاش (حتى الوهمي) كي لا يكشف زمن الرد وجود البريد
   const ok = await verifyPassword(password, row?.password_hash ?? DUMMY_HASH);
   if (!row || !ok) return { error: "البريد أو كلمة المرور غير صحيحة.", values: { email } };
@@ -105,7 +105,7 @@ export async function reviewVerification(_: FormState, formData: FormData): Prom
   if (!id.success || (decision !== "approve" && decision !== "reject")) return { error: "طلب غير صالح." };
   if (decision === "reject" && note.trim().length < 3) return { error: "اكتب سبب الرفض ليعرف التاجر ما يصححه." };
   try {
-    await asAdmin(a.adminId, (tx) => tx.q("SELECT app.review_verification($1, $2, $3)", [id.data, decision === "approve", note]));
+    await asAdmin(a.adminId, (tx) => tx.q("SELECT trends.review_verification($1, $2, $3)", [id.data, decision === "approve", note]));
   } catch (e) {
     if ((e as { code?: string }).code === "P0002") return { error: "الطلب لم يعد قيد المراجعة." };
     throw e;

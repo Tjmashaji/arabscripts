@@ -11,7 +11,7 @@ async function main() {
   if (password.length < 12) throw new Error("ضع كلمة مرور من 12 حرفًا على الأقل في ADMIN_PASSWORD");
   const url = process.env.MIGRATION_DATABASE_URL;
   if (!url) throw new Error("MIGRATION_DATABASE_URL غير معرّف");
-  const db = new Client({ connectionString: url });
+  const db = new Client({ connectionString: url, options: "-c search_path=trends" });
   await db.connect();
   await db.query(
     "INSERT INTO admins (email, name, password_hash) VALUES (lower($1), $2, $3) ON CONFLICT (email) DO UPDATE SET name = $2, password_hash = $3",

@@ -5,7 +5,7 @@ import { anonymous } from "./db";
 export const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
 
 export async function rateLimited(bucket: string, limit: number, windowSeconds: number): Promise<boolean> {
-  const row = await anonymous((tx) => tx.one<{ ok: boolean }>("SELECT app.hit_rate_limit($1, $2, $3) AS ok", [bucket, limit, windowSeconds]));
+  const row = await anonymous((tx) => tx.one<{ ok: boolean }>("SELECT trends.hit_rate_limit($1, $2, $3) AS ok", [bucket, limit, windowSeconds]));
   return !row?.ok;
 }
 

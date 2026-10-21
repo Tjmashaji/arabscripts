@@ -28,15 +28,15 @@ async function issue(create: (hash: string, ua: string) => Promise<unknown>) {
 
 // جلسة التاجر لا تُنشأ إلا من رد سلة بعد الدخول (انظر /api/auth/salla/callback)
 export const startStoreSession = (storeId: string) =>
-  issue((hash, ua) => asWorker((tx) => tx.q("SELECT app.create_store_session($1, $2, $3, $4)", [storeId, hash, ua, TTL_SECONDS])));
+  issue((hash, ua) => asWorker((tx) => tx.q("SELECT trends.create_store_session($1, $2, $3, $4)", [storeId, hash, ua, TTL_SECONDS])));
 
 export const startAdminSession = (adminId: string) =>
-  issue((hash, ua) => anonymous((tx) => tx.q("SELECT app.create_admin_session($1, $2, $3, $4)", [adminId, hash, ua, TTL_SECONDS])));
+  issue((hash, ua) => anonymous((tx) => tx.q("SELECT trends.create_admin_session($1, $2, $3, $4)", [adminId, hash, ua, TTL_SECONDS])));
 
 export async function endSession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) await anonymous((tx) => tx.q("SELECT app.delete_session($1)", [hashToken(token)]));
+  if (token) await anonymous((tx) => tx.q("SELECT trends.delete_session($1)", [hashToken(token)]));
   jar.delete(SESSION_COOKIE);
 }
 
@@ -45,7 +45,7 @@ export async function currentViewer(): Promise<Viewer | null> {
   if (!token) return null;
   const row = await anonymous((tx) =>
     tx.one<{ store_id: string | null; store_name: string | null; admin_id: string | null; admin_name: string | null; admin_email: string | null }>(
-      "SELECT * FROM app.session_identity($1)",
+      "SELECT * FROM trends.session_identity($1)",
       [hashToken(token)],
     ),
   );

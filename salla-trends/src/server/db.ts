@@ -8,6 +8,9 @@ let workerPool: Pool | undefined;
 const app = () => (appPool ??= new Pool({ connectionString: env().DATABASE_URL, max: 10 }));
 const worker = () => (workerPool ??= new Pool({ connectionString: env().WORKER_DATABASE_URL, max: 5 }));
 
+// كل جداول المنصة ودوالها في مخطط trends (انظر 0001_schema.sql)
+export const SEARCH_PATH = "trends";
+
 export type Tx = {
   q: <R extends QueryResultRow = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<R[]>;
   one: <R extends QueryResultRow = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<R | undefined>;
@@ -26,6 +29,8 @@ async function inTx<T>(p: Pool, settings: Record<string, string>, fn: (tx: Tx) =
   const client = await p.connect();
   try {
     await client.query("BEGIN");
+    // داخل المعاملة لا على مستوى الاتصال، لأن مجمّع Supabase (وضع المعاملات) يبدّل الاتصالات بين المعاملات
+    await client.query("SELECT set_config('search_path', $1, true)", [SEARCH_PATH]);
     for (const [k, v] of Object.entries(settings)) await client.query("SELECT set_config($1, $2, true)", [k, v]);
     const out = await fn(wrap(client));
     await client.query("COMMIT");

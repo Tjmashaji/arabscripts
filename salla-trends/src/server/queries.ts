@@ -17,7 +17,7 @@ export type StoreRow = {
   last_synced_at: Date | null;
 };
 
-export const myStore = (tx: Tx) => tx.one<StoreRow>("SELECT * FROM stores WHERE id = app.current_store()");
+export const myStore = (tx: Tx) => tx.one<StoreRow>("SELECT * FROM stores WHERE id = trends.current_store()");
 
 export type JobRow = { kind: string; status: string; page: number; last_error: string | null; updated_at: Date };
 export const myJobs = (tx: Tx) =>
@@ -72,8 +72,8 @@ export async function trendItems(tx: Tx, runId: string, f: TrendFilter): Promise
        SELECT id FROM trend_runs WHERE finished_at IS NOT NULL AND id < $1 AND as_of <= (SELECT as_of FROM trend_runs WHERE id = $1) - interval '20 hours'
        ORDER BY id DESC LIMIT 1
      ), mine AS (
-       SELECT DISTINCT fingerprint FROM products WHERE store_id = app.current_store()
-       UNION SELECT DISTINCT fingerprint FROM order_lines WHERE store_id = app.current_store()
+       SELECT DISTINCT fingerprint FROM products WHERE store_id = trends.current_store()
+       UNION SELECT DISTINCT fingerprint FROM order_lines WHERE store_id = trends.current_store()
      )
      SELECT t.rank, t.fingerprint, t.display_name, t.units, t.prev_units, t.stores_count, t.orders_count, t.growth, t.score, t.median_price_halalas,
             (SELECT x.taxonomy FROM trend_items x WHERE x.run_id = t.run_id AND x.fingerprint = t.fingerprint AND x.taxonomy <> 'ALL' LIMIT 1) AS taxonomy_hint,
@@ -92,13 +92,13 @@ export async function opportunities(tx: Tx, runId: string, window: 7 | 30 = 7, l
   return tx.q<TrendItem & { taxonomy: string }>(
     `WITH my_tax AS (
        SELECT taxonomy FROM (
-         SELECT taxonomy, count(*) n FROM products WHERE store_id = app.current_store() AND taxonomy <> 'other' GROUP BY taxonomy
+         SELECT taxonomy, count(*) n FROM products WHERE store_id = trends.current_store() AND taxonomy <> 'other' GROUP BY taxonomy
          UNION ALL
-         SELECT taxonomy, sum(quantity) FROM order_lines WHERE store_id = app.current_store() AND taxonomy <> 'other' GROUP BY taxonomy
+         SELECT taxonomy, sum(quantity) FROM order_lines WHERE store_id = trends.current_store() AND taxonomy <> 'other' GROUP BY taxonomy
        ) s GROUP BY taxonomy ORDER BY sum(n) DESC LIMIT 4
      ), mine AS (
-       SELECT fingerprint FROM products WHERE store_id = app.current_store()
-       UNION SELECT fingerprint FROM order_lines WHERE store_id = app.current_store()
+       SELECT fingerprint FROM products WHERE store_id = trends.current_store()
+       UNION SELECT fingerprint FROM order_lines WHERE store_id = trends.current_store()
      )
      SELECT (row_number() OVER (ORDER BY t.score DESC))::int AS rank, t.fingerprint, t.display_name, t.units, t.prev_units, t.stores_count,
             t.orders_count, t.growth, t.score, t.median_price_halalas, t.taxonomy, t.taxonomy AS taxonomy_hint, false AS mine, NULL::int AS prev_rank

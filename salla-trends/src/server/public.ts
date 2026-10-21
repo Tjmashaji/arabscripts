@@ -5,5 +5,5 @@ export type PublicVerification = { name: string; domain: string | null; verified
 
 export async function publicVerification(publicId: string): Promise<PublicVerification | null> {
   if (!/^[0-9a-f]{18}$/.test(publicId)) return null;
-  return (await anonymous((tx) => tx.one<PublicVerification>("SELECT * FROM app.public_verification($1)", [publicId]))) ?? null;
+  return (await anonymous((tx) => tx.one<PublicVerification>("SELECT * FROM trends.public_verification($1)", [publicId]))) ?? null;
 }

@@ -37,7 +37,7 @@ const pick = <T,>(a: T[]) => a[Math.floor(rand() * a.length)];
 async function main() {
   const url = process.env.WORKER_DATABASE_URL;
   if (!url) throw new Error("WORKER_DATABASE_URL غير معرّف");
-  const db = new Client({ connectionString: url });
+  const db = new Client({ connectionString: url, options: "-c search_path=trends" });
   await db.connect();
   await db.query("BEGIN");
   await db.query("DELETE FROM stores WHERE salla_merchant_id >= 990000001");
@@ -79,8 +79,8 @@ async function main() {
   }
   await db.query("COMMIT");
   // لقطتان: أمس واليوم، لتظهر أسهم الصعود والهبوط في الترتيب
-  await db.query("SELECT app.compute_trends(now() - interval '1 day')");
-  await db.query("SELECT app.compute_trends(now())");
+  await db.query("SELECT trends.compute_trends(now() - interval '1 day')");
+  await db.query("SELECT trends.compute_trends(now())");
   await db.end();
   console.log(`✓ 12 متجرًا تجريبيًا، ${orderId - 1} طلبًا، وحُسب الترند`);
 }

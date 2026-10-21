@@ -13,7 +13,7 @@ import { computeTrends, runDueJobs } from "@/server/sync";
 import { latestRun, opportunities, trendItems } from "@/server/queries";
 
 const SECRET = process.env.SALLA_WEBHOOK_SECRET!;
-const owner = new Client({ connectionString: "postgres://trends_owner:trends_owner_dev@127.0.0.1:5432/salla_trends_test" });
+const owner = new Client({ connectionString: "postgres://trends_owner:trends_owner_dev@127.0.0.1:5432/salla_trends_test", options: "-c search_path=trends" });
 
 async function reset() {
   await owner.query(
@@ -222,7 +222,7 @@ describe("التوثيق", () => {
     const id = await storeId(500);
     const admin = (await owner.query("INSERT INTO admins (email, name, password_hash) VALUES ('a@x.sa', 'مدير', 'x') RETURNING id")).rows[0].id;
     await asStore(id, (tx) =>
-      tx.q("INSERT INTO verification_requests (store_id, kind, number, legal_name, document, document_mime, document_name) VALUES (app.current_store(), 'commercial_register', '1010123456', 'مؤسسة التجربة', $1, 'application/pdf', 'cr.pdf')", [Buffer.from("%PDF-1.4")]),
+      tx.q("INSERT INTO verification_requests (store_id, kind, number, legal_name, document, document_mime, document_name) VALUES (trends.current_store(), 'commercial_register', '1010123456', 'مؤسسة التجربة', $1, 'application/pdf', 'cr.pdf')", [Buffer.from("%PDF-1.4")]),
     );
     // لا يستطيع التاجر تقديم طلب باسم متجر آخر
     await authorize(501);
@@ -232,14 +232,14 @@ describe("التوثيق", () => {
     ).rejects.toMatchObject({ code: "42501" });
     // ولا مراجعة طلبه بنفسه
     const req = (await owner.query("SELECT id FROM verification_requests WHERE store_id = $1", [id])).rows[0].id;
-    await expect(asStore(id, (tx) => tx.q("SELECT app.review_verification($1, true, '')", [req]))).rejects.toMatchObject({ code: "42501" });
+    await expect(asStore(id, (tx) => tx.q("SELECT trends.review_verification($1, true, '')", [req]))).rejects.toMatchObject({ code: "42501" });
     expect((await owner.query("SELECT verification_status FROM stores WHERE id = $1", [id])).rows[0].verification_status).toBe("pending");
 
-    await asAdmin(admin, (tx) => tx.q("SELECT app.review_verification($1, true, 'مطابق')", [req]));
-    const pub = await asWorker((tx) => tx.one("SELECT * FROM app.public_verification((SELECT public_id FROM stores WHERE id = $1))", [id]));
+    await asAdmin(admin, (tx) => tx.q("SELECT trends.review_verification($1, true, 'مطابق')", [req]));
+    const pub = await asWorker((tx) => tx.one("SELECT * FROM trends.public_verification((SELECT public_id FROM stores WHERE id = $1))", [id]));
     expect(pub).toMatchObject({ verified: true, legal_name: "مؤسسة التجربة", active: true });
     // مراجعة مزدوجة مرفوضة
-    await expect(asAdmin(admin, (tx) => tx.q("SELECT app.review_verification($1, false, 'x')", [req]))).rejects.toMatchObject({ code: "P0002" });
+    await expect(asAdmin(admin, (tx) => tx.q("SELECT trends.review_verification($1, false, 'x')", [req]))).rejects.toMatchObject({ code: "P0002" });
   });
 });
 

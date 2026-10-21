@@ -83,7 +83,10 @@ MIGRATION_DATABASE_URL=... ADMIN_PASSWORD='كلمة-مرور-طويلة' npx tsx
 ## النشر
 
 - **Vercel** (أو أي استضافة Node): `vercel.json` يشغّل المزامنة كل 10 دقائق والترند يوميًا. Vercel Cron يرسل `CRON_SECRET` تلقائيًا. خطة Hobby تسمح بالمهام اليومية فقط؛ المزامنة كل 10 دقائق تحتاج Pro أو مُجدولًا خارجيًا يستدعي `/api/cron/sync` بترويسة `Authorization: Bearer <CRON_SECRET>`.
-- **قاعدة البيانات**: أي Postgres مُدار (Supabase، Neon، RDS). نفّذ `db/roles.sql` بصلاحية superuser مع كلمات مرور قوية، ثم الترحيلات بدور `trends_owner`. التطبيق يحتاج اتصالين: `DATABASE_URL` (trends_app) و`WORKER_DATABASE_URL` (trends_worker).
+- **قاعدة البيانات**: كل الجداول والدوال في مخطط `trends` مستقل، فتعمل المنصة داخل مشروع Supabase موجود دون أن تمس جداوله.
+  - **Supabase**: `npm run db:supabase-sql > setup.sql` يولّد ملفًا واحدًا بكلمات مرور عشوائية (مطبوعة في رأسه). الصقه في **SQL Editor** وشغّله **مرة واحدة**. ثم استخدم **Transaction pooler** (منفذ 6543) من زر **Connect**، واسم المستخدم بصيغة `trends_app.<رقم-المشروع>` و`trends_worker.<رقم-المشروع>`.
+  - **Postgres آخر**: نفّذ `db/roles.sql` بصلاحية superuser مع كلمات مرور قوية، ثم `npm run db:migrate` بدور `trends_owner`.
+  - التطبيق يحتاج اتصالين: `DATABASE_URL` (trends_app) و`WORKER_DATABASE_URL` (trends_worker).
 - **الصحة**: `/api/health`.
 
 ## البنية

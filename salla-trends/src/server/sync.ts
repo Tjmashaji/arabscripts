@@ -126,7 +126,7 @@ export async function runDueJobs(opts: { maxJobs?: number; budgetMs?: number } =
 export async function computeTrends(asOf = new Date()) {
   const e = env();
   return asWorker(async (tx) => {
-    const row = await tx.one<{ id: string }>("SELECT app.compute_trends($1, $2, $3, $4) AS id", [
+    const row = await tx.one<{ id: string }>("SELECT trends.compute_trends($1, $2, $3, $4) AS id", [
       asOf, e.TRENDS_MIN_STORES, e.TRENDS_MAX_STORE_SHARE, e.TRENDS_MIN_UNITS,
     ]);
     await tx.q("DELETE FROM sessions WHERE expires_at < now()");

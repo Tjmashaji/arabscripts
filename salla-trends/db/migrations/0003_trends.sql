@@ -10,14 +10,16 @@
 --   trending: درجة z تقريبية بافتراض توزيع بواسون: (الحالي − السابق) / √(السابق + 5).
 --             تكافئ النمو الكبير على حجم معقول، ولا تنخدع بقفزة من 1 إلى 4.
 
-CREATE OR REPLACE FUNCTION app.compute_trends(
+SET search_path = trends;
+
+CREATE OR REPLACE FUNCTION trends.compute_trends(
   p_as_of timestamptz DEFAULT now(),
   p_min_stores integer DEFAULT 3,
   p_max_share numeric DEFAULT 0.7,
   p_min_units integer DEFAULT 10,
   p_top integer DEFAULT 50
 ) RETURNS bigint
-LANGUAGE plpgsql SET search_path = public, app AS $$
+LANGUAGE plpgsql SET search_path = trends AS $$
 DECLARE
   v_run bigint;
   w integer;
@@ -100,8 +102,8 @@ BEGIN
   RETURN v_run;
 END $$;
 
-REVOKE ALL ON FUNCTION app.compute_trends(timestamptz, integer, numeric, integer, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app.compute_trends(timestamptz, integer, numeric, integer, integer) TO trends_worker;
+REVOKE ALL ON FUNCTION trends.compute_trends(timestamptz, integer, numeric, integer, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION trends.compute_trends(timestamptz, integer, numeric, integer, integer) TO trends_worker;
 
 -- أحدث دفعة مكتملة
 CREATE OR REPLACE VIEW latest_trend_run WITH (security_invoker = true) AS
