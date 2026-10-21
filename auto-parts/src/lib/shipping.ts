@@ -12,13 +12,17 @@ export const adminOrderTargets = ["processing", "ready_to_ship", "cancelled", "c
 export const supplierOrderTargets = ["processing", "ready_to_ship"] as const;
 
 // الحالات التالية المتاحة للشحنة من حالتها الحالية: التقدم في المسار (الجمارك اختيارية) أو الفشل/الإرجاع.
+// مثل ap_update_shipment: قبل الاستلام يتقدم الناقل خطوة واحدة فقط (لا قفز من «مُسندة» إلى «تم التسليم»)،
+// و«مرتجع» لا يكون إلا بعد استلام الشحنة.
 export function nextShipmentStatuses(current: ShipmentStatus, isAdmin: boolean): ShipmentStatus[] {
   if (closedShipmentStatuses.includes(current)) return [];
   const rank = (shipmentPath as readonly string[]).indexOf(current);
-  const forward = shipmentPath.slice(rank + 1) as ShipmentStatus[];
+  const pickedUp = rank >= shipmentPath.indexOf("picked_up");
+  const all = shipmentPath.slice(rank + 1) as ShipmentStatus[];
+  const forward = isAdmin || pickedUp ? all : all.slice(0, 1);
   const back: ShipmentStatus[] = current === "customs_clearance" ? ["in_transit"] : [];
   const cancel: ShipmentStatus[] = isAdmin && (current === "assigned" || current === "accepted") ? ["cancelled"] : [];
-  return [...back, ...forward, "failed", "returned", ...cancel];
+  return [...back, ...forward, "failed", ...(pickedUp ? (["returned"] as ShipmentStatus[]) : []), ...cancel];
 }
 
 // الوزن المحتسب = الأكبر من الفعلي والحجمي.

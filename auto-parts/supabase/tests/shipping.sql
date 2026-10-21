@@ -221,10 +221,19 @@ begin
     || ' T2 لا أسعار ولا أسماء ولا عناوين ولا جوال في نتيجة التتبع');
   out := array_append(out, (case when public.ap_track_order(x, '+966511111111') is null then 'PASS' else 'FAIL' end) || ' T3 جوال خاطئ لا يكشف شيئًا');
   out := array_append(out, (case when public.ap_track_order('ORD-1', '+966500000001') is null then 'PASS' else 'FAIL' end) || ' T4 رقم بصيغة غير صحيحة');
-  for n in 1..9 loop perform public.ap_track_order(x, '+9667' || lpad(n::text, 8, '0')); end loop;
+  -- جوال واحد يخمّن أرقام طلبات: يُقفل هذا الجوال بعد 10 محاولات، ولا يُقفل صاحب الطلب.
+  for n in 1..10 loop perform public.ap_track_order('ORD-9' || lpad(n::text, 6, '0'), '+966522222222'); end loop;
+  ok := false; begin perform public.ap_track_order(x, '+966522222222'); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' T5 بعد 10 محاولات خاطئة من نفس الجوال يُقفل التتبع لهذا الجوال');
+  out := array_append(out, (case when public.ap_track_order(x, '+966500000001')->>'reference' = x then 'PASS' else 'FAIL' end)
+    || ' T6 محاولات جوال آخر لا تقفل صاحب الطلب');
+  -- تخمين الجوال لطلب معيّن بجوالات متغيرة: يُقفل الطلب بعد 50 محاولة في الساعة.
+  for n in 1..49 loop perform public.ap_track_order(x, '+9667' || lpad(n::text, 8, '0')); end loop;
   ok := false; begin perform public.ap_track_order(x, '+966500000001'); exception when others then ok := true; end;
-  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' T5 بعد 10 محاولات خاطئة يُقفل التتبع لهذا الطلب حتى بالجوال الصحيح');
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' T7 بعد 50 محاولة خاطئة على الطلب يُقفل تتبعه');
   reset role;
+  select count(*) into n from ap_private.track_attempts where phone_hash is null or phone_hash !~ '^[0-9a-f]{64}$';
+  out := array_append(out, (case when n = 0 then 'PASS' else 'FAIL' end) || ' T8 الجوال يُخزَّن مُجزّأً (hash) لا نصًا');
 
   raise exception 'RESULT%', E'\n' || array_to_string(out, E'\n');
 end $$;

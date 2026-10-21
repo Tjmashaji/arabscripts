@@ -90,12 +90,25 @@ test("email links carried in the # fragment are handled on any page", async ({ p
   await page.goto("/#error=access_denied&error_code=otp_expired&error_description=expired");
   await expect(page).toHaveURL(/\/login\?error=confirmFailed$/);
   await page.goto("/en#access_token=bad.token.value-that-is-long-enough&refresh_token=bad&type=recovery");
+  await page.getByRole("dialog").getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/en\/login\?error=confirmFailed$/);
   await expect(page.locator("main [role=alert]")).toBeVisible();
 });
 
+test("an email link asks before signing in, shows the link's account, and can be cancelled", async ({ page }) => {
+  const payload = Buffer.from(JSON.stringify({ email: "someone-else@example.com" })).toString("base64url");
+  await page.goto(`/en#access_token=x.${payload}.signature-long-enough&refresh_token=bad&type=signup`);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("someone-else@example.com");
+  expect(new URL(page.url()).hash).toBe("");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/\/en$/);
+});
+
 test("/auth/confirm forwards a # fragment link to the handler", async ({ page }) => {
   await page.goto("/auth/confirm#access_token=bad.token.value-that-is-long-enough&refresh_token=bad&type=recovery");
+  await page.getByRole("dialog").getByRole("button", { name: "متابعة" }).click();
   await expect(page).toHaveURL(/\/login\?error=confirmFailed$/);
   await expect(page.locator("main [role=alert]")).toBeVisible();
 });

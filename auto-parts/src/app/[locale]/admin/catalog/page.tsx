@@ -7,6 +7,7 @@ import { getCatalogForStaff, type Model } from "@/lib/catalog-data";
 import { localName } from "@/lib/catalog";
 import { saveModel } from "@/server/catalog-actions";
 import { localeFrom } from "@/i18n/locales";
+import { errorMessage } from "@/lib/errors";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -61,7 +62,7 @@ export default async function AdminCatalog({
     <div className="flex flex-col gap-5">
       <PageTitle>{t("catalog")}</PageTitle>
       {q.done && <Alert tone="success">{t("done")}</Alert>}
-      {q.error && <Alert tone="danger">{t("failed")}{q.error}</Alert>}
+      {q.error && <Alert tone="danger">{await errorMessage(q.error)}</Alert>}
       <Card className="flex flex-col gap-4">
         <h2 className="font-bold">{t("models")}</h2>
         {modelForm()}

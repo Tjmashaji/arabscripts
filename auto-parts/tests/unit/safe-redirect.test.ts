@@ -26,3 +26,20 @@ describe("stripLocalePrefix", () => {
     expect(stripLocalePrefix("/english", locales)).toBe("/english");
   });
 });
+
+describe("internal redirect after removing the locale prefix (open-redirect regression)", () => {
+  const locales = ["ar", "en", "zh"];
+  const target = (v: string) => stripLocalePrefix(safeNextPath(v), locales);
+  it.each(["/en//evil.example", "/ar//evil.example/x", "/zh//evil.example", "/en/\\evil.example", "/en/%2F%2Fevil.example"])(
+    "never yields a protocol-relative URL for %s",
+    (value) => {
+      const out = target(value);
+      expect(out.startsWith("//")).toBe(false);
+      expect(out.startsWith("/\\")).toBe(false);
+      expect(new URL(out, "https://site.test").origin).toBe("https://site.test");
+    },
+  );
+  it("still keeps normal localized paths", () => {
+    expect(target("/en/account/orders?x=1")).toBe("/account/orders?x=1");
+  });
+});

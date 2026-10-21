@@ -8,7 +8,10 @@ import { createClient } from "@/lib/supabase/server";
 import { localePath, requireStaff } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { isCapability } from "@/lib/partners";
-import { isLocale } from "@/i18n/locales";
+import { directionOf, isLocale } from "@/i18n/locales";
+import { getTranslations } from "next-intl/server";
+import { emailConfigured, sendEmail } from "@/lib/email";
+import { invitationEmail } from "@/lib/email-templates";
 import { formLocale, text } from "./form";
 
 const roleSchema = z.enum(["super_admin", "operations_admin", "finance_admin", "support_agent"]);
@@ -71,10 +74,31 @@ export async function createInvitation(form: FormData) {
   });
   const row = Array.isArray(data) ? data[0] : null;
   if (error || !row?.token) redirect(invitePage(locale, "error=failed"));
-  // الرابط يُعرض مرة واحدة؛ لا يُخزَّن الرمز الخام في أي مكان.
+  // الرابط يُعرض مرة واحدة؛ لا يُخزَّن الرمز الخام في أي مكان. يُرسل بالبريد إن كانت خدمة البريد مضبوطة.
   const link = `${env.siteUrl}${localePath(inviteLocale, `/invite/${row.token}`)}`;
+  const mail = emailConfigured() ? await sendInvitationEmail(email.data, inviteLocale, link, caps, text(form, "message", 1000) || null, row.expires_at, row.id) : "off";
   (await cookies()).set("ap_invite_link", link, { path: "/", httpOnly: true, sameSite: "strict", maxAge: 120, secure: true });
-  redirect(invitePage(locale, "created=1"));
+  redirect(invitePage(locale, `created=1&mail=${mail}&to=${encodeURIComponent(email.data)}`));
+}
+
+async function sendInvitationEmail(to: string, inviteLocale: string, link: string, caps: string[], message: string | null,
+  expiresAt: string, invitationId: string): Promise<"sent" | "failed"> {
+  const t = await getTranslations({ locale: inviteLocale, namespace: "inviteEmail" });
+  const tc = await getTranslations({ locale: inviteLocale, namespace: "capabilities" });
+  const brand = env.platformName ?? (await getTranslations({ locale: inviteLocale, namespace: "brand" }))("name");
+  const expires = new Intl.DateTimeFormat(inviteLocale === "ar" ? "ar-SA" : inviteLocale, { dateStyle: "long", timeZone: "Asia/Riyadh" })
+    .format(new Date(expiresAt));
+  const m = invitationEmail({
+    dir: directionOf(inviteLocale), lang: inviteLocale, brand, link, capabilities: caps.map((c) => tc(c)), message,
+    text: {
+      subject: t("subject", { brand }), heading: t("heading"), intro: t("intro", { brand }), capabilities: t("capabilities"),
+      message: t("message"), button: t("button"), expires: t("expires", { date: expires }), sameEmail: t("sameEmail", { email: to }),
+      ignore: t("ignore"), linkHint: t("linkHint"),
+    },
+  });
+  const result = await sendEmail({ to, ...m, idempotencyKey: `invitation-${invitationId}` });
+  if (!result.ok) console.error("invitation email failed", result.error);
+  return result.ok ? "sent" : "failed";
 }
 
 export async function revokeInvitation(form: FormData) {

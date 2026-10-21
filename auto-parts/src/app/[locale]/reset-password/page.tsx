@@ -4,10 +4,12 @@ import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
+import { hasFreshRecovery } from "@/lib/auth-callback";
+import { createClient } from "@/lib/supabase/server";
 import { updatePassword } from "@/server/auth-actions";
 import { localeFrom } from "@/i18n/locales";
 
-const errorKeys = new Set(["mismatch", "weakPassword", "samePassword", "rateLimited", "generic"]);
+const errorKeys = new Set(["mismatch", "weakPassword", "samePassword", "rateLimited", "generic", "currentInvalid"]);
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -26,6 +28,9 @@ export default async function ResetPasswordPage({
   setRequestLocale(locale);
   const session = await requireSession(locale, "/reset-password");
   const { error } = await searchParams;
+  // خارج رابط الاستعادة الحديث تُطلب كلمة المرور الحالية (نفس شرط الخادم في updatePassword).
+  const { data: claims } = await (await createClient()).auth.getClaims();
+  const needsCurrent = !hasFreshRecovery(claims?.claims.amr);
   const t = await getTranslations("auth");
 
   return (
@@ -37,6 +42,11 @@ export default async function ResetPasswordPage({
           {error && errorKeys.has(error) && <Alert tone="danger">{t(`errors.${error}`)}</Alert>}
           <form action={updatePassword} className="flex flex-col gap-4">
             <input type="hidden" name="locale" value={locale} />
+            {needsCurrent && (
+              <Field label={t("currentPassword")} htmlFor="current">
+                <Input id="current" name="current" type="password" autoComplete="current-password" dir="ltr" required maxLength={72} />
+              </Field>
+            )}
             <Field label={t("newPassword")} hint={t("passwordHint")} htmlFor="password">
               <Input id="password" name="password" type="password" autoComplete="new-password" dir="ltr" required minLength={8} maxLength={72} />
             </Field>

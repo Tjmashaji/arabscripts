@@ -14,6 +14,7 @@ import {
   addFitment, confirmAvailability, removeFitment, removeProductImage, saveOffer, submitProduct, updateProduct, uploadProductImage,
 } from "@/server/catalog-actions";
 import { localeFrom } from "@/i18n/locales";
+import { errorMessage } from "@/lib/errors";
 
 type Product = {
   id: string; organization_id: string; name: string; description: string | null; status: string; brand_id: string; category_id: string;
@@ -136,7 +137,7 @@ export default async function PartnerProduct({
           </Badge>
         </div>
         {q.saved && <Alert tone="success">{t("saved")}</Alert>}
-        {q.error && <Alert tone="danger">{t("failed")}{q.error}</Alert>}
+        {q.error && <Alert tone="danger">{await errorMessage(q.error)}</Alert>}
         {product.review_reason && <Alert tone="info">{t("reviewReason")}: {product.review_reason}</Alert>}
         {ownsProduct && !editable && <p className="text-sm text-muted">{t("locked")}</p>}
         <datalist id="countries">{countries.map((c) => <option key={c} value={c} />)}</datalist>

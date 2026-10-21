@@ -82,7 +82,8 @@
       "confirmFailed": "激活链接无效或已过期。",
       "generic": "操作失败，请重试。",
       "mismatch": "两次输入的密码不一致。",
-      "samePassword": "请设置与当前密码不同的新密码。"
+      "samePassword": "请设置与当前密码不同的新密码。",
+      "currentInvalid": "当前密码不正确。"
     },
     "forgotLink": "忘记密码？",
     "forgotTitle": "重置密码",
@@ -96,7 +97,12 @@
     "resetSubmit": "保存密码",
     "passwordUpdated": "密码已修改。",
     "backToLogin": "返回登录",
-    "verifying": "正在验证链接…"
+    "verifying": "正在验证链接…",
+    "currentPassword": "当前密码",
+    "linkConfirmTitle": "以此账户继续？",
+    "linkConfirmBody": "此链接将登录上面的账户。仅当这是您的账户且是您本人申请的链接时才继续。",
+    "linkContinue": "继续",
+    "linkCancel": "取消"
   },
   "account": {
     "title": "我的账户",
@@ -288,7 +294,7 @@
     "validDays": "有效期（天）",
     "create": "创建邀请",
     "linkReady": "邀请链接已生成。请复制并发送给受邀人；链接不会再次显示。",
-    "emailNotConfigured": "尚未配置邮件发送（需接入邮件服务）。请自行发送链接。",
+    "emailNotConfigured": "尚未开通邮件发送（需要接入邮件服务）。请自行发送链接。",
     "revoke": "撤销",
     "expires": "到期",
     "status": "状态",
@@ -322,7 +328,10 @@
     "notReviewable": "该申请不在审核阶段。",
     "contact": "联系人",
     "checklist": "核查清单",
-    "checklistNote": "请人工核查：法定名称与文件一致、文件有效、代表人身份。系统不会自动查询政府登记信息。"
+    "checklistNote": "请人工核查：法定名称与文件一致、文件有效、代表人身份。系统不会自动查询政府登记信息。",
+    "emailSent": "邀请已通过邮件发送至 {email}。",
+    "emailFailed": "邮件发送失败。请复制链接自行发送。",
+    "linkBackup": "链接备份（以防邮件未送达或进入垃圾邮件）："
   },
   "partTypes": {
     "genuine": "原厂件",
@@ -637,7 +646,9 @@
     "saveLines": "保存项目",
     "sellerHint": "向客户合法销售的一方（例如通过平台作为中介的供应商）。",
     "issue": "发给客户",
-    "feeSuggestion": "建议服务费（配件价格的 {percent}%）：{amount}"
+    "feeSuggestion": "建议服务费（配件价格的 {percent}%）：{amount}",
+    "shareMedia": "与所选供应商共享需求照片（照片中可能有车牌或车架号）。",
+    "mediaShared": "已共享照片"
   },
   "errors": {
     "failed": "操作失败：",
@@ -672,10 +683,11 @@
     "quote_not_acceptable": "无法接受此报价。",
     "too_many_requests": "一小时内请求过多，请稍后再试。",
     "draft_already_exists": "已有未完成的报价草稿。",
-    "supplier_quote_not_usable": "供应商报价不可用。",
+    "supplier_quote_not_usable": "供应商报价无效或已过期。请让供应商重新报价。",
     "invalid_country": "国家代码无效（例如 CN, SA）。",
     "carrier_required": "请选择承运商。",
-    "agree": "请确认您的同意。"
+    "agree": "请确认您的同意。",
+    "generic": "操作未能完成。请重试，如反复出现请联系客服。"
   },
   "shipping": {
     "adminTitle": "运输",
@@ -1175,5 +1187,17 @@
         }
       ]
     }
+  },
+  "inviteEmail": {
+    "subject": "邀请您作为合作伙伴加入 {brand}",
+    "heading": "诚邀您成为合作伙伴",
+    "intro": "您受邀加入 {brand}——中国汽车配件中介平台。接受邀请后，请完善贵公司的资料和文件，平台团队审核通过后即可开展业务。",
+    "capabilities": "拟定资格",
+    "message": "平台团队留言",
+    "button": "接受邀请",
+    "expires": "邀请将于 {date} 过期。",
+    "sameEmail": "请使用收到邀请的邮箱（{email}）注册或登录。",
+    "ignore": "如果您没有预期收到此邀请，可忽略本邮件。",
+    "linkHint": "如果按钮无法使用，请将此链接复制到浏览器："
   }
 }

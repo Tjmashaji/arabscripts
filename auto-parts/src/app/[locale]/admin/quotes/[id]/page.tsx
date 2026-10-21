@@ -78,29 +78,36 @@ export default async function AdminQuote({
 
   const { data: req } = await supabase
     .from("ap_quote_requests")
-    .select("*, ap_quote_request_media(id), ap_quote_request_suppliers(organization_id, share_vin, invited_at)")
+    .select("*, ap_quote_request_media(id), ap_quote_request_suppliers(organization_id, share_vin, share_media, invited_at)")
     .eq("id", id)
     .maybeSingle();
   if (!req) notFound();
-  const [{ data: sqRows }, { data: cqRows }, { data: orgRows }, { data: product }, { data: shqRows }, { data: feeRow }] = await Promise.all([
+  const [{ data: sqRows }, { data: cqRows }, { data: orgRows }, { data: product }, { data: shqRows }, { data: feeRow }, { data: noteRow }, { data: lineDetails }] = await Promise.all([
     supabase.from("ap_supplier_quotes").select("*").eq("request_id", id).order("unit_price"),
     supabase.from("ap_customer_quotes")
-      .select("id, version, status, currency, total, valid_until, issued_at, supplier_quote_id, estimated_delivery_days, cancellation_terms, seller_of_record, notes, ap_customer_quote_lines(id, code, description, quantity, unit_amount, amount, status, source, beneficiary, sort_order)")
+      .select("id, version, status, currency, total, valid_until, issued_at, supplier_quote_id, estimated_delivery_days, cancellation_terms, seller_of_record, notes, ap_customer_quote_lines(id, code, description, quantity, unit_amount, amount, status, sort_order)")
       .eq("request_id", id).order("version", { ascending: false }),
     supabase.from("ap_organizations").select("id, legal_name, trade_name, country_code, ap_organization_verifications(capability, status)").eq("status", "active").order("legal_name"),
     req.product_id ? supabase.from("ap_products").select("id, name").eq("id", req.product_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("ap_shipping_quotes").select("*").eq("request_id", id).order("created_at"),
     supabase.from("ap_platform_settings").select("value").eq("key", "service_fee_percent").maybeSingle(),
+    supabase.from("ap_quote_request_notes").select("notes").eq("request_id", id).maybeSingle(),
+    // مصدر البند والمستفيد حقول داخلية لا يقرؤها العميل من الجدول، فتأتي من دالة خاصة بالإدارة.
+    supabase.rpc("ap_admin_quote_line_details", { p_request: id }),
   ]);
+  const details = new Map(((lineDetails ?? []) as { id: string; source: string | null; beneficiary: string | null }[]).map((d) => [d.id, d]));
   const shippingQuotes = (shqRows ?? []) as ShippingQuote[];
   const feePercent = Number(feeRow?.value ?? 0) || 0;
   const carriers = ((orgRows ?? []) as Org[]).filter((o) => o.ap_organization_verifications.some((v) => v.status === "approved" && v.capability === "carrier"));
   const supplierQuotes = (sqRows ?? []) as SupplierQuote[];
-  const customerQuotes = (cqRows ?? []) as CustomerQuote[];
+  const customerQuotes = ((cqRows ?? []) as CustomerQuote[]).map((c) => ({
+    ...c,
+    ap_customer_quote_lines: c.ap_customer_quote_lines.map((l) => ({ ...l, source: details.get(l.id)?.source ?? null, beneficiary: details.get(l.id)?.beneficiary ?? null })),
+  }));
   const orgs = ((orgRows ?? []) as Org[]).filter((o) =>
     o.ap_organization_verifications.some((v) => v.status === "approved" && ["seller", "supplier", "manufacturer"].includes(v.capability)));
   const orgName = new Map(((orgRows ?? []) as Org[]).map((o) => [o.id, o.trade_name || o.legal_name]));
-  const invited = req.ap_quote_request_suppliers as { organization_id: string; share_vin: boolean; invited_at: string }[];
+  const invited = req.ap_quote_request_suppliers as { organization_id: string; share_vin: boolean; share_media: boolean; invited_at: string }[];
   const invitedIds = new Set(invited.map((i) => i.organization_id));
   const media = req.ap_quote_request_media as { id: string }[];
   const draft = customerQuotes.find((c) => c.status === "draft");
@@ -169,7 +176,7 @@ export default async function AdminQuote({
 
         <Card>
           <h2 className="mb-3 font-bold">{t("statusTitle")}</h2>
-          {req.admin_notes && <p className="mb-3 whitespace-pre-line text-sm">{req.admin_notes}</p>}
+          {noteRow?.notes && <p className="mb-3 whitespace-pre-line text-sm">{noteRow.notes}</p>}
           {isOpen ? (
             <form action={updateRequestStatus} className="flex flex-col gap-3">
               {hidden}
@@ -190,7 +197,7 @@ export default async function AdminQuote({
         {invited.length > 0 && (
           <ul className="flex flex-wrap gap-2 text-sm">
             {invited.map((i) => (
-              <li key={i.organization_id}><Badge tone="neutral">{orgName.get(i.organization_id) ?? "—"}{i.share_vin ? ` · ${t("vinShared")}` : ""}</Badge></li>
+              <li key={i.organization_id}><Badge tone="neutral">{orgName.get(i.organization_id) ?? "—"}{i.share_vin ? ` · ${t("vinShared")}` : ""}{i.share_media ? ` · ${t("mediaShared")}` : ""}</Badge></li>
             ))}
           </ul>
         )}
@@ -212,6 +219,12 @@ export default async function AdminQuote({
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" name="shareVin" className="mt-1 size-4 accent-accent" />
                 <span>{t("shareVin")}</span>
+              </label>
+            )}
+            {media.length > 0 && (
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" name="shareMedia" className="mt-1 size-4 accent-accent" />
+                <span>{t("shareMedia")}</span>
               </label>
             )}
             <div><SubmitButton variant="secondary">{t("send")}</SubmitButton></div>

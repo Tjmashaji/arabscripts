@@ -21,14 +21,36 @@ export function authCallbackTarget(pathname: string, search: URLSearchParams): s
   return `/auth/confirm?${params.toString()}`;
 }
 
+type Amr = { method?: string; timestamp?: number }[];
+
+function tokenPayload(accessToken: string | undefined): Record<string, unknown> | null {
+  const payload = accessToken?.split(".")[1];
+  if (!payload) return null;
+  try {
+    const bytes = Uint8Array.from(atob(payload.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+    const json = JSON.parse(new TextDecoder().decode(bytes));
+    return json && typeof json === "object" ? json : null;
+  } catch {
+    return null;
+  }
+}
+
 // هل فُتحت الجلسة من رابط «نسيت كلمة المرور»؟ Supabase يضع طريقة الدخول في حقل amr داخل رمز الجلسة.
 export function isRecoveryToken(accessToken: string | undefined): boolean {
-  const payload = accessToken?.split(".")[1];
-  if (!payload) return false;
-  try {
-    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return Array.isArray(json.amr) && json.amr.some((m: { method?: string }) => m?.method === "recovery");
-  } catch {
-    return false;
-  }
+  const amr = tokenPayload(accessToken)?.amr;
+  return Array.isArray(amr) && amr.some((m: { method?: string }) => m?.method === "recovery");
+}
+
+// جلسة استعادة حديثة (خلال ساعة): تغيّر كلمة المرور بلا الحالية. غيرها يحتاج كلمة المرور الحالية،
+// فمن يجد جهازًا مفتوحًا أو جلسة مسروقة لا يستولي على الحساب بتغيير كلمة مروره.
+export const RECOVERY_WINDOW_SECONDS = 60 * 60;
+export function hasFreshRecovery(amr: unknown, nowSeconds = Math.floor(Date.now() / 1000)): boolean {
+  if (!Array.isArray(amr)) return false;
+  return (amr as Amr).some((m) => m?.method === "recovery" && typeof m.timestamp === "number" && nowSeconds - m.timestamp <= RECOVERY_WINDOW_SECONDS);
+}
+
+// البريد داخل رمز رابط البريد، ليُعرض للمستخدم قبل فتح الجلسة (لا يُعتمد عليه للتحقق؛ الخادم يتحقق من الرمز).
+export function tokenEmail(accessToken: string | undefined): string | null {
+  const email = tokenPayload(accessToken)?.email;
+  return typeof email === "string" && email.length <= 320 ? email : null;
 }

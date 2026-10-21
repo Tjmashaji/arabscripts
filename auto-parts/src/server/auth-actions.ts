@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createEmailLinkClient } from "@/lib/supabase/implicit";
-import { isRecoveryToken } from "@/lib/auth-callback";
+import { hasFreshRecovery, isRecoveryToken } from "@/lib/auth-callback";
 import { env } from "@/lib/env";
 import { localePath } from "@/lib/auth";
 import { safeNextPath, stripLocalePrefix } from "@/lib/safe-redirect";
@@ -84,7 +84,7 @@ export async function signUp(form: FormData) {
   // بعد تفعيل البريد يعود المستخدم للصفحة التي جاء منها (مثل رابط دعوة شريك).
   const afterConfirm = stripLocalePrefix(next, locales);
   if (afterConfirm !== "/account") {
-    (await cookies()).set("ap_after_confirm", afterConfirm, { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 });
+    (await cookies()).set("ap_after_confirm", afterConfirm, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 60 * 60 * 24 });
   }
   // نفس الرسالة سواء كان البريد مسجلًا من قبل أم لا، حتى لا تكشف الصفحة من لديه حساب.
   redirect(`${localePath(locale, "/signup")}?sent=1`);
@@ -127,7 +127,8 @@ const newPasswordSchema = z
   .object({ password: z.string().min(8).max(72), confirm: z.string() })
   .refine((v) => v.password === v.confirm, { path: ["confirm"] });
 
-// يعمل فقط بجلسة فتحها رابط الاستعادة (أو جلسة دخول عادية).
+// جلسة فتحها رابط الاستعادة خلال الساعة الأخيرة تغيّر كلمة المرور مباشرة؛ أي جلسة أخرى تحتاج كلمة المرور الحالية.
+// بعد التغيير تُغلق كل الجلسات الأخرى (أجهزة أخرى أو جلسة مسروقة).
 export async function updatePassword(form: FormData) {
   const locale = formLocale(form);
   const page = localePath(locale, "/reset-password");
@@ -139,8 +140,20 @@ export async function updatePassword(form: FormData) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect(`${localePath(locale, "/login")}?next=${encodeURIComponent("/reset-password")}`);
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!hasFreshRecovery(claims?.claims.amr)) {
+    const raw = form.get("current");
+    const current = typeof raw === "string" ? raw.slice(0, 72) : "";
+    if (!current || !data.user.email) redirect(`${page}?error=currentInvalid`);
+    // عميل مستقل بلا كوكيز: التحقق لا يغيّر جلسة المتصفح، وجلسة التحقق تُغلق فورًا.
+    const verifier = createEmailLinkClient();
+    const check = await verifier.auth.signInWithPassword({ email: data.user.email, password: current });
+    if (check.error) redirect(`${page}?error=${authErrorKey(check.error) === "rateLimited" ? "rateLimited" : "currentInvalid"}`);
+    await verifier.auth.signOut({ scope: "local" });
+  }
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
   if (error) redirect(`${page}?error=${error.code === "same_password" ? "samePassword" : authErrorKey(error)}`);
+  await supabase.auth.signOut({ scope: "others" });
   redirect(`${localePath(locale, "/account")}?password=1`);
 }
 

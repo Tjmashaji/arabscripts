@@ -82,7 +82,8 @@
       "confirmFailed": "The activation link is invalid or has expired.",
       "generic": "Something went wrong. Please try again.",
       "mismatch": "The passwords don't match.",
-      "samePassword": "Choose a password different from your current one."
+      "samePassword": "Choose a password different from your current one.",
+      "currentInvalid": "The current password is incorrect."
     },
     "forgotLink": "Forgot your password?",
     "forgotTitle": "Reset your password",
@@ -96,7 +97,12 @@
     "resetSubmit": "Save password",
     "passwordUpdated": "Your password was changed.",
     "backToLogin": "Back to sign in",
-    "verifying": "Verifying your link…"
+    "verifying": "Verifying your link…",
+    "currentPassword": "Current password",
+    "linkConfirmTitle": "Continue with this account?",
+    "linkConfirmBody": "This link signs in to the account above. Continue only if it is yours and you requested the link.",
+    "linkContinue": "Continue",
+    "linkCancel": "Cancel"
   },
   "account": {
     "title": "My account",
@@ -288,7 +294,7 @@
     "validDays": "Valid for (days)",
     "create": "Create invitation",
     "linkReady": "The invitation link is ready. Copy it and send it to the invitee; it won't be shown again.",
-    "emailNotConfigured": "Email sending isn't set up yet (needs an email provider). Send the link yourself.",
+    "emailNotConfigured": "Email sending isn't enabled yet (needs an email service). Send the link yourself.",
     "revoke": "Revoke",
     "expires": "Expires",
     "status": "Status",
@@ -322,7 +328,10 @@
     "notReviewable": "The application isn't under review.",
     "contact": "Contact",
     "checklist": "Checklist",
-    "checklistNote": "Check manually: legal name matches the document, documents are valid, the representative's role. There is no automatic government-registry check."
+    "checklistNote": "Check manually: legal name matches the document, documents are valid, the representative's role. There is no automatic government-registry check.",
+    "emailSent": "The invitation was emailed to {email}.",
+    "emailFailed": "The email couldn't be sent. Copy the link and send it yourself.",
+    "linkBackup": "Backup copy of the link (in case the email doesn't arrive or lands in spam):"
   },
   "partTypes": {
     "genuine": "Genuine",
@@ -637,7 +646,9 @@
     "saveLines": "Save lines",
     "sellerHint": "The party legally selling to the customer (e.g. the supplier via the platform as broker).",
     "issue": "Issue to customer",
-    "feeSuggestion": "Suggested service fee ({percent}% of part price): {amount}"
+    "feeSuggestion": "Suggested service fee ({percent}% of part price): {amount}",
+    "shareMedia": "Share the request photos with the selected suppliers (they may show the plate or VIN).",
+    "mediaShared": "Photos shared"
   },
   "errors": {
     "failed": "Action failed: ",
@@ -672,10 +683,11 @@
     "quote_not_acceptable": "This quote can't be accepted.",
     "too_many_requests": "Too many requests this hour. Try later.",
     "draft_already_exists": "A draft quote is already open.",
-    "supplier_quote_not_usable": "The supplier quote isn't usable.",
+    "supplier_quote_not_usable": "The supplier quote is invalid or expired. Ask the supplier for a new quote.",
     "invalid_country": "Invalid country codes (e.g. CN, SA).",
     "carrier_required": "Choose a carrier.",
-    "agree": "Please confirm your acceptance."
+    "agree": "Please confirm your acceptance.",
+    "generic": "The action could not be completed. Try again, and contact support if it keeps happening."
   },
   "shipping": {
     "adminTitle": "Shipping",
@@ -1175,5 +1187,17 @@
         }
       ]
     }
+  },
+  "inviteEmail": {
+    "subject": "Invitation to join {brand} as a partner",
+    "heading": "You're invited to join as a partner",
+    "intro": "You've been invited to join {brand}, a brokerage platform for Chinese car parts. After accepting, you complete your organization's details and documents, which the team reviews before any activity.",
+    "capabilities": "Proposed capabilities",
+    "message": "Message from the platform team",
+    "button": "Accept invitation",
+    "expires": "This invitation expires on {date}.",
+    "sameEmail": "Sign up or sign in with the same email the invitation was sent to ({email}).",
+    "ignore": "If you weren't expecting this invitation, you can ignore this email.",
+    "linkHint": "If the button doesn't work, copy this link into your browser:"
   }
 }

@@ -9,6 +9,7 @@ import { getCatalog } from "@/lib/catalog-data";
 import { localName } from "@/lib/catalog";
 import { reviewProduct } from "@/server/catalog-actions";
 import { localeFrom } from "@/i18n/locales";
+import { errorMessage } from "@/lib/errors";
 
 const statuses = ["pending_review", "published", "rejected", "suspended", "draft"] as const;
 type Row = {
@@ -51,7 +52,7 @@ export default async function AdminProducts({
     <div className="flex flex-col gap-5">
       <PageTitle>{t("products")}</PageTitle>
       {q.done && <Alert tone="success">{t("done")}</Alert>}
-      {q.error && <Alert tone="danger">{t("failed")}{q.error}</Alert>}
+      {q.error && <Alert tone="danger">{await errorMessage(q.error)}</Alert>}
       <nav className="flex flex-wrap gap-2">
         {statuses.map((s) => (
           <Link key={s} href={{ pathname: "/admin/products", query: { status: s } }}

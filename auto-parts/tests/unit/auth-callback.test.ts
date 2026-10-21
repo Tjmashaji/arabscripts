@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authCallbackTarget, isRecoveryToken } from "@/lib/auth-callback";
+import { authCallbackTarget, hasFreshRecovery, isRecoveryToken, tokenEmail } from "@/lib/auth-callback";
 
 const q = (s: string) => new URLSearchParams(s);
 
@@ -31,5 +31,26 @@ describe("isRecoveryToken", () => {
     expect(isRecoveryToken(token({ amr: [{ method: "password" }] }))).toBe(false);
     expect(isRecoveryToken("not-a-jwt")).toBe(false);
     expect(isRecoveryToken(undefined)).toBe(false);
+  });
+});
+
+describe("hasFreshRecovery", () => {
+  const now = 1_800_000_000;
+  it("accepts a recovery login within the last hour only", () => {
+    expect(hasFreshRecovery([{ method: "recovery", timestamp: now - 600 }], now)).toBe(true);
+    expect(hasFreshRecovery([{ method: "recovery", timestamp: now - 7200 }], now)).toBe(false);
+    expect(hasFreshRecovery([{ method: "password", timestamp: now }], now)).toBe(false);
+    expect(hasFreshRecovery(undefined, now)).toBe(false);
+    expect(hasFreshRecovery([{ method: "recovery" }], now)).toBe(false);
+  });
+});
+
+describe("tokenEmail", () => {
+  const token = (payload: object) => `x.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.y`;
+  it("reads the account email from the link token (UTF-8 safe)", () => {
+    expect(tokenEmail(token({ email: "a@example.com" }))).toBe("a@example.com");
+    expect(tokenEmail(token({ email: "تجربة@example.com" }))).toBe("تجربة@example.com");
+    expect(tokenEmail(token({ sub: "x" }))).toBeNull();
+    expect(tokenEmail("garbage")).toBeNull();
   });
 });
