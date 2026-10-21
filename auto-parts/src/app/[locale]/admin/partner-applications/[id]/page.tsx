@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { reviewApplication, startReview } from "@/server/admin-actions";
 import { applicationFields, reviewableStatuses, type ApplicationStatus } from "@/lib/partners";
 import { localeFrom, localeNames, isLocale } from "@/i18n/locales";
+import { errorMessage } from "@/lib/errors";
 
 const decisionLabels: Record<string, "approve" | "reject" | "requestChanges" | "startReview"> = {
   approved: "approve", rejected: "reject", changes_requested: "requestChanges", under_review: "startReview",
@@ -100,7 +101,7 @@ export default async function ApplicationReviewPage({
         <Badge tone={statusTone(app.status)}>{tas(app.status)}</Badge>
       </div>
       {q.decided && <Alert tone="success">{t("decided")}</Alert>}
-      {q.error && <Alert tone="danger">{t("actionFailed")}{q.error}</Alert>}
+      {q.error && <Alert tone="danger">{await errorMessage(q.error)}</Alert>}
 
       <div className="grid gap-5 xl:grid-cols-[1fr_24rem]">
         <div className="flex flex-col gap-5">

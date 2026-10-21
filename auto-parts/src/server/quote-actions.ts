@@ -130,7 +130,7 @@ export async function sendToSuppliers(form: FormData) {
   const orgs = form.getAll("orgs").map(String).filter((v) => uuid.safeParse(v).success).slice(0, 30);
   if (orgs.length === 0) redirect(adminPage(locale, id, "error=noSuppliers", "#suppliers"));
   const { error } = await supabase.rpc("ap_admin_send_request_to_suppliers", {
-    p_request: id, p_orgs: orgs, p_share_vin: form.get("shareVin") === "on",
+    p_request: id, p_orgs: orgs, p_share_vin: form.get("shareVin") === "on", p_share_media: form.get("shareMedia") === "on",
   });
   redirect(adminPage(locale, id, error ? fail(error.message) : "done=1", "#suppliers"));
 }

@@ -11,6 +11,12 @@ describe("nextShipmentStatuses", () => {
     expect(nextShipmentStatuses("assigned", false)).not.toContain("cancelled");
     expect(nextShipmentStatuses("picked_up", true)).not.toContain("cancelled");
   });
+  it("carrier cannot skip steps before pickup, and return needs a pickup first", () => {
+    expect(nextShipmentStatuses("assigned", false)).toEqual(["accepted", "failed"]);
+    expect(nextShipmentStatuses("accepted", false)).toEqual(["picked_up", "failed"]);
+    expect(nextShipmentStatuses("assigned", true)).not.toContain("returned");
+    expect(nextShipmentStatuses("assigned", true)).toContain("delivered");
+  });
   it("offers nothing once closed", () => {
     expect(nextShipmentStatuses("delivered", true)).toEqual([]);
   });

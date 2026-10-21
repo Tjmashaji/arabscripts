@@ -82,7 +82,8 @@
       "confirmFailed": "The activation link is invalid or has expired.",
       "generic": "Something went wrong. Please try again.",
       "mismatch": "The passwords don't match.",
-      "samePassword": "Choose a password different from your current one."
+      "samePassword": "Choose a password different from your current one.",
+      "currentInvalid": "The current password is incorrect."
     },
     "forgotLink": "Forgot your password?",
     "forgotTitle": "Reset your password",
@@ -96,7 +97,12 @@
     "resetSubmit": "Save password",
     "passwordUpdated": "Your password was changed.",
     "backToLogin": "Back to sign in",
-    "verifying": "Verifying your link…"
+    "verifying": "Verifying your link…",
+    "currentPassword": "Current password",
+    "linkConfirmTitle": "Continue with this account?",
+    "linkConfirmBody": "This link signs in to the account above. Continue only if it is yours and you requested the link.",
+    "linkContinue": "Continue",
+    "linkCancel": "Cancel"
   },
   "account": {
     "title": "My account",
@@ -640,7 +646,9 @@
     "saveLines": "Save lines",
     "sellerHint": "The party legally selling to the customer (e.g. the supplier via the platform as broker).",
     "issue": "Issue to customer",
-    "feeSuggestion": "Suggested service fee ({percent}% of part price): {amount}"
+    "feeSuggestion": "Suggested service fee ({percent}% of part price): {amount}",
+    "shareMedia": "Share the request photos with the selected suppliers (they may show the plate or VIN).",
+    "mediaShared": "Photos shared"
   },
   "errors": {
     "failed": "Action failed: ",
@@ -675,10 +683,11 @@
     "quote_not_acceptable": "This quote can't be accepted.",
     "too_many_requests": "Too many requests this hour. Try later.",
     "draft_already_exists": "A draft quote is already open.",
-    "supplier_quote_not_usable": "The supplier quote isn't usable.",
+    "supplier_quote_not_usable": "The supplier quote is invalid or expired. Ask the supplier for a new quote.",
     "invalid_country": "Invalid country codes (e.g. CN, SA).",
     "carrier_required": "Choose a carrier.",
-    "agree": "Please confirm your acceptance."
+    "agree": "Please confirm your acceptance.",
+    "generic": "The action could not be completed. Try again, and contact support if it keeps happening."
   },
   "shipping": {
     "adminTitle": "Shipping",
