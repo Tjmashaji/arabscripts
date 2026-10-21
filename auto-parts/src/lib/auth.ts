@@ -52,6 +52,8 @@ export const getSession = cache(async (): Promise<Session | null> => {
       p_full_name: typeof meta.full_name === "string" ? meta.full_name : null,
       p_locale: typeof meta.locale === "string" ? meta.locale : null,
     });
+    // حساب حُذف ورمز جلسته لم ينتهِ بعد: لا ملف ولا حساب، فيُعامل كزائر.
+    if (error?.code === "23503") return null;
     if (error) throw new Error(`ap_ensure_profile failed: ${error.message}`);
     ({ data: profile } = await loadProfile());
     if (!profile) throw new Error("ap_ensure_profile failed: no profile");

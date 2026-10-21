@@ -102,7 +102,8 @@
     "linkConfirmTitle": "以此账户继续？",
     "linkConfirmBody": "此链接将登录上面的账户。仅当这是您的账户且是您本人申请的链接时才继续。",
     "linkContinue": "继续",
-    "linkCancel": "取消"
+    "linkCancel": "取消",
+    "accountDeleted": "您的账户已删除。"
   },
   "account": {
     "title": "我的账户",
@@ -115,7 +116,20 @@
     "saved": "已保存。",
     "saveFailed": "保存失败，请检查填写内容。",
     "staffRoles": "您的管理角色",
-    "suspended": "此账户已被停用，请联系客服。"
+    "suspended": "此账户已被停用，请联系客服。",
+    "deleteTitle": "删除账户",
+    "deleteBody": "删除账户是永久性的，无法撤销。",
+    "deleteRemoved": "将删除：您的账户、姓名、电话、邮箱、偏好设置和通知，需求照片，以及需求中的车架号、联系和收货信息。未完成的需求将被取消。",
+    "deleteKept": "将匿名保留：已完成的订单和付款记录，因为法律要求我们保留财务记录。",
+    "deleteConfirm": "请输入您的邮箱以确认",
+    "deleteSubmit": "永久删除我的账户",
+    "deleteErrors": {
+      "confirm": "输入的邮箱与您的账户不符。",
+      "failed": "无法删除账户。请重试或联系我们。",
+      "staff_account": "团队账户不能在此删除。请先让超级管理员移除您的角色。",
+      "organization_owner": "您是合作企业的所有者。删除账户前请联系我们转移所有权或关闭企业。",
+      "open_orders": "您有尚未完成的订单。订单完成或取消后即可删除账户。"
+    }
   },
   "admin": {
     "title": "管理后台",

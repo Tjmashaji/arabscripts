@@ -161,7 +161,7 @@ export default async function AdminQuote({
             <div><dt className="text-xs text-muted">{tq("partNumber")}</dt><dd className="ltr-value">{req.part_number ?? "—"}</dd></div>
             <div><dt className="text-xs text-muted">{tc("quantity")}</dt><dd>{req.quantity}</dd></div>
             <div><dt className="text-xs text-muted">{tq("city")}</dt><dd>{req.city}</dd></div>
-            <div className="sm:col-span-2"><dt className="text-xs text-muted">{t("customerContact")}</dt><dd>{req.contact_name} · <span className="ltr-value">{req.contact_phone}</span></dd></div>
+            <div className="sm:col-span-2"><dt className="text-xs text-muted">{t("customerContact")}</dt><dd>{req.contact_name ?? "—"} · <span className="ltr-value">{req.contact_phone ?? "—"}</span></dd></div>
           </dl>
           {media.length > 0 && (
             <ul className="mt-3 flex flex-wrap gap-2">

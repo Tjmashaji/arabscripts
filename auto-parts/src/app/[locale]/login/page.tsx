@@ -22,11 +22,11 @@ export default async function LoginPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; deleted?: string }>;
 }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
-  const { error, next: rawNext } = await searchParams;
+  const { error, next: rawNext, deleted } = await searchParams;
   const next = safeNextPath(rawNext);
   if (await getSession()) redirect(localePath(locale, next));
   const t = await getTranslations("auth");
@@ -36,6 +36,7 @@ export default async function LoginPage({
       <div className="mx-auto max-w-md px-4 py-10">
         <Card className="flex flex-col gap-5">
           <PageTitle>{t("loginTitle")}</PageTitle>
+          {deleted && <Alert tone="success">{t("accountDeleted")}</Alert>}
           {error && errorKeys.has(error) && <Alert tone="danger">{t(`errors.${error}`)}</Alert>}
           <form action={signIn} className="flex flex-col gap-4">
             <input type="hidden" name="locale" value={locale} />

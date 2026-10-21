@@ -102,7 +102,8 @@
     "linkConfirmTitle": "Continue with this account?",
     "linkConfirmBody": "This link signs in to the account above. Continue only if it is yours and you requested the link.",
     "linkContinue": "Continue",
-    "linkCancel": "Cancel"
+    "linkCancel": "Cancel",
+    "accountDeleted": "Your account has been deleted."
   },
   "account": {
     "title": "My account",
@@ -115,7 +116,20 @@
     "saved": "Saved.",
     "saveFailed": "Couldn't save. Check the fields.",
     "staffRoles": "Your admin roles",
-    "suspended": "This account is suspended. Please contact support."
+    "suspended": "This account is suspended. Please contact support.",
+    "deleteTitle": "Delete account",
+    "deleteBody": "Deleting your account is permanent and cannot be undone.",
+    "deleteRemoved": "Removed: your account, name, phone, email, preferences and notifications, your request photos, and the VIN, contact and delivery details in your requests. Open requests are cancelled.",
+    "deleteKept": "Kept without your name: completed orders and payments, because we are legally required to keep financial records.",
+    "deleteConfirm": "To confirm, type your email address",
+    "deleteSubmit": "Permanently delete my account",
+    "deleteErrors": {
+      "confirm": "The email you typed does not match your account.",
+      "failed": "The account could not be deleted. Try again or contact us.",
+      "staff_account": "Team accounts cannot be deleted here. Ask a super admin to remove your role first.",
+      "organization_owner": "You own a partner company. Contact us to transfer ownership or close the company before deleting your account.",
+      "open_orders": "You have an order that is not finished yet. You can delete your account once it is completed or cancelled."
+    }
   },
   "admin": {
     "title": "Admin",
