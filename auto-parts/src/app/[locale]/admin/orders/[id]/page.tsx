@@ -102,7 +102,7 @@ export default async function AdminOrder({
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             {req && <div><dt className="text-xs text-muted">{t("request")}</dt><dd><Link href={`/admin/quotes/${req.id}`} className="text-accent ltr-value">{req.reference}</Link></dd></div>}
             <div><dt className="text-xs text-muted">{t("supplier")}</dt><dd>{order.supplier_org_id ? orgName.get(order.supplier_org_id) ?? "—" : "—"}</dd></div>
-            {req && <div className="sm:col-span-2"><dt className="text-xs text-muted">{t("customer")}</dt><dd>{req.contact_name} · <span className="ltr-value">{req.contact_phone}</span> · {req.city}</dd></div>}
+            {req && <div className="sm:col-span-2"><dt className="text-xs text-muted">{t("customer")}</dt><dd>{req.contact_name ?? "—"} · <span className="ltr-value">{req.contact_phone ?? "—"}</span> · {req.city}</dd></div>}
           </dl>
         </Card>
 
