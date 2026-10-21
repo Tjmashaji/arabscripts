@@ -17,7 +17,8 @@
     "skip": "跳至正文",
     "partner": "合作伙伴门户",
     "products": "产品",
-    "requestPart": "询价配件"
+    "requestPart": "询价配件",
+    "notifications": "通知"
   },
   "home": {
     "brandsLine": "奇瑞 · 长安 · 捷途 · 吉利 · 哈弗",
@@ -1213,5 +1214,47 @@
     "sameEmail": "请使用收到邀请的邮箱（{email}）注册或登录。",
     "ignore": "如果您没有预期收到此邀请，可忽略本邮件。",
     "linkHint": "如果按钮无法使用，请将此链接复制到浏览器："
+  },
+  "push": {
+    "default": {
+      "title": "中国汽车配件平台",
+      "body": "您有一条新通知。"
+    },
+    "customer_quote_issued": {
+      "title": "报价已出",
+      "body": "您的需求 {reference} 的报价已准备好，请在有效期内确认。"
+    },
+    "order_status": {
+      "title": "订单 {reference} 更新",
+      "body": "订单状态：{status}"
+    },
+    "quote_request_invited": {
+      "title": "新的询价",
+      "body": "询价 {reference} 等待您的报价。"
+    },
+    "shipping_quote_requested": {
+      "title": "运费询价",
+      "body": "您有一个新的货件需要报价。"
+    },
+    "shipment_assigned": {
+      "title": "新货件",
+      "body": "有新的货件分配给您。"
+    },
+    "application_approved": {
+      "title": "企业已通过审核",
+      "body": "您现在可以开始使用平台。"
+    },
+    "application_rejected": {
+      "title": "审核结果更新",
+      "body": "您的申请已审核，请打开平台查看原因。"
+    },
+    "application_changes_requested": {
+      "title": "需要修改申请",
+      "body": "请查看备注，修改申请后重新提交。"
+    },
+    "application_under_review": {
+      "title": "申请审核中",
+      "body": "平台团队已开始审核您的申请。"
+    }
   }
 }

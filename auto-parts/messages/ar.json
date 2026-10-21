@@ -17,7 +17,8 @@
     "skip": "تخطَّ إلى المحتوى",
     "partner": "بوابة الشريك",
     "products": "المنتجات",
-    "requestPart": "اطلب قطعة"
+    "requestPart": "اطلب قطعة",
+    "notifications": "الإشعارات"
   },
   "home": {
     "brandsLine": "شيري · شانجان · جيتور · جيلي · هافال",
@@ -1213,5 +1214,47 @@
     "sameEmail": "سجّل أو ادخل بنفس البريد الذي وصلتك عليه الدعوة ({email}).",
     "ignore": "إذا لم تتوقع هذه الدعوة يمكنك تجاهل الرسالة.",
     "linkHint": "إذا لم يعمل الزر، انسخ هذا الرابط في المتصفح:"
+  },
+  "push": {
+    "default": {
+      "title": "قطع الغيار الصينية",
+      "body": "لديك إشعار جديد."
+    },
+    "customer_quote_issued": {
+      "title": "وصلتك تسعيرة",
+      "body": "تسعيرة طلبك {reference} جاهزة. راجعها ووافق قبل انتهاء صلاحيتها."
+    },
+    "order_status": {
+      "title": "تحديث طلبك {reference}",
+      "body": "حالة الطلب الآن: {status}"
+    },
+    "quote_request_invited": {
+      "title": "طلب تسعير جديد",
+      "body": "الطلب {reference} بانتظار عرضك."
+    },
+    "shipping_quote_requested": {
+      "title": "طلب عرض شحن",
+      "body": "وصلك طلب جديد لتسعير شحنة."
+    },
+    "shipment_assigned": {
+      "title": "شحنة جديدة",
+      "body": "أُسندت إليك شحنة جديدة."
+    },
+    "application_approved": {
+      "title": "تم اعتماد منشأتك",
+      "body": "يمكنك الآن البدء على المنصة."
+    },
+    "application_rejected": {
+      "title": "تحديث على طلب الاعتماد",
+      "body": "تمت مراجعة طلبك. افتح المنصة لمعرفة السبب."
+    },
+    "application_changes_requested": {
+      "title": "مطلوب تعديل على طلب الاعتماد",
+      "body": "راجع الملاحظات وعدّل الطلب ثم أرسله."
+    },
+    "application_under_review": {
+      "title": "طلب الاعتماد قيد المراجعة",
+      "body": "بدأ فريق المنصة مراجعة طلبك."
+    }
   }
 }

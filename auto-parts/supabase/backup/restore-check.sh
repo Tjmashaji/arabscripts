@@ -16,7 +16,8 @@ tar -C "$WORK" -xzf "$ARCHIVE"; SRC="$(ls -d "$WORK"/auto-parts-*)"; chmod -R a+
 PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -q -X)
 "${PSQL[@]}" -d postgres -c "create database restore_check" >/dev/null
 sed "s/current_database_placeholder/restore_check/" "$SUPA/tests/local/supabase_stub.sql" | "${PSQL[@]}" -d restore_check >/dev/null
-for f in "$SUPA"/migrations/*.sql; do "${PSQL[@]}" -d restore_check -f "$f" >/dev/null 2>"$WORK/err" || { echo "✗ ترحيل $(basename "$f")"; cat "$WORK/err"; exit 1; }; done
+# pg_cron وpg_net غير متوفرين محليًا؛ البديل في supabase_stub.sql
+for f in "$SUPA"/migrations/*.sql; do sed -E '/create extension if not exists (pg_cron|pg_net)/d' "$f" | "${PSQL[@]}" -d restore_check >/dev/null 2>"$WORK/err" || { echo "✗ ترحيل $(basename "$f")"; cat "$WORK/err"; exit 1; }; done
 
 fail=0
 # 1) هيكل الإنتاج يطابق الترحيلات (نفس الجداول).

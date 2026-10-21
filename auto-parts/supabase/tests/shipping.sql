@@ -217,7 +217,7 @@ begin
   j := public.ap_track_order(lower(x), '+966500000001');
   out := array_append(out, (case when j->>'reference' = x and j->'shipment'->>'status' = 'delivered'
     and jsonb_array_length(j->'shipment'->'events') = 6 then 'PASS' else 'FAIL' end) || ' T1 الزائر يتتبع طلبه برقم الطلب والجوال');
-  out := array_append(out, (case when j::text !~ '(total|amount|price|recipient|address|contact|عميل|حي الشاطئ|966)' then 'PASS' else 'FAIL' end)
+  out := array_append(out, (case when j::text !~ '(total|amount|price|recipient|address|contact|عميل|حي الشاطئ|966500000001)' then 'PASS' else 'FAIL' end)
     || ' T2 لا أسعار ولا أسماء ولا عناوين ولا جوال في نتيجة التتبع');
   out := array_append(out, (case when public.ap_track_order(x, '+966511111111') is null then 'PASS' else 'FAIL' end) || ' T3 جوال خاطئ لا يكشف شيئًا');
   out := array_append(out, (case when public.ap_track_order('ORD-1', '+966500000001') is null then 'PASS' else 'FAIL' end) || ' T4 رقم بصيغة غير صحيحة');

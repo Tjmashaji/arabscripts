@@ -17,7 +17,8 @@
     "skip": "Skip to content",
     "partner": "Partner portal",
     "products": "Products",
-    "requestPart": "Request a part"
+    "requestPart": "Request a part",
+    "notifications": "Notifications"
   },
   "home": {
     "brandsLine": "Chery · Changan · Jetour · Geely · Haval",
@@ -1213,5 +1214,47 @@
     "sameEmail": "Sign up or sign in with the same email the invitation was sent to ({email}).",
     "ignore": "If you weren't expecting this invitation, you can ignore this email.",
     "linkHint": "If the button doesn't work, copy this link into your browser:"
+  },
+  "push": {
+    "default": {
+      "title": "Chinese Car Parts",
+      "body": "You have a new notification."
+    },
+    "customer_quote_issued": {
+      "title": "Your quote is ready",
+      "body": "The quote for your request {reference} is ready. Review and accept it before it expires."
+    },
+    "order_status": {
+      "title": "Order {reference} update",
+      "body": "Order status: {status}"
+    },
+    "quote_request_invited": {
+      "title": "New quote request",
+      "body": "Request {reference} is waiting for your offer."
+    },
+    "shipping_quote_requested": {
+      "title": "Shipping quote request",
+      "body": "You have a new shipment to price."
+    },
+    "shipment_assigned": {
+      "title": "New shipment",
+      "body": "A new shipment has been assigned to you."
+    },
+    "application_approved": {
+      "title": "Your company is approved",
+      "body": "You can now start on the platform."
+    },
+    "application_rejected": {
+      "title": "Application update",
+      "body": "Your application was reviewed. Open the platform to see the reason."
+    },
+    "application_changes_requested": {
+      "title": "Changes requested",
+      "body": "Review the notes, update your application and resubmit."
+    },
+    "application_under_review": {
+      "title": "Application under review",
+      "body": "The platform team has started reviewing your application."
+    }
   }
 }

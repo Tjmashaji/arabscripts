@@ -162,6 +162,25 @@ select id, 'super_admin' from auth.users where email = 'بريدك@example.com';
   `ap_account_deletion_blocker` يعرض السبب قبل أي حذف.
 - **التنفيذ:** `ap_delete_my_account` يحذف من `auth.users` مباشرة، فلا يحتاج مفتاح الخدمة. الاختبارات في `supabase/tests/account_deletion.sql`.
 
+## الإشعارات الفورية (تطبيق الجوال)
+
+كل إشعار تسجّله المنصة في `ap_notifications` يصل كإشعار فوري لأجهزة صاحبه داخل التطبيق، بلغته، ويفتح الصفحة المرتبطة عند الضغط. يشمل ذلك التسعيرة الجاهزة، وتغيّر حالة الطلب، وطلب التسعير للمورد، وطلب عرض الشحن، والشحنة المسندة، وقرار طلب الاعتماد.
+
+- **التسجيل:** التطبيق يطلب الإذن بعد الدخول، ويسجّل الجهاز عبر `ap_register_push_token`.
+- **الإرسال:** مشغّل على `ap_notifications` يستدعي `/api/push/dispatch` عبر `pg_net`، بعد نجاح العملية فقط، ومعه سر مشترك من Vault. المسار يرسل لأندرويد عبر Firebase (FCM v1) ولآيفون عبر APNs، ويبلغ عن الرموز المنتهية لتُحذف.
+- **عند الخروج:** يُلغى تسجيل الجهاز.
+- **عند حذف الحساب:** تُحذف أجهزته.
+
+**الإعداد:**
+1. **قاعدة البيانات:** شغّل `supabase/manual/phase_i_push_notifications.sql`. يضبط رابط المسار، ويولّد السر في Vault باسم `ap_push_webhook_secret`.
+2. **Vercel (Sensitive):**
+   - `PUSH_WEBHOOK_SECRET`: نفس قيمة السر، تنسخها من `select decrypted_secret from vault.decrypted_secrets where name = 'ap_push_webhook_secret';`.
+   - `FIREBASE_SERVICE_ACCOUNT`: محتوى ملف حساب الخدمة من Firebase.
+   - لاحقًا لآيفون: `APNS_KEY` (محتوى ملف .p8) و`APNS_KEY_ID` و`APNS_TEAM_ID`.
+3. **GitHub Secrets:** `GOOGLE_SERVICES_JSON`، وهو محتوى `google-services.json` لتطبيق أندرويد. بدونه تُبنى نسخة أندرويد بلا إشعارات، والموقع لا يطلبها فيها.
+
+الاختبارات في `supabase/tests/push.sql` و`tests/unit/push*.test.ts`.
+
 ## البريد (دعوات الشركاء)
 
 عند إنشاء دعوة تُرسل رسالة بلغة الدعوة (عربي/إنجليزي/صيني) فيها الصفات ورسالة المدير وزر القبول وتاريخ الانتهاء، ويبقى الرابط ظاهرًا للمدير كنسخة احتياطية. بدون الإعداد أدناه لا يُرسل شيء ويُعرض الرابط للنسخ كما كان.

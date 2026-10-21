@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 import { signOut } from "@/server/auth-actions";
 import type { Locale } from "@/i18n/locales";
 import { LanguageSwitcher } from "./language-switcher";
+import { PushRegistrar } from "./push-registrar";
 
 export async function SiteHeader({ locale, path }: { locale: Locale; path: string }) {
   const t = await getTranslations("nav");
@@ -13,6 +14,7 @@ export async function SiteHeader({ locale, path }: { locale: Locale; path: strin
 
   return (
     <header className="bg-ink text-white">
+      {session && <PushRegistrar channelName={t("notifications")} />}
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:m-2 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-ink">
         {t("skip")}
       </a>
