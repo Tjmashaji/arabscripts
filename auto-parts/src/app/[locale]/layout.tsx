@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -14,6 +14,8 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
+export const viewport: Viewport = { themeColor: "#141414" };
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "meta" });
@@ -26,6 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     openGraph: { type: "website", siteName: name, title: name, description: t("description"), locale: ogLocale[locale as Locale] ?? "ar_SA" },
     twitter: { card: "summary", title: name, description: t("description") },
     formatDetection: { telephone: false },
+    appleWebApp: { capable: true, title: name, statusBarStyle: "black" },
   };
 }
 

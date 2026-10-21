@@ -17,7 +17,9 @@ export async function SiteHeader({ locale, path }: { locale: Locale; path: strin
         {t("skip")}
       </a>
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <Link href="/" className="text-lg font-bold">
+        <Link href="/" className="flex items-center gap-2 text-lg font-bold">
+          {/* eslint-disable-next-line @next/next/no-img-element -- أيقونة SVG ثابتة صغيرة */}
+          <img src="/icons/icon.svg" alt="" width={28} height={28} className="size-7" />
           {brand}
         </Link>
         <nav className="flex flex-wrap items-center gap-2 text-sm">

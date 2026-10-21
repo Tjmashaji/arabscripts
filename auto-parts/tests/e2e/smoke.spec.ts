@@ -278,3 +278,14 @@ test("sitemap and robots are published", async ({ request }) => {
   expect(robots).toContain("Disallow: /admin");
   expect(robots).toContain("Sitemap:");
 });
+
+test("the site is installable: manifest, icons and theme color", async ({ page, request }) => {
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.icons.some((i: { purpose: string }) => i.purpose === "maskable")).toBe(true);
+  for (const icon of manifest.icons as { src: string }[]) expect((await request.get(icon.src)).status()).toBe(200);
+  await page.goto("/");
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#141414");
+});
