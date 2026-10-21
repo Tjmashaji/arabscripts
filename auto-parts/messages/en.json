@@ -486,6 +486,7 @@
     "contactPhone": "Mobile number",
     "contactPhoneHint": "Used only about this request; never shown to suppliers.",
     "privacyText": "I agree that my request data is used for quoting, and that the part description and vehicle details are shared with approved suppliers without my name or number.",
+    "autoContactText": "I agree that an automated assistant may call me when my quote is ready and to confirm my order, and send me a WhatsApp message if I don't answer. (Optional)",
     "send": "Send request",
     "myRequests": "Quote requests",
     "myOrders": "My orders",
@@ -675,7 +676,8 @@
     "supplier_quote_not_usable": "The supplier quote isn't usable.",
     "invalid_country": "Invalid country codes (e.g. CN, SA).",
     "carrier_required": "Choose a carrier.",
-    "agree": "Please confirm your acceptance."
+    "agree": "Please confirm your acceptance.",
+    "job_busy": "The call is already in progress or queued."
   },
   "shipping": {
     "adminTitle": "Shipping",
@@ -1175,5 +1177,25 @@
         }
       ]
     }
+  },
+  "contact": {
+    "title": "Automated confirmation assistant",
+    "empty": "No automated calls for this request. The assistant only calls customers who agreed to it when submitting their request.",
+    "note": "For information only: the quote and order do not change automatically.",
+    "kind_quote_ready": "Quote ready notice",
+    "kind_order_confirm": "Order confirmation",
+    "status_queued": "Queued",
+    "status_calling": "Calling",
+    "status_answered": "Answered",
+    "status_no_answer": "No answer",
+    "status_whatsapp_sent": "No answer, WhatsApp sent",
+    "status_failed": "Call failed",
+    "status_cancelled": "Cancelled",
+    "outcome_confirmed": "Confirmed",
+    "outcome_declined": "Declined",
+    "outcome_callback": "Wants a call from staff",
+    "outcome_unclear": "Unclear",
+    "attempts": "Attempts: {count}",
+    "requeue": "Call again"
   }
 }

@@ -50,6 +50,7 @@ export async function createQuoteRequest(form: FormData) {
     p_quantity: qty && qty > 0 ? qty : 1, p_city: city, p_contact_name: contactName, p_contact_phone: phone,
     p_privacy_accepted: true,
     p_product: optionalUuid(text(form, "productId", 64)), p_offer: optionalUuid(text(form, "offerId", 64)),
+    p_auto_contact: form.get("autoContact") === "on",
   });
   if (error || typeof id !== "string") redirect(back(fail(error?.message ?? "failed")));
 

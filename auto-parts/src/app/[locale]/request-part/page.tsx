@@ -126,6 +126,10 @@ export default async function RequestPart({
               <input type="checkbox" name="privacy" required className="mt-1 size-4 accent-accent" />
               <span>{t("privacyText")}</span>
             </label>
+            <label className="flex items-start gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" name="autoContact" className="mt-1 size-4 accent-accent" />
+              <span>{t("autoContactText")}</span>
+            </label>
             <div className="sm:col-span-2">
               <SubmitButton>{t("send")}</SubmitButton>
             </div>

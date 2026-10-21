@@ -1,4 +1,4 @@
-// المتغيرات العامة فقط (آمنة للمتصفح). لا يوجد في هذا المشروع أي مفتاح سري حتى الآن.
+// المتغيرات العامة فقط (آمنة للمتصفح). مفاتيح المساعد الآلي السرية في contact-server.ts (على الخادم فقط).
 function required(name: string, value: string | undefined): string {
   if (!value) throw new Error(`Missing environment variable ${name} (see .env.example)`);
   return value;

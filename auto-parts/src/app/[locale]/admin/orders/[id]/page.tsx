@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SubmitButton } from "@/components/submit-button";
+import { ContactPanel, CONTACT_SELECT, type ContactJobRow } from "@/components/contact-panel";
 import { QuoteBreakdown, type QuoteLineRow } from "@/components/quote-breakdown";
 import { ShipmentPanel, type ShipmentRow } from "@/components/shipment-panel";
 import { Alert, Badge, Card, Field, Input, PageTitle, Select, Textarea, statusTone } from "@/components/ui";
@@ -58,13 +59,14 @@ export default async function AdminOrder({
     .maybeSingle();
   if (!data) notFound();
   const order = data as Order;
-  const [{ data: req }, { data: shipmentRows }, { data: sqRow }, { data: orgRows }] = await Promise.all([
+  const [{ data: req }, { data: shipmentRows }, { data: sqRow }, { data: orgRows }, { data: contactRows }] = await Promise.all([
     supabase.from("ap_quote_requests").select("id, reference, contact_name, contact_phone, city").eq("id", order.request_id).maybeSingle(),
     supabase.from("ap_shipments").select(SHIPMENT_SELECT).eq("order_id", id).order("created_at", { ascending: false }),
     order.shipping_quote_id
       ? supabase.from("ap_shipping_quotes").select("id, carrier_id, carrier_name, mode, pieces, weight_kg, volumetric_weight_kg, delivery_estimate_days").eq("id", order.shipping_quote_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("ap_organizations").select("id, legal_name, trade_name, ap_organization_verifications(capability, status)").eq("status", "active"),
+    supabase.from("ap_contact_jobs").select(CONTACT_SELECT).eq("order_id", id).order("created_at", { ascending: false }),
   ]);
   const shipments = (shipmentRows ?? []) as unknown as (ShipmentRow & { carrier_id: string | null })[];
   const shippingQuote = sqRow as ShippingQuote | null;
@@ -130,6 +132,10 @@ export default async function AdminOrder({
           )}
         </Card>
       </div>
+
+      {can("orders.manage_all") && (
+        <ContactPanel jobs={(contactRows ?? []) as ContactJobRow[]} locale={locale} back={`/admin/orders/${order.id}`} />
+      )}
 
       <Card id="payment" className="flex flex-col gap-3">
         <h2 className="font-bold">{t("paymentTitle")}</h2>

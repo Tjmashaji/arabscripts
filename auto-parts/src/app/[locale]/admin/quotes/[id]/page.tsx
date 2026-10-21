@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SubmitButton } from "@/components/submit-button";
+import { ContactPanel, CONTACT_SELECT, type ContactJobRow } from "@/components/contact-panel";
 import { QuoteBreakdown, type QuoteLineRow } from "@/components/quote-breakdown";
 import { Alert, Badge, Card, Field, Input, PageTitle, Select, Textarea, statusTone } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
@@ -82,7 +83,7 @@ export default async function AdminQuote({
     .eq("id", id)
     .maybeSingle();
   if (!req) notFound();
-  const [{ data: sqRows }, { data: cqRows }, { data: orgRows }, { data: product }, { data: shqRows }, { data: feeRow }] = await Promise.all([
+  const [{ data: sqRows }, { data: cqRows }, { data: orgRows }, { data: product }, { data: shqRows }, { data: feeRow }, { data: contactRows }] = await Promise.all([
     supabase.from("ap_supplier_quotes").select("*").eq("request_id", id).order("unit_price"),
     supabase.from("ap_customer_quotes")
       .select("id, version, status, currency, total, valid_until, issued_at, supplier_quote_id, estimated_delivery_days, cancellation_terms, seller_of_record, notes, ap_customer_quote_lines(id, code, description, quantity, unit_amount, amount, status, source, beneficiary, sort_order)")
@@ -91,6 +92,7 @@ export default async function AdminQuote({
     req.product_id ? supabase.from("ap_products").select("id, name").eq("id", req.product_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("ap_shipping_quotes").select("*").eq("request_id", id).order("created_at"),
     supabase.from("ap_platform_settings").select("value").eq("key", "service_fee_percent").maybeSingle(),
+    supabase.from("ap_contact_jobs").select(CONTACT_SELECT).eq("request_id", id).order("created_at", { ascending: false }),
   ]);
   const shippingQuotes = (shqRows ?? []) as ShippingQuote[];
   const feePercent = Number(feeRow?.value ?? 0) || 0;
@@ -463,6 +465,8 @@ export default async function AdminQuote({
           ))}
         </Card>
       )}
+
+      <ContactPanel jobs={(contactRows ?? []) as ContactJobRow[]} locale={locale} back={`/admin/quotes/${req.id}`} />
     </div>
   );
 }
