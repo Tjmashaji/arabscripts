@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // تطبيق الجوال (Capacitor) له ملفاته المولّدة ومكتباته.
+    "mobile/**",
   ]),
 ]);
 
