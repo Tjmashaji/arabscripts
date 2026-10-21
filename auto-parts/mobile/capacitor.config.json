@@ -1,0 +1,34 @@
+{
+  "appId": "sa.chinesecarparts.app",
+  "appName": "قطع الغيار الصينية",
+  "webDir": "www",
+  "server": {
+    "url": "https://auto-parts-blond.vercel.app",
+    "errorPath": "offline.html",
+    "cleartext": false
+  },
+  "appendUserAgent": "ChineseCarPartsApp",
+  "backgroundColor": "#f4f4f2",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#141414",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#141414",
+      "overlaysWebView": false
+    }
+  }
+}
