@@ -3,18 +3,18 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
-// سياسة أمان المحتوى: لا سكربتات أو اتصالات أو إطارات من خارج الموقع. الصور الخارجية الوحيدة صور المنتجات من
-// تخزين Supabase. 'unsafe-inline' للسكربت مطلوب لسكربتات Next.js المضمّنة (لا يوجد في الكود أي HTML خام).
+// سياسة أمان المحتوى: لا سكربتات أو اتصالات أو إطارات من خارج الموقع، عدا تحقق Cloudflare Turnstile في نماذج
+// الدخول. الصور الخارجية الوحيدة صور المنتجات من تخزين Supabase. 'unsafe-inline' للسكربت مطلوب لسكربتات Next.js المضمّنة (لا يوجد في الكود أي HTML خام).
 // تُطبّق في الإنتاج فقط لأن وضع التطوير يحتاج eval لإعادة التحميل.
 const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin : "";
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://vercel.live",
+  "script-src 'self' 'unsafe-inline' https://vercel.live https://challenges.cloudflare.com",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${supabaseOrigin}`.trim(),
   "font-src 'self'",
   "connect-src 'self' https://vercel.live",
-  "frame-src https://vercel.live",
+  "frame-src https://vercel.live https://challenges.cloudflare.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

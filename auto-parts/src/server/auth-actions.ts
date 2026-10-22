@@ -14,7 +14,7 @@ import { isLocale, locales } from "@/i18n/locales";
 import { PUSH_COOKIE } from "@/lib/push-content";
 import { formLocale, text } from "./form";
 
-type AuthErrorKey = "invalid" | "notConfirmed" | "weakPassword" | "invalidEmail" | "nameRequired" | "rateLimited" | "generic";
+type AuthErrorKey = "invalid" | "notConfirmed" | "weakPassword" | "invalidEmail" | "nameRequired" | "rateLimited" | "captcha" | "generic";
 
 function authErrorKey(error: AuthError): AuthErrorKey {
   switch (error.code) {
@@ -29,6 +29,8 @@ function authErrorKey(error: AuthError): AuthErrorKey {
     case "over_request_rate_limit":
     case "over_email_send_rate_limit":
       return "rateLimited";
+    case "captcha_failed":
+      return "captcha";
     default:
       return "generic";
   }
@@ -37,6 +39,9 @@ function authErrorKey(error: AuthError): AuthErrorKey {
 function back(locale: string, page: "/login" | "/signup", error: AuthErrorKey, next: string): never {
   redirect(`${localePath(locale, page)}?error=${error}&next=${encodeURIComponent(next)}`);
 }
+
+// رمز Turnstile من النموذج؛ Supabase يتحقق منه عند تفعيل CAPTCHA في لوحته ويتجاهله إن كان معطلًا.
+const captchaToken = (form: FormData) => text(form, "cf-turnstile-response", 2048) || undefined;
 
 const credentials = z.object({ email: z.email().max(254), password: z.string().min(8).max(72) });
 
@@ -47,7 +52,7 @@ export async function signIn(form: FormData) {
   if (!parsed.success) back(locale, "/login", "invalid", next);
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { error } = await supabase.auth.signInWithPassword({ ...parsed.data, options: { captchaToken: captchaToken(form) } });
   if (error) back(locale, "/login", authErrorKey(error), next);
 
   // يُفتح الحساب بلغته المفضلة المحفوظة، لا بلغة الصفحة التي سجّل منها.
@@ -78,7 +83,10 @@ export async function signUp(form: FormData) {
     email: parsed.data.email,
     password: parsed.data.password,
     // لا نضع "role" في البيانات الوصفية: مشغّل تطبيق آخر في نفس المشروع يقرؤها.
-    options: { data: { full_name: parsed.data.fullName, locale: preferred, app: "auto_parts" }, emailRedirectTo: `${env.siteUrl}/auth/confirm` },
+    options: {
+      data: { full_name: parsed.data.fullName, locale: preferred, app: "auto_parts" }, emailRedirectTo: `${env.siteUrl}/auth/confirm`,
+      captchaToken: captchaToken(form),
+    },
   });
   if (error) back(locale, "/signup", authErrorKey(error), next);
 
@@ -125,9 +133,10 @@ export async function requestPasswordReset(form: FormData) {
   if (!email.success) redirect(`${localePath(locale, "/forgot-password")}?error=invalidEmail`);
 
   const { error } = await createEmailLinkClient().auth.resetPasswordForEmail(email.data, {
-    redirectTo: `${env.siteUrl}/auth/confirm`,
+    redirectTo: `${env.siteUrl}/auth/confirm`, captchaToken: captchaToken(form),
   });
-  if (error && authErrorKey(error) === "rateLimited") redirect(`${localePath(locale, "/forgot-password")}?error=rateLimited`);
+  const reset = error ? authErrorKey(error) : null;
+  if (reset === "rateLimited" || reset === "captcha") redirect(`${localePath(locale, "/forgot-password")}?error=${reset}`);
   redirect(`${localePath(locale, "/forgot-password")}?sent=1`);
 }
 
@@ -155,8 +164,11 @@ export async function updatePassword(form: FormData) {
     if (!current || !data.user.email) redirect(`${page}?error=currentInvalid`);
     // عميل مستقل بلا كوكيز: التحقق لا يغيّر جلسة المتصفح، وجلسة التحقق تُغلق فورًا.
     const verifier = createEmailLinkClient();
-    const check = await verifier.auth.signInWithPassword({ email: data.user.email, password: current });
-    if (check.error) redirect(`${page}?error=${authErrorKey(check.error) === "rateLimited" ? "rateLimited" : "currentInvalid"}`);
+    const check = await verifier.auth.signInWithPassword({ email: data.user.email, password: current, options: { captchaToken: captchaToken(form) } });
+    if (check.error) {
+      const key = authErrorKey(check.error);
+      redirect(`${page}?error=${key === "rateLimited" || key === "captcha" ? key : "currentInvalid"}`);
+    }
     await verifier.auth.signOut({ scope: "local" });
   }
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password });

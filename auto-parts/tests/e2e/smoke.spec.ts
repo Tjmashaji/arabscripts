@@ -56,7 +56,8 @@ test("wrong credentials show an error from Supabase (no account is created)", as
   await page.fill('input[name="email"]', "zz-nobody-e2e@example.com");
   await page.fill('input[name="password"]', "wrong-password-123");
   await page.getByRole("button", { name: "Sign in" }).last().click();
-  await expect(page).toHaveURL(/error=(invalid|rateLimited)/);
+  // مع تفعيل CAPTCHA في Supabase يُرفض الطلب الآلي قبل فحص كلمة المرور.
+  await expect(page).toHaveURL(/error=(invalid|rateLimited|captcha)/);
   await expect(page.locator("main [role=alert]")).toBeVisible();
 });
 

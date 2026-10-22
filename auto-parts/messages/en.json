@@ -84,7 +84,8 @@
       "generic": "Something went wrong. Please try again.",
       "mismatch": "The passwords don't match.",
       "samePassword": "Choose a password different from your current one.",
-      "currentInvalid": "The current password is incorrect."
+      "currentInvalid": "The current password is incorrect.",
+      "captcha": "We couldn't verify you're not a bot. Wait for the check below the form to finish, then try again."
     },
     "forgotLink": "Forgot your password?",
     "forgotTitle": "Reset your password",

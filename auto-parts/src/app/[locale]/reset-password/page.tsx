@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
+import { Turnstile } from "@/components/turnstile";
+import { env } from "@/lib/env";
 import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { requireSession } from "@/lib/auth";
 import { hasFreshRecovery } from "@/lib/auth-callback";
@@ -9,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { updatePassword } from "@/server/auth-actions";
 import { localeFrom } from "@/i18n/locales";
 
-const errorKeys = new Set(["mismatch", "weakPassword", "samePassword", "rateLimited", "generic", "currentInvalid"]);
+const errorKeys = new Set(["mismatch", "weakPassword", "samePassword", "rateLimited", "generic", "currentInvalid", "captcha"]);
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -53,6 +55,7 @@ export default async function ResetPasswordPage({
             <Field label={t("confirmPassword")} htmlFor="confirm">
               <Input id="confirm" name="confirm" type="password" autoComplete="new-password" dir="ltr" required minLength={8} maxLength={72} />
             </Field>
+            {needsCurrent && <Turnstile siteKey={env.turnstileSiteKey} locale={locale} action="password" />}
             <SubmitButton>{t("resetSubmit")}</SubmitButton>
           </form>
         </Card>

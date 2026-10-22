@@ -14,6 +14,10 @@ export const env = {
   get siteUrl() {
     return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
   },
+  // مفتاح موقع Cloudflare Turnstile (عام). فارغ = لا يظهر التحقق (ويجب أن يبقى CAPTCHA معطلًا في Supabase).
+  get turnstileSiteKey() {
+    return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
+  },
   get platformName() {
     return process.env.NEXT_PUBLIC_PLATFORM_NAME?.trim() || null;
   },
