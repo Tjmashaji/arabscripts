@@ -1,4 +1,5 @@
 -- الإشعارات الفورية: الصقه كاملًا في SQL Editor لمشروع auto-parts-eu ثم Run (مرة واحدة).
+-- يصلح تشغيله قبل phase_j_payment_email.sql أو بعده (الأفضل قبله).
 -- كله في معاملة واحدة: إن فشل أي سطر لا يتغير شيء.
 begin;
 
@@ -94,6 +95,34 @@ revoke all on function public.ap_register_push_token(text, text), public.ap_unre
   public.ap_push_tokens_invalid(text, text[]) from public, anon;
 grant execute on function public.ap_register_push_token(text, text), public.ap_unregister_push_token(text) to authenticated;
 grant execute on function public.ap_push_tokens_invalid(text, text[]) to anon, authenticated;
+
+-- ───────── نسخة الإرسال الأحدث (من phase_j: الأجهزة والبريد) ─────────
+-- تُطبّق هنا أيضًا حتى تكون النتيجة صحيحة سواء شُغّل هذا الملف قبل phase_j أو بعده.
+-- الإرسال: الأجهزة كما كانت، ومعها البريد المؤكد. يُرسل إن وُجد أي منهما.
+create or replace function ap_private.dispatch_push() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_url text; v_secret text; v_tokens jsonb; v_locale text; v_email text;
+begin
+  select nullif(value #>> '{}', '') into v_url from public.ap_platform_settings where key = 'push_webhook_url';
+  v_secret := ap_private.push_secret();
+  if v_url is null or v_url !~ '^https://' or v_secret is null then return new; end if;
+  select jsonb_agg(jsonb_build_object('token', token, 'platform', platform)) into v_tokens
+    from public.ap_push_tokens where user_id = new.user_id;
+  select email into v_email from auth.users where id = new.user_id and email_confirmed_at is not null and email is not null;
+  if v_tokens is null and v_email is null then return new; end if;
+  select locale into v_locale from public.ap_user_preferences where user_id = new.user_id;
+  perform net.http_post(
+    url := v_url,
+    body := jsonb_build_object('id', new.id, 'kind', new.kind, 'payload', new.payload, 'locale', coalesce(v_locale, 'ar'),
+      'tokens', coalesce(v_tokens, '[]'::jsonb), 'email', v_email),
+    headers := jsonb_build_object('content-type', 'application/json', 'x-push-secret', v_secret),
+    timeout_milliseconds := 5000);
+  return new;
+exception when others then
+  -- الإشعار الفوري والبريد إضافة: فشلهما لا يُفشل العملية الأصلية (الإشعار محفوظ في الصفحة).
+  return new;
+end $$;
+revoke all on function ap_private.dispatch_push() from public, anon, authenticated;
 
 -- ───────── الإعداد على هذا المشروع ─────────
 -- رابط الإرسال: مسار المنصة المنشورة (حدّثه عند الانتقال لنطاق خاص).
