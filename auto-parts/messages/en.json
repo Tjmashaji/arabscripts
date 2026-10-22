@@ -18,7 +18,8 @@
     "partner": "Partner portal",
     "products": "Products",
     "requestPart": "Request a part",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "menu": "Menu"
   },
   "home": {
     "brandsLine": "Chery · Changan · Jetour · Geely · Haval",
@@ -419,7 +420,8 @@
     "shopByBrand": "Shop by brand",
     "validUntil": "Offer valid until {date}",
     "noImage": "No image",
-    "requestCta": "Request a part"
+    "requestCta": "Request a part",
+    "filters": "Filter results"
   },
   "partnerProducts": {
     "title": "My products",
@@ -948,7 +950,9 @@
     "privacy": "Privacy policy",
     "terms": "Terms & conditions",
     "whatsapp": "WhatsApp",
-    "cr": "Commercial registration"
+    "cr": "Commercial registration",
+    "whatsappCta": "Chat with us on WhatsApp",
+    "whatsappMessage": "Hello, I have a question about a spare part."
   },
   "brandPage": {
     "title": "{brand} spare parts",

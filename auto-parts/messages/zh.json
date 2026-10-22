@@ -18,7 +18,8 @@
     "partner": "合作伙伴门户",
     "products": "产品",
     "requestPart": "询价配件",
-    "notifications": "通知"
+    "notifications": "通知",
+    "menu": "菜单"
   },
   "home": {
     "brandsLine": "奇瑞 · 长安 · 捷途 · 吉利 · 哈弗",
@@ -419,7 +420,8 @@
     "shopByBrand": "按品牌选购",
     "validUntil": "报价有效期至 {date}",
     "noImage": "暂无图片",
-    "requestCta": "询价配件"
+    "requestCta": "询价配件",
+    "filters": "筛选结果"
   },
   "partnerProducts": {
     "title": "我的产品",
@@ -948,7 +950,9 @@
     "privacy": "隐私政策",
     "terms": "条款与条件",
     "whatsapp": "WhatsApp",
-    "cr": "商业登记号"
+    "cr": "商业登记号",
+    "whatsappCta": "通过 WhatsApp 联系我们",
+    "whatsappMessage": "您好，我想咨询一个汽车配件。"
   },
   "brandPage": {
     "title": "{brand} 汽车配件",

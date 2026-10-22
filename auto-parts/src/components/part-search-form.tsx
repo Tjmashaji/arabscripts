@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { getCatalog, modelLabel } from "@/lib/catalog-data";
 import { localName } from "@/lib/catalog";
@@ -6,7 +7,10 @@ import { cx } from "./ui";
 type Values = { q?: string; brand?: string; model?: string; year?: string };
 
 // نموذج بحث GET عادي (يعمل بلا JavaScript): اسم القطعة أو رقمها + العلامة + الموديل + السنة.
-export async function PartSearchForm({ locale, action, values = {}, dark = false }: { locale: string; action: string; values?: Values; dark?: boolean }) {
+// filters: حقول تصفية إضافية في نفس النموذج (زر بحث واحد)، مطوية تحت «تصفية النتائج» ومفتوحة إن كان فيها اختيار.
+export async function PartSearchForm({ locale, action, values = {}, dark = false, filters, filtersOpen = false }: {
+  locale: string; action: string; values?: Values; dark?: boolean; filters?: ReactNode; filtersOpen?: boolean;
+}) {
   const t = await getTranslations("catalog");
   const { brands, models } = await getCatalog();
   const field = cx("min-h-11 w-full rounded-lg border px-3 text-base", dark ? "border-white/20 bg-white text-ink" : "border-line bg-card");
@@ -41,6 +45,15 @@ export async function PartSearchForm({ locale, action, values = {}, dark = false
       <button type="submit" className="min-h-11 rounded-lg bg-accent px-6 font-bold text-white hover:bg-accent-strong">
         {t("search")}
       </button>
+      {filters && (
+        <details open={filtersOpen} className="group rounded-xl border border-line bg-card text-sm sm:col-span-2 lg:col-span-5">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 font-bold [&::-webkit-details-marker]:hidden">
+            {t("filters")}
+            <span aria-hidden="true" className="text-muted transition group-open:rotate-180">▾</span>
+          </summary>
+          <div className="grid gap-2 border-t border-line p-3 sm:grid-cols-2 lg:grid-cols-5">{filters}</div>
+        </details>
+      )}
     </form>
   );
 }

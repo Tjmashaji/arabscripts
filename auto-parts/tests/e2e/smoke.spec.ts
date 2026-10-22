@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// على الجوال روابط الهيدر داخل زر القائمة؛ على الكمبيوتر ظاهرة دائمًا.
+async function openMenu(page: Page) {
+  const toggle = page.locator('header button[aria-controls="site-menu"]');
+  if (await toggle.isVisible()) {
+    await toggle.click();
+    await expect(page.locator("#site-menu")).toBeVisible();
+  }
+}
+
 async function noHorizontalScroll(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
@@ -42,9 +51,11 @@ test("an external next= target is replaced with an internal path", async ({ page
 
 test("language switcher changes the URL and the choice sticks", async ({ page }) => {
   await page.goto("/login");
+  await openMenu(page);
   await page.getByRole("button", { name: "English" }).click();
   await expect(page).toHaveURL(/\/en\/login$/);
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+  await openMenu(page);
   await page.getByRole("button", { name: "العربية" }).click();
   await expect(page).toHaveURL(/127\.0\.0\.1:\d+\/login$/);
   await page.goto("/");
@@ -170,6 +181,7 @@ test("request media requires sign-in", async ({ request }) => {
 
 test("the header links to the part request form", async ({ page }) => {
   await page.goto("/products");
+  await openMenu(page);
   await page.locator('header a[href="/request-part"]').click();
   await expect(page).toHaveURL(/\/login\?next=%2Frequest-part$/);
   await noHorizontalScroll(page);
@@ -214,6 +226,7 @@ test("security headers are set and no page breaks under the content security pol
   }
   // تبديل اللغة يعمل عبر Server Action (fetch إلى الموقع نفسه) ولا يُحجب.
   await page.goto("/login");
+  await openMenu(page);
   await page.getByRole("button", { name: "English" }).click();
   await expect(page).toHaveURL(/\/en\/login$/);
   expect(violations).toEqual([]);
@@ -302,4 +315,28 @@ test("the push dispatch endpoint only accepts the shared secret", async ({ reque
     expect(res.status()).toBe(200);
     expect(await res.json()).toEqual({ sent: 0, invalid: 0, failed: 1 });
   }
+});
+
+test("the phone header is one row and the menu opens and closes", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout only");
+  await page.goto("/");
+  const header = await page.locator("header").boundingBox();
+  expect(header!.height).toBeLessThan(80);
+  await expect(page.locator("#site-menu")).toBeHidden();
+  await openMenu(page);
+  await expect(page.locator('#site-menu a[href="/products"]')).toBeVisible();
+  await page.locator('header button[aria-controls="site-menu"]').click();
+  await expect(page.locator("#site-menu")).toBeHidden();
+  await noHorizontalScroll(page);
+});
+
+test("products search and filters are one form with one search button", async ({ page }) => {
+  await page.goto("/products?type=genuine");
+  await expect(page.locator("main form")).toHaveCount(1);
+  await expect(page.locator('main form button[type="submit"]')).toHaveCount(1);
+  await expect(page.locator("main form details")).toHaveAttribute("open", "");
+  await page.fill('main input[name="q"]', "filter");
+  await page.locator('main form button[type="submit"]').click();
+  await expect(page).toHaveURL(/q=filter/);
+  await expect(page).toHaveURL(/type=genuine/);
 });
