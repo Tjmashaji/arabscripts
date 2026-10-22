@@ -203,6 +203,8 @@ export function StudentPhotoButton({ schoolId, studentId, name, hasPhoto, onSave
   const [busy, setBusy] = useState(false);
   const pick = async (file: File | undefined) => {
     if (!file) return;
+    // صور فقط، وبحجم معقول قبل التصغير (الخادم يقبل بعد التصغير JPEG حتى 1MB)
+    if ((file.type && !/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type)) || file.size > 20 * 1024 * 1024) { onSaved("تعذر رفع الصورة: اختر صورة JPG أو PNG أصغر من 20MB."); if (input.current) input.current.value = ""; return; }
     setBusy(true);
     try {
       const blob = await shrink(file);

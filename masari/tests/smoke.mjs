@@ -20,15 +20,21 @@ const failures = [];
 const check = (ok, label) => { console.log(`${ok ? "✓" : "✗"} ${label}`); if (!ok) failures.push(label); };
 
 const browser = await chromium.launch(launchOptions);
-const watch = (page, tag) => page.on("pageerror", (e) => failures.push(`${tag}: ${e.message}`));
+// أخطاء الصفحة، وأي شيء تمنعه سياسة أمان المحتوى (المعاينة تطبّق رؤوس vercel.json نفسها)
+const watch = (page, tag) => {
+  page.on("pageerror", (e) => failures.push(`${tag}: ${e.message}`));
+  page.on("console", (m) => { if (m.type() === "error" && /Content Security Policy/i.test(m.text())) failures.push(`${tag}: CSP ${m.text().slice(0, 200)}`); });
+};
 const overflowX = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
 // الصفحة العامة والدخول وسياسة الخصوصية
 {
   const page = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage(); watch(page, "landing");
   await page.route(/supabase\.co\//, (r) => r.fulfill({ status: 400, contentType: "application/json", body: '{"error":"invalid_grant","error_description":"Invalid login credentials"}' }));
-  await page.goto(BASE, { waitUntil: "load" });
+  const resp = await page.goto(BASE, { waitUntil: "load" });
   check(await page.locator(".lp-hero h1").isVisible(), "الصفحة الرئيسية تظهر");
+  const h = resp?.headers() ?? {};
+  check(/frame-ancestors 'none'/.test(h["content-security-policy"] ?? "") && h["x-content-type-options"] === "nosniff" && h["x-frame-options"] === "DENY", "رؤوس الأمان: سياسة المحتوى ومنع التضمين");
   check((await overflowX(page)) <= 1, "لا تمرير أفقي على الجوال");
   await page.click(".lp-login");
   await page.fill("input[type=email]", "nobody@example.com"); await page.fill("input[type=password]", "wrong-pass");

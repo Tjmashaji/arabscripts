@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BusFront, Check, KeyRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { useCaptcha } from "./captcha";
 import { disableNativePush, enableNativePush, isNativePush, nativePushState } from "@/lib/native-push";
 
 // استعادة كلمة المرور: رابط بالبريد يعيد المستخدم للتطبيق بجلسة استعادة (type=recovery)،
@@ -14,8 +15,8 @@ import { disableNativePush, enableNativePush, isNativePush, nativePushState } fr
 const LINK_AT_LOAD = typeof window !== "undefined" && /type=(recovery|invite)/.test(window.location.hash + window.location.search);
 export const isRecoveryLink = () => LINK_AT_LOAD;
 
-export async function requestPasswordReset(email: string): Promise<string> {
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+export async function requestPasswordReset(email: string, captchaToken?: string): Promise<string> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin, captchaToken });
   if (error && /rate limit|too many/i.test(error.message)) return "طلبات كثيرة خلال وقت قصير. انتظر قليلًا ثم حاول مرة أخرى.";
   if (error) return "تعذر إرسال الرابط. تحقق من البريد وحاول مرة أخرى.";
   // نفس الرسالة سواء كان البريد مسجلًا أم لا، حتى لا تكشف الحسابات المسجلة.
@@ -26,14 +27,16 @@ export function ForgotPassword({ initialEmail, onBack }: { initialEmail: string;
   const [email, setEmail] = useState(initialEmail);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const valid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const captcha = useCaptcha();
+  const valid = /^\S+@\S+\.\S+$/.test(email.trim()) && captcha.ready;
   return <div className="forgot-box">
     <p className="eyebrow">استعادة الحساب</p>
     <h2>نسيت كلمة المرور؟</h2>
     <p className="muted-label">اكتب بريدك وسنرسل لك رابطًا لتعيين كلمة مرور جديدة.</p>
     <label>البريد الإلكتروني<input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></label>
+    {captcha.widget}
     {message && <p className="auth-message">{message}</p>}
-    <Button className="wide-action" disabled={!valid || busy} onClick={async () => { setBusy(true); setMessage(await requestPasswordReset(email)); setBusy(false); }}>{busy ? "جارٍ الإرسال…" : "إرسال رابط الاستعادة"}</Button>
+    <Button className="wide-action" disabled={!valid || busy} onClick={async () => { setBusy(true); setMessage(await requestPasswordReset(email, captcha.token)); setBusy(false); captcha.reset(); }}>{busy ? "جارٍ الإرسال…" : "إرسال رابط الاستعادة"}</Button>
     <button className="text-link" onClick={onBack}>رجوع لتسجيل الدخول</button>
   </div>;
 }

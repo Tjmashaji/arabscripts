@@ -72,6 +72,9 @@ jobs:
       - run: npm ci
       - name: Build web app and copy into Android
         run: npm run android:sync
+        env:
+          # مفتاح موقع Turnstile العام (متغير مستودع، ليس سرًا). بدونه يُبنى التطبيق والتحقق متوقف.
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
       - name: Build APK
         working-directory: masari/android
         run: ./gradlew assembleDebug --no-daemon
