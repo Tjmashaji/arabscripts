@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Locale } from "@/i18n/locales";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
+import { WhatsAppButton } from "./whatsapp-button";
 
 // غلاف الصفحات العامة وصفحات الحساب. path هو المسار بدون بادئة اللغة (لمبدّل اللغة).
 export async function SiteShell({ locale, path, children }: { locale: Locale; path: string; children: ReactNode }) {
@@ -12,6 +13,7 @@ export async function SiteShell({ locale, path, children }: { locale: Locale; pa
         {children}
       </main>
       <SiteFooter />
+      <WhatsAppButton />
     </div>
   );
 }

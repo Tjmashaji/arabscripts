@@ -18,7 +18,8 @@
     "partner": "بوابة الشريك",
     "products": "المنتجات",
     "requestPart": "اطلب قطعة",
-    "notifications": "الإشعارات"
+    "notifications": "الإشعارات",
+    "menu": "القائمة"
   },
   "home": {
     "brandsLine": "شيري · شانجان · جيتور · جيلي · هافال",
@@ -419,7 +420,8 @@
     "shopByBrand": "تسوّق حسب العلامة",
     "validUntil": "العرض صالح حتى {date}",
     "noImage": "لا توجد صورة",
-    "requestCta": "اطلب قطعة"
+    "requestCta": "اطلب قطعة",
+    "filters": "تصفية النتائج"
   },
   "partnerProducts": {
     "title": "منتجاتي",
@@ -948,7 +950,9 @@
     "privacy": "سياسة الخصوصية",
     "terms": "الشروط والأحكام",
     "whatsapp": "واتساب",
-    "cr": "السجل التجاري"
+    "cr": "السجل التجاري",
+    "whatsappCta": "تواصل معنا على واتساب",
+    "whatsappMessage": "السلام عليكم، عندي استفسار عن قطعة غيار."
   },
   "brandPage": {
     "title": "قطع غيار {brand}",
