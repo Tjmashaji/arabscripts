@@ -4,7 +4,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, Input, PageTitle } from "@/components/ui";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { editableSettings, numericSettings, type NumericSetting } from "@/lib/site";
+import { editableSettings, numericSettings, paymentSettings, type NumericSetting } from "@/lib/site";
 import { updateSetting } from "@/server/shipping-actions";
 import { localeFrom } from "@/i18n/locales";
 
@@ -23,8 +23,10 @@ export default async function Settings({ params, searchParams }: { params: Promi
   const supabase = await createClient();
   const { data } = await supabase.from("ap_platform_settings").select("key, value").in("key", editableSettings);
   const byKey = new Map((data ?? []).map((r) => [r.key as string, r.value]));
+  const isPayment = (k: string) => (paymentSettings as readonly string[]).includes(k);
   const groups = [
-    { title: t("operatorTitle"), help: t("operatorHelp"), keys: editableSettings.filter((k) => !(k in numericSettings)) },
+    { title: t("operatorTitle"), help: t("operatorHelp"), keys: editableSettings.filter((k) => !(k in numericSettings) && !isPayment(k)) },
+    { title: t("paymentTitle"), help: t("paymentHelp"), keys: editableSettings.filter(isPayment) },
     { title: t("operationsTitle"), help: null, keys: editableSettings.filter((k) => k in numericSettings) },
   ];
 
@@ -48,7 +50,8 @@ export default async function Settings({ params, searchParams }: { params: Promi
                   <label htmlFor={key} className="font-bold">{t(key)}</label>
                   <p className="text-xs text-muted">{t(`${key}_help`)}</p>
                   <div className="flex gap-2">
-                    <Input id={key} name="value" defaultValue={String(byKey.get(key) ?? "")} dir={key === "legal_entity_name" ? undefined : "ltr"}
+                    <Input id={key} name="value" defaultValue={String(byKey.get(key) ?? "")}
+                      dir={key === "legal_entity_name" || key === "bank_name" || key === "bank_account_name" ? undefined : "ltr"}
                       inputMode={numeric || key === "commercial_register" ? "decimal" : key === "contact_whatsapp" ? "tel" : key === "contact_email" ? "email" : undefined}
                       required={numeric} className={numeric ? "max-w-40" : ""}
                       max={numeric ? numericSettings[key as NumericSetting].max : undefined} />

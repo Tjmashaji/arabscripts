@@ -289,3 +289,16 @@ test("the site is installable: manifest, icons and theme color", async ({ page, 
   await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#141414");
 });
+
+test("the push dispatch endpoint only accepts the shared secret", async ({ request }) => {
+  const body = { kind: "order_status", payload: {}, locale: "ar", tokens: [{ token: "x".repeat(40), platform: "android" }] };
+  expect((await request.post("/api/push/dispatch", { data: body })).status()).toBe(401);
+  expect((await request.post("/api/push/dispatch", { data: body, headers: { "x-push-secret": "wrong" } })).status()).toBe(401);
+  const secret = process.env.PUSH_WEBHOOK_SECRET;
+  if (secret) {
+    // بلا حساب Firebase في بيئة الاختبار: يُقبل الطلب ويُحسب الإرسال فاشلًا دون أن يتعطل المسار.
+    const res = await request.post("/api/push/dispatch", { data: body, headers: { "x-push-secret": secret } });
+    expect(res.status()).toBe(200);
+    expect(await res.json()).toEqual({ sent: 0, invalid: 0, failed: 1 });
+  }
+});

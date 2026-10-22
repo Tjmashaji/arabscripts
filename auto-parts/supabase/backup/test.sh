@@ -13,7 +13,7 @@ trap cleanup EXIT
 PSQL=(psql -h "$WORK" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -q -X)
 "${PSQL[@]}" -d postgres -c "create database prod" >/dev/null
 sed "s/current_database_placeholder/prod/" "$SUPA/tests/local/supabase_stub.sql" | "${PSQL[@]}" -d prod >/dev/null
-for f in "$SUPA"/migrations/*.sql; do "${PSQL[@]}" -d prod -f "$f" >/dev/null; done
+for f in "$SUPA"/migrations/*.sql; do sed -E '/create extension if not exists (pg_cron|pg_net)/d' "$f" | "${PSQL[@]}" -d prod >/dev/null; done
 grep -v "raise exception 'RESULT%'" "$SUPA/tests/shipping.sql" | "${PSQL[@]}" -d prod >/dev/null 2>&1
 echo "· بيانات الاختبار: $("${PSQL[@]}" -d prod -At -c "select count(*) from public.ap_audit_logs") سجل تدقيق، $("${PSQL[@]}" -d prod -At -c "select count(*) from public.ap_orders") طلب"
 DB_URL="postgresql://postgres@/prod?host=$WORK&port=$PORT"

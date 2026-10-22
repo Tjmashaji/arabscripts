@@ -5,15 +5,16 @@
   "description": "تطبيق منصة قطع الغيار الصينية لأندرويد وآيفون (Capacitor يفتح المنصة المنشورة)",
   "scripts": {
     "assets": "capacitor-assets generate --iconBackgroundColor '#c2410c' --splashBackgroundColor '#141414' --splashBackgroundColorDark '#141414'",
-    "sync": "cap sync",
-    "android:debug": "cap sync android && cd android && ./gradlew assembleDebug",
-    "android:release": "cap sync android && cd android && ./gradlew bundleRelease"
+    "sync": "cap sync && node scripts/push-flag.mjs",
+    "android:debug": "cap sync android && node scripts/push-flag.mjs && cd android && ./gradlew assembleDebug",
+    "android:release": "cap sync android && node scripts/push-flag.mjs && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/ios": "^8.5.3",
+    "@capacitor/push-notifications": "^8.1.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4"
   },

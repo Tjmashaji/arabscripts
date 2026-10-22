@@ -50,8 +50,18 @@ declare j bigint; begin
 create or replace function cron.unschedule(job_name text) returns boolean language sql as $$
   with d as (delete from cron.job where jobname = job_name returning 1) select exists(select 1 from d) $$;
 
+-- pg_net: يسجّل الطلبات بدل إرسالها، لتتحقق منها الاختبارات.
+create table if not exists net.test_requests (id bigserial primary key, url text, body jsonb, headers jsonb);
 create or replace function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb, headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)
-returns bigint language sql as $$ select 0::bigint $$;
+returns bigint language sql as $$ insert into net.test_requests (url, body, headers) values (url, body, headers) returning id $$;
+
+-- Supabase Vault (مبسّط: بلا تشفير).
+create schema if not exists vault;
+create table if not exists vault.secrets (id uuid primary key default gen_random_uuid(), name text unique, secret text);
+create or replace view vault.decrypted_secrets as select id, name, secret as decrypted_secret from vault.secrets;
+create or replace function vault.create_secret(new_secret text, new_name text default null, new_description text default '', new_key_id uuid default null)
+returns uuid language sql as $$
+  insert into vault.secrets (name, secret) values (new_name, new_secret) returning id $$;
 
 grant usage on schema auth, extensions, storage to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;

@@ -12,7 +12,8 @@ declare
     'ap_organizations.registered_address', 'ap_organizations.operating_country', 'ap_organizations.website',
     'ap_organizations.activity_description', 'ap_organizations.billing_currency', 'ap_organizations.preferred_locale'];
   -- الدوال الوحيدة المتاحة للزائر: البحث والعروض العامة وفحص رابط الدعوة.
-  allowed_anon text[] := array['ap_search_products', 'ap_public_offers', 'ap_invitation_lookup', 'ap_track_order'];
+  -- ap_push_tokens_invalid يستدعيه مسار الإشعارات بلا جلسة، ومحمي بسر مشترك.
+  allowed_anon text[] := array['ap_search_products', 'ap_public_offers', 'ap_invitation_lookup', 'ap_track_order', 'ap_push_tokens_invalid'];
 begin
   select array_agg(c.relname order by c.relname) into bad from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'ap\_%' and not c.relrowsecurity;

@@ -17,7 +17,8 @@
     "skip": "跳至正文",
     "partner": "合作伙伴门户",
     "products": "产品",
-    "requestPart": "询价配件"
+    "requestPart": "询价配件",
+    "notifications": "通知"
   },
   "home": {
     "brandsLine": "奇瑞 · 长安 · 捷途 · 吉利 · 哈弗",
@@ -551,7 +552,18 @@
     "totalEstimated": "预估合计",
     "deliveryConfirmed": "谢谢，已确认收货。",
     "confirmDeliveryHelp": "已收到配件且符合要求？请确认收货以关闭订单。",
-    "confirmDelivery": "确认收货"
+    "confirmDelivery": "确认收货",
+    "payTitle": "付款方式：银行转账",
+    "payBank": "银行",
+    "payAccountName": "账户名",
+    "payIban": "IBAN",
+    "payAmount": "金额",
+    "payReferenceHint": "请在转账备注中填写订单号 {reference}，以便我们快速核对。",
+    "payConfirmNote": "财务团队确认款项到账后，订单将变为“已付款”并开始备货。",
+    "reportLabel": "已转账？请输入转账参考号",
+    "reportButton": "报告转账",
+    "reportedNotice": "您已报告参考号为 {reference} 的转账，等待财务确认。",
+    "reportSaved": "已收到您的转账报告。核对账户后我们将确认付款。"
   },
   "costLines": {
     "part": "配件价格",
@@ -701,7 +713,8 @@
     "invalid_country": "国家代码无效（例如 CN, SA）。",
     "carrier_required": "请选择承运商。",
     "agree": "请确认您的同意。",
-    "generic": "操作未能完成。请重试，如反复出现请联系客服。"
+    "generic": "操作未能完成。请重试，如反复出现请联系客服。",
+    "invalid_reference": "转账参考号须为 3 至 120 个字符。"
   },
   "shipping": {
     "adminTitle": "运输",
@@ -824,7 +837,8 @@
     "paymentReference": "交易编号",
     "receivedBy": "收款方",
     "paymentConfirm": "我已核实收款方已收到全部款项。",
-    "recordPayment": "记录付款"
+    "recordPayment": "记录付款",
+    "paymentReported": "客户于 {date} 报告了参考号为 {reference} 的转账。登记付款前请先核对账户。"
   },
   "carrier": {
     "title": "承运商面板",
@@ -910,7 +924,15 @@
     "contact_email": "联系邮箱",
     "contact_email_help": "对访客可见，建议使用平台域名邮箱。",
     "contact_whatsapp": "WhatsApp 号码",
-    "contact_whatsapp_help": "国际格式，例如 +9665XXXXXXXX。"
+    "contact_whatsapp_help": "国际格式，例如 +9665XXXXXXXX。",
+    "paymentTitle": "银行转账信息",
+    "paymentHelp": "在每个待付款订单上向客户显示，并附金额和订单号。IBAN 为空时，客户会看到“我们将联系您完成付款”。",
+    "bank_name": "银行名称",
+    "bank_name_help": "例如：沙特国家银行。",
+    "bank_account_name": "账户持有人",
+    "bank_account_name_help": "客户转账时看到的名称。",
+    "bank_iban": "IBAN",
+    "bank_iban_help": "SA 加 22 位数字。空格会自动删除。"
   },
   "footer": {
     "platform": "平台",
@@ -1213,5 +1235,56 @@
     "sameEmail": "请使用收到邀请的邮箱（{email}）注册或登录。",
     "ignore": "如果您没有预期收到此邀请，可忽略本邮件。",
     "linkHint": "如果按钮无法使用，请将此链接复制到浏览器："
+  },
+  "push": {
+    "default": {
+      "title": "中国汽车配件平台",
+      "body": "您有一条新通知。"
+    },
+    "customer_quote_issued": {
+      "title": "报价已出",
+      "body": "您的需求 {reference} 的报价已准备好，请在有效期内确认。"
+    },
+    "order_status": {
+      "title": "订单 {reference} 更新",
+      "body": "订单状态：{status}"
+    },
+    "quote_request_invited": {
+      "title": "新的询价",
+      "body": "询价 {reference} 等待您的报价。"
+    },
+    "shipping_quote_requested": {
+      "title": "运费询价",
+      "body": "您有一个新的货件需要报价。"
+    },
+    "shipment_assigned": {
+      "title": "新货件",
+      "body": "有新的货件分配给您。"
+    },
+    "application_approved": {
+      "title": "企业已通过审核",
+      "body": "您现在可以开始使用平台。"
+    },
+    "application_rejected": {
+      "title": "审核结果更新",
+      "body": "您的申请已审核，请打开平台查看原因。"
+    },
+    "application_changes_requested": {
+      "title": "需要修改申请",
+      "body": "请查看备注，修改申请后重新提交。"
+    },
+    "application_under_review": {
+      "title": "申请审核中",
+      "body": "平台团队已开始审核您的申请。"
+    },
+    "payment_reported": {
+      "title": "新的转账通知",
+      "body": "客户已为订单 {reference} 报告转账。请核对账户后登记付款。"
+    }
+  },
+  "notificationEmail": {
+    "button": "在平台中打开",
+    "linkHint": "如果按钮无法使用，请将此链接复制到浏览器：",
+    "footer": "您收到此邮件是因为您在平台上拥有账户。所有通知都可在您的账户中查看。"
   }
 }

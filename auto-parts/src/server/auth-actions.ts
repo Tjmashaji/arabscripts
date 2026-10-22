@@ -11,6 +11,7 @@ import { env } from "@/lib/env";
 import { localePath } from "@/lib/auth";
 import { safeNextPath, stripLocalePrefix } from "@/lib/safe-redirect";
 import { isLocale, locales } from "@/i18n/locales";
+import { PUSH_COOKIE } from "@/lib/push-content";
 import { formLocale, text } from "./form";
 
 type AuthErrorKey = "invalid" | "notConfirmed" | "weakPassword" | "invalidEmail" | "nameRequired" | "rateLimited" | "generic";
@@ -93,6 +94,13 @@ export async function signUp(form: FormData) {
 export async function signOut(form: FormData) {
   const locale = formLocale(form);
   const supabase = await createClient();
+  // جهاز الجوال يتوقف عن استقبال إشعارات هذا الحساب بعد الخروج.
+  const jar = await cookies();
+  const pushToken = jar.get(PUSH_COOKIE)?.value;
+  if (pushToken) {
+    await supabase.rpc("ap_unregister_push_token", { p_token: pushToken });
+    jar.delete(PUSH_COOKIE);
+  }
   await supabase.auth.signOut();
   redirect(localePath(locale, "/"));
 }

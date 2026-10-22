@@ -16,7 +16,7 @@ const cachedSettings = unstable_cache(
     for (const row of data ?? []) if (typeof row.value === "string") out[row.key as TextSetting] = row.value;
     return out;
   },
-  ["ap-public-settings-v1"],
+  ["ap-public-settings-v2"],
   { tags: [SETTINGS_TAG], revalidate: 600 },
 );
 

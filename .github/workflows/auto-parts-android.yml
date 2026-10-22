@@ -31,7 +31,13 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
-      - run: npx cap sync android
+      # إعداد Firebase للإشعارات (Settings ← Secrets ← GOOGLE_SERVICES_JSON). بدونه تُبنى النسخة بلا إشعارات.
+      - name: Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; fi
+      - run: npx cap sync android && node scripts/push-flag.mjs
       - name: Build debug APK
         working-directory: auto-parts/mobile/android
         run: ./gradlew assembleDebug --no-daemon

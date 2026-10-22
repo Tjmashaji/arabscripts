@@ -17,6 +17,7 @@ import { localeFrom } from "@/i18n/locales";
 type Order = {
   id: string; reference: string; status: string; payment_status: string; total: string; currency: string; created_at: string;
   request_id: string; supplier_org_id: string | null; shipping_quote_id: string | null;
+  payment_report: string | null; payment_reported_at: string | null;
   ap_order_items: QuoteLineRow[];
   ap_order_status_history: { id: number; from_status: string | null; to_status: string; note: string | null; changed_at: string }[];
   ap_payments: { id: string; amount: string; currency: string; method: string; reference: string; received_by: string; status: string; recorded_at: string }[];
@@ -53,7 +54,7 @@ export default async function AdminOrder({
   const supabase = await createClient();
   const { data } = await supabase
     .from("ap_orders")
-    .select("id, reference, status, payment_status, total, currency, created_at, request_id, supplier_org_id, shipping_quote_id, ap_order_items(id, code, description, quantity, unit_amount, amount, status, sort_order), ap_order_status_history(id, from_status, to_status, note, changed_at), ap_payments(id, amount, currency, method, reference, received_by, status, recorded_at)")
+    .select("id, reference, status, payment_status, total, currency, created_at, request_id, supplier_org_id, shipping_quote_id, payment_report, payment_reported_at, ap_order_items(id, code, description, quantity, unit_amount, amount, status, sort_order), ap_order_status_history(id, from_status, to_status, note, changed_at), ap_payments(id, amount, currency, method, reference, received_by, status, recorded_at)")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
@@ -146,6 +147,9 @@ export default async function AdminOrder({
         ) : (
           <p className="text-sm text-muted">{t("noPayment")}</p>
         )}
+        {order.payment_status === "unpaid" && order.payment_report && order.payment_reported_at && (
+          <Alert tone="info">{t("paymentReported", { reference: order.payment_report, date: dateFmt.format(new Date(order.payment_reported_at)) })}</Alert>
+        )}
         {can("finance.manage") && order.status === "awaiting_payment" && order.payment_status === "unpaid" && (
           <form action={recordPayment} className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
             {hidden}
@@ -159,7 +163,7 @@ export default async function AdminOrder({
               <Select id="method" name="method">{paymentMethods.map((m) => <option key={m} value={m}>{t(`method_${m}`)}</option>)}</Select>
             </Field>
             <Field label={t("paymentReference")} htmlFor="reference">
-              <Input id="reference" name="reference" required minLength={2} maxLength={120} dir="ltr" />
+              <Input id="reference" name="reference" required minLength={2} maxLength={120} dir="ltr" defaultValue={order.payment_report ?? ""} />
             </Field>
             <Field label={t("receivedBy")} htmlFor="receivedBy">
               <Input id="receivedBy" name="receivedBy" required minLength={2} maxLength={200} />
