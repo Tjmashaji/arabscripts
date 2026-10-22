@@ -3,11 +3,13 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
+import { Turnstile } from "@/components/turnstile";
+import { env } from "@/lib/env";
 import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { requestPasswordReset } from "@/server/auth-actions";
 import { localeFrom } from "@/i18n/locales";
 
-const errorKeys = new Set(["invalidEmail", "rateLimited"]);
+const errorKeys = new Set(["invalidEmail", "rateLimited", "captcha"]);
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -45,6 +47,7 @@ export default async function ForgotPasswordPage({
                 <Field label={t("email")} htmlFor="email">
                   <Input id="email" name="email" type="email" autoComplete="email" dir="ltr" required maxLength={254} />
                 </Field>
+                <Turnstile siteKey={env.turnstileSiteKey} locale={locale} action="reset" />
                 <SubmitButton>{t("forgotSubmit")}</SubmitButton>
               </form>
             </>

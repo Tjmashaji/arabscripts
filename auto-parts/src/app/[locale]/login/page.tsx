@@ -4,13 +4,15 @@ import { redirect } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
+import { Turnstile } from "@/components/turnstile";
+import { env } from "@/lib/env";
 import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { getSession, localePath } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { signIn } from "@/server/auth-actions";
 import { localeFrom } from "@/i18n/locales";
 
-const errorKeys = new Set(["invalid", "notConfirmed", "rateLimited", "confirmFailed", "generic"]);
+const errorKeys = new Set(["invalid", "notConfirmed", "rateLimited", "confirmFailed", "generic", "captcha"]);
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -47,6 +49,7 @@ export default async function LoginPage({
             <Field label={t("password")} htmlFor="password">
               <Input id="password" name="password" type="password" autoComplete="current-password" dir="ltr" required minLength={8} maxLength={72} />
             </Field>
+            <Turnstile siteKey={env.turnstileSiteKey} locale={locale} action="login" />
             <SubmitButton>{t("submitLogin")}</SubmitButton>
           </form>
           <Link href="/forgot-password" className="text-sm font-bold text-accent">

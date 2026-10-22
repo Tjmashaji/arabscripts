@@ -84,7 +84,8 @@
       "generic": "操作失败，请重试。",
       "mismatch": "两次输入的密码不一致。",
       "samePassword": "请设置与当前密码不同的新密码。",
-      "currentInvalid": "当前密码不正确。"
+      "currentInvalid": "当前密码不正确。",
+      "captcha": "无法验证您不是机器人。请等待表单下方的验证完成后重试。"
     },
     "forgotLink": "忘记密码？",
     "forgotTitle": "重置密码",

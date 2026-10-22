@@ -4,13 +4,15 @@ import { redirect } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
+import { Turnstile } from "@/components/turnstile";
+import { env } from "@/lib/env";
 import { Alert, Card, Field, Input, PageTitle, Select } from "@/components/ui";
 import { getSession, localePath } from "@/lib/auth";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { signUp } from "@/server/auth-actions";
 import { localeNames, locales, localeFrom } from "@/i18n/locales";
 
-const errorKeys = new Set(["weakPassword", "invalidEmail", "nameRequired", "rateLimited", "generic"]);
+const errorKeys = new Set(["weakPassword", "invalidEmail", "nameRequired", "rateLimited", "generic", "captcha"]);
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -65,6 +67,7 @@ export default async function SignupPage({
                     ))}
                   </Select>
                 </Field>
+                <Turnstile siteKey={env.turnstileSiteKey} locale={locale} action="signup" />
                 <SubmitButton>{t("submitSignup")}</SubmitButton>
               </form>
               <p className="text-sm text-muted">
