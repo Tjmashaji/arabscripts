@@ -552,7 +552,18 @@
     "totalEstimated": "预估合计",
     "deliveryConfirmed": "谢谢，已确认收货。",
     "confirmDeliveryHelp": "已收到配件且符合要求？请确认收货以关闭订单。",
-    "confirmDelivery": "确认收货"
+    "confirmDelivery": "确认收货",
+    "payTitle": "付款方式：银行转账",
+    "payBank": "银行",
+    "payAccountName": "账户名",
+    "payIban": "IBAN",
+    "payAmount": "金额",
+    "payReferenceHint": "请在转账备注中填写订单号 {reference}，以便我们快速核对。",
+    "payConfirmNote": "财务团队确认款项到账后，订单将变为“已付款”并开始备货。",
+    "reportLabel": "已转账？请输入转账参考号",
+    "reportButton": "报告转账",
+    "reportedNotice": "您已报告参考号为 {reference} 的转账，等待财务确认。",
+    "reportSaved": "已收到您的转账报告。核对账户后我们将确认付款。"
   },
   "costLines": {
     "part": "配件价格",
@@ -702,7 +713,8 @@
     "invalid_country": "国家代码无效（例如 CN, SA）。",
     "carrier_required": "请选择承运商。",
     "agree": "请确认您的同意。",
-    "generic": "操作未能完成。请重试，如反复出现请联系客服。"
+    "generic": "操作未能完成。请重试，如反复出现请联系客服。",
+    "invalid_reference": "转账参考号须为 3 至 120 个字符。"
   },
   "shipping": {
     "adminTitle": "运输",
@@ -825,7 +837,8 @@
     "paymentReference": "交易编号",
     "receivedBy": "收款方",
     "paymentConfirm": "我已核实收款方已收到全部款项。",
-    "recordPayment": "记录付款"
+    "recordPayment": "记录付款",
+    "paymentReported": "客户于 {date} 报告了参考号为 {reference} 的转账。登记付款前请先核对账户。"
   },
   "carrier": {
     "title": "承运商面板",
@@ -911,7 +924,15 @@
     "contact_email": "联系邮箱",
     "contact_email_help": "对访客可见，建议使用平台域名邮箱。",
     "contact_whatsapp": "WhatsApp 号码",
-    "contact_whatsapp_help": "国际格式，例如 +9665XXXXXXXX。"
+    "contact_whatsapp_help": "国际格式，例如 +9665XXXXXXXX。",
+    "paymentTitle": "银行转账信息",
+    "paymentHelp": "在每个待付款订单上向客户显示，并附金额和订单号。IBAN 为空时，客户会看到“我们将联系您完成付款”。",
+    "bank_name": "银行名称",
+    "bank_name_help": "例如：沙特国家银行。",
+    "bank_account_name": "账户持有人",
+    "bank_account_name_help": "客户转账时看到的名称。",
+    "bank_iban": "IBAN",
+    "bank_iban_help": "SA 加 22 位数字。空格会自动删除。"
   },
   "footer": {
     "platform": "平台",
@@ -1255,6 +1276,15 @@
     "application_under_review": {
       "title": "申请审核中",
       "body": "平台团队已开始审核您的申请。"
+    },
+    "payment_reported": {
+      "title": "新的转账通知",
+      "body": "客户已为订单 {reference} 报告转账。请核对账户后登记付款。"
     }
+  },
+  "notificationEmail": {
+    "button": "在平台中打开",
+    "linkHint": "如果按钮无法使用，请将此链接复制到浏览器：",
+    "footer": "您收到此邮件是因为您在平台上拥有账户。所有通知都可在您的账户中查看。"
   }
 }

@@ -274,3 +274,17 @@ export async function confirmDelivery(form: FormData) {
   const { error } = await supabase.rpc("ap_customer_confirm_delivery", { p_order: id.data });
   redirect(withQuery(back, error ? fail(error.message) : "confirmed=1"));
 }
+
+// العميل يبلغ عن تحويل بنكي لطلبه؛ المالية تطابقه ثم تسجّل الدفع.
+export async function reportPayment(form: FormData) {
+  const locale = formLocale(form);
+  await requireSession(locale, "/account/orders");
+  const back = localePath(locale, "/account/orders");
+  const id = uuid.safeParse(text(form, "orderId", 64));
+  if (!id.success) redirect(back);
+  const reference = text(form, "reference", 120);
+  if (reference.length < 3) redirect(withQuery(back, "error=invalid_reference"));
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("ap_customer_report_payment", { p_order: id.data, p_reference: reference });
+  redirect(withQuery(back, error ? fail(error.message) : "reported=1"));
+}

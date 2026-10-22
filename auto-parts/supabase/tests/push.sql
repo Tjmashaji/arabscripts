@@ -45,10 +45,17 @@ begin
   out := array_append(out, (case when j->>'kind' = 'customer_quote_issued' and j->>'locale' = 'en' and j->'tokens'->0->>'token' = tok
     and j->'tokens'->0->>'platform' = 'android' and j->'payload'->>'reference' = 'RFQ-1' then 'PASS' else 'FAIL' end)
     || ' P8 الإشعار يُرسل لأجهزة صاحبه بلغته ومعه السر');
-  select count(*) into n from net.test_requests;
+  out := array_append(out, (case when j->>'email' = 'zz-p-cu@example.com' then 'PASS' else 'FAIL' end) || ' P8b ومعه بريد صاحبه المؤكد');
   perform ap_private.notify(cx, 'order_status', '{"reference":"ORD-2","status":"paid"}');
+  select body into j from net.test_requests order by id desc limit 1;
+  out := array_append(out, (case when j->>'email' = 'zz-p-cx@example.com' and j->'tokens' = '[]'::jsonb then 'PASS' else 'FAIL' end)
+    || ' P9 من لا جهاز له يصله الإشعار بالبريد');
+  update auth.users set email_confirmed_at = null where id = cx;
+  select count(*) into n from net.test_requests;
+  perform ap_private.notify(cx, 'order_status', '{"reference":"ORD-2","status":"shipped"}');
   select count(*) - n into n from net.test_requests;
-  out := array_append(out, (case when n = 0 then 'PASS' else 'FAIL' end) || ' P9 من لا جهاز له لا يُرسل له شيء');
+  out := array_append(out, (case when n = 0 then 'PASS' else 'FAIL' end) || ' P9b لا جهاز ولا بريد مؤكد: لا يُرسل شيء');
+  update auth.users set email_confirmed_at = now() where id = cx;
   update public.ap_platform_settings set value = '"http://insecure.example/push"' where key = 'push_webhook_url';
   select count(*) into n from net.test_requests;
   perform ap_private.notify(cu, 'order_status', '{"reference":"ORD-1","status":"shipped"}');

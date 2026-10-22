@@ -112,11 +112,34 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', fin, 'role', 'authenticated')::text, true);
   ok := false; begin perform public.ap_finance_record_payment(ord, 500, 'SAR', 'bank_transfer', 'TRX-1', 'المورد'); exception when others then ok := true; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' D4 مبلغ لا يطابق الإجمالي مرفوض');
+
+  -- ───────── بلاغ العميل عن التحويل ─────────
+  perform set_config('request.jwt.claims', json_build_object('sub', cx, 'role', 'authenticated')::text, true);
+  ok := false; begin perform public.ap_customer_report_payment(ord, 'TRX-1'); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' DR1 لا يبلغ عميل عن تحويل لطلب غيره');
+  perform set_config('request.jwt.claims', json_build_object('sub', cu, 'role', 'authenticated')::text, true);
+  ok := false; begin perform public.ap_customer_report_payment(ord, ' x '); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' DR2 مرجع التحويل القصير مرفوض');
+  perform public.ap_customer_report_payment(ord, '  TRX-1  ');
+  reset role;
+  select payment_report || '/' || payment_status || '/' || (payment_reported_at is not null)::text into x from public.ap_orders where id = ord;
+  out := array_append(out, (case when x = 'TRX-1/unpaid/true' then 'PASS' else 'FAIL' end) || ' DR3 البلاغ يُحفظ ولا يغيّر حالة الدفع');
+  select string_agg(user_id::text, ',') into x from public.ap_notifications where kind = 'payment_reported' and payload->>'order_id' = ord::text;
+  out := array_append(out, (case when x = fin::text then 'PASS' else 'FAIL' end) || ' DR4 المالية وحدها يصلها إشعار البلاغ');
+  set local role authenticated;
+  ok := false; begin update public.ap_orders set payment_status = 'paid' where id = ord; get diagnostics n = row_count; ok := n = 0; exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' DR5 العميل لا يغيّر حالة الدفع مباشرة');
+
+  perform set_config('request.jwt.claims', json_build_object('sub', fin, 'role', 'authenticated')::text, true);
   perform public.ap_finance_record_payment(ord, 570, 'SAR', 'bank_transfer', 'TRX-1', 'المورد');
   select status::text || '/' || payment_status into x from public.ap_orders where id = ord;
   out := array_append(out, (case when x = 'paid/paid' then 'PASS' else 'FAIL' end) || ' D5 تسجيل الدفع ينقل الطلب إلى مدفوع');
   ok := false; begin perform public.ap_finance_record_payment(ord, 570, 'SAR', 'bank_transfer', 'TRX-2', 'المورد'); exception when others then ok := true; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' D6 لا يُسجَّل الدفع مرتين');
+  perform set_config('request.jwt.claims', json_build_object('sub', cu, 'role', 'authenticated')::text, true);
+  ok := false; begin perform public.ap_customer_report_payment(ord, 'TRX-9'); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' DR6 لا بلاغ تحويل بعد تأكيد الدفع');
+  perform set_config('request.jwt.claims', json_build_object('sub', fin, 'role', 'authenticated')::text, true);
 
   -- ───────── تجهيز المورد ─────────
   perform set_config('request.jwt.claims', json_build_object('sub', sa, 'role', 'authenticated')::text, true);

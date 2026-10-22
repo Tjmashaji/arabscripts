@@ -22,6 +22,8 @@ function target(kind: string, p: Record<string, unknown>): string {
       return id("shipping_quote_id") ? `/carrier/quotes/${id("shipping_quote_id")}` : "/carrier";
     case "shipment_assigned":
       return id("shipment_id") ? `/carrier/shipments/${id("shipment_id")}` : "/carrier";
+    case "payment_reported":
+      return id("order_id") ? `/admin/orders/${id("order_id")}#payment` : "/admin/orders";
     default:
       return kind.startsWith("application_") ? "/partner/application" : "/account";
   }

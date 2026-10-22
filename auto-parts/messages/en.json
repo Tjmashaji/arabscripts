@@ -552,7 +552,18 @@
     "totalEstimated": "Estimated total",
     "deliveryConfirmed": "Thanks, delivery confirmed.",
     "confirmDeliveryHelp": "Received the part and it matches? Confirm delivery to close the order.",
-    "confirmDelivery": "Confirm delivery"
+    "confirmDelivery": "Confirm delivery",
+    "payTitle": "How to pay: bank transfer",
+    "payBank": "Bank",
+    "payAccountName": "Account name",
+    "payIban": "IBAN",
+    "payAmount": "Amount",
+    "payReferenceHint": "Write the order number {reference} in the transfer description so we can match it quickly.",
+    "payConfirmNote": "The finance team confirms the funds have arrived, then the order becomes “Paid” and preparation starts.",
+    "reportLabel": "Transferred the amount? Enter the transfer reference",
+    "reportButton": "Report transfer",
+    "reportedNotice": "You reported a transfer with reference {reference}. Waiting for finance to confirm.",
+    "reportSaved": "We received your transfer report. We will confirm payment after checking the account."
   },
   "costLines": {
     "part": "Part price",
@@ -702,7 +713,8 @@
     "invalid_country": "Invalid country codes (e.g. CN, SA).",
     "carrier_required": "Choose a carrier.",
     "agree": "Please confirm your acceptance.",
-    "generic": "The action could not be completed. Try again, and contact support if it keeps happening."
+    "generic": "The action could not be completed. Try again, and contact support if it keeps happening.",
+    "invalid_reference": "The transfer reference must be 3 to 120 characters."
   },
   "shipping": {
     "adminTitle": "Shipping",
@@ -825,7 +837,8 @@
     "paymentReference": "Transaction reference",
     "receivedBy": "Received by",
     "paymentConfirm": "I verified the full amount was received by the receiving party.",
-    "recordPayment": "Record payment"
+    "recordPayment": "Record payment",
+    "paymentReported": "The customer reported a transfer with reference {reference} on {date}. Check the account before recording the payment."
   },
   "carrier": {
     "title": "Carrier dashboard",
@@ -911,7 +924,15 @@
     "contact_email": "Contact email",
     "contact_email_help": "Visible to visitors. Preferably on the platform's domain.",
     "contact_whatsapp": "WhatsApp number",
-    "contact_whatsapp_help": "International format, e.g. +9665XXXXXXXX."
+    "contact_whatsapp_help": "International format, e.g. +9665XXXXXXXX.",
+    "paymentTitle": "Bank transfer details",
+    "paymentHelp": "Shown to the customer on every order awaiting payment, with the amount and order number. If the IBAN is empty, customers see “we will contact you to complete payment”.",
+    "bank_name": "Bank name",
+    "bank_name_help": "e.g. Saudi National Bank.",
+    "bank_account_name": "Account holder name",
+    "bank_account_name_help": "As the customer sees it when transferring.",
+    "bank_iban": "IBAN",
+    "bank_iban_help": "SA followed by 22 digits. Spaces are removed automatically."
   },
   "footer": {
     "platform": "Platform",
@@ -1255,6 +1276,15 @@
     "application_under_review": {
       "title": "Application under review",
       "body": "The platform team has started reviewing your application."
+    },
+    "payment_reported": {
+      "title": "New transfer report",
+      "body": "The customer reported a transfer for order {reference}. Check the account, then record the payment."
     }
+  },
+  "notificationEmail": {
+    "button": "Open on the platform",
+    "linkHint": "If the button doesn't work, copy this link into your browser:",
+    "footer": "You received this because you have an account on the platform. All your notifications are in your account."
   }
 }

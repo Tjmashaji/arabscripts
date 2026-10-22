@@ -4,16 +4,30 @@ import { createPrivateKey, sign } from "node:crypto";
 import ar from "../../messages/ar.json";
 import en from "../../messages/en.json";
 import zh from "../../messages/zh.json";
-import { isLocale, type Locale } from "@/i18n/locales";
+import { directionOf, isLocale, type Locale } from "@/i18n/locales";
+import { env } from "@/lib/env";
+import { notificationEmail, type NotificationEmailText } from "./email-templates";
 import { pushText, type PushMessages } from "./push-content";
 
-const messages: Record<Locale, PushMessages> = { ar, en, zh } as unknown as Record<Locale, PushMessages>;
+type Messages = PushMessages & { brand: { name: string }; notificationEmail: NotificationEmailText };
+const messages: Record<Locale, Messages> = { ar, en, zh } as unknown as Record<Locale, Messages>;
 
 export type PushTarget = { token: string; platform: "android" | "ios" };
 export type PushResult = "sent" | "invalid" | "failed";
 
 export function pushContent(kind: string, payload: Record<string, unknown>, locale: string) {
   return pushText(messages[isLocale(locale) ? locale : "ar"], kind, payload, isLocale(locale) ? locale : "ar");
+}
+
+// بريد الإشعار بنفس نص الإشعار الفوري، والرابط كامل على نطاق المنصة.
+export function notificationEmailContent(kind: string, payload: Record<string, unknown>, locale: string) {
+  const lang: Locale = isLocale(locale) ? locale : "ar";
+  const m = messages[lang];
+  const msg = pushText(m, kind, payload, lang);
+  return notificationEmail({
+    dir: directionOf(lang), lang, brand: env.platformName ?? m.brand.name, title: msg.title, body: msg.body,
+    link: `${env.siteUrl}${msg.path}`, text: m.notificationEmail,
+  });
 }
 
 const b64url = (data: Buffer | string) => Buffer.from(data).toString("base64url");
