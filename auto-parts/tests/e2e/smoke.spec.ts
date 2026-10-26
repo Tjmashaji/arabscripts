@@ -340,3 +340,17 @@ test("products search and filters are one form with one search button", async ({
   await expect(page).toHaveURL(/q=filter/);
   await expect(page).toHaveURL(/type=genuine/);
 });
+
+test("join as a partner: public page that sends visitors to sign up and back", async ({ page }) => {
+  await page.goto("/join");
+  await expect(page.locator("h1")).toContainText("انضم كشريك");
+  await expect(page.locator('main a[href="/signup?next=%2Fjoin"]')).toBeVisible();
+  await expect(page.locator('main a[href="/login?next=%2Fjoin"]')).toBeVisible();
+  await noHorizontalScroll(page);
+  await page.goto("/en/join");
+  await expect(page.locator("h1")).toContainText("Join as a partner");
+  // بعد زيارة الإنجليزي تُحفظ اللغة، فالرئيسية تصبح /en وروابطها /en/join.
+  await page.goto("/");
+  await expect(page.locator('main a[href$="/join"]')).toBeVisible();
+  await expect(page.locator('footer a[href$="/join"]')).toBeVisible();
+});

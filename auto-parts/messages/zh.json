@@ -57,7 +57,8 @@
       "p3": "只要还有未确定的必需费用，就不显示最终总价。"
     },
     "partnerTitle": "您是供应商、工厂或货运代理？",
-    "partnerBody": "目前合作伙伴通过邀请加入，每家企业在平台上开展业务前都需经过审核批准。"
+    "partnerBody": "可在「成为合作伙伴」页面自行登记企业，所有企业在开展业务前均需审核通过。",
+    "partnerCta": "成为合作伙伴"
   },
   "auth": {
     "loginTitle": "登录",
@@ -262,7 +263,7 @@
     "acceptTitle": "开始申请",
     "accept": "接受邀请并开始申请",
     "noApproval": "选择资质本身不授予任何权限，每项资质都需平台审核批准。",
-    "noOrg": "您的账户未关联企业。合作伙伴需通过平台邀请加入。",
+    "noOrg": "您的账户尚未关联企业。请在「成为合作伙伴」页面登记企业，或接受平台团队的邀请。",
     "applicationTitle": "企业资质申请",
     "status": "状态",
     "edit": "编辑申请",
@@ -298,7 +299,8 @@
     "notif_application_changes_requested": "您的申请需要修改。",
     "notif_quote_request_invited": "您收到一条新的询价请求。",
     "notif_shipping_quote_requested": "您收到一条新的运费询价。",
-    "notif_shipment_assigned": "有一票货运已分配给您。"
+    "notif_shipment_assigned": "有一票货运已分配给您。",
+    "started": "企业已登记。请完善资料、上传文件，然后提交审核。"
   },
   "adminPartners": {
     "invitations": "合作伙伴邀请",
@@ -348,7 +350,9 @@
     "checklistNote": "请人工核查：法定名称与文件一致、文件有效、代表人身份。系统不会自动查询政府登记信息。",
     "emailSent": "邀请已通过邮件发送至 {email}。",
     "emailFailed": "邮件发送失败。请复制链接自行发送。",
-    "linkBackup": "链接备份（以防邮件未送达或进入垃圾邮件）："
+    "linkBackup": "链接备份（以防邮件未送达或进入垃圾邮件）：",
+    "sourceInvite": "受邀",
+    "sourceSelf": "自行登记"
   },
   "partTypes": {
     "genuine": "原厂件",
@@ -952,7 +956,8 @@
     "whatsapp": "WhatsApp",
     "cr": "商业登记号",
     "whatsappCta": "通过 WhatsApp 联系我们",
-    "whatsappMessage": "您好，我想咨询一个汽车配件。"
+    "whatsappMessage": "您好，我想咨询一个汽车配件。",
+    "join": "成为合作伙伴"
   },
   "brandPage": {
     "title": "{brand} 汽车配件",
@@ -1285,11 +1290,46 @@
     "payment_reported": {
       "title": "新的转账通知",
       "body": "客户已为订单 {reference} 报告转账。请核对账户后登记付款。"
+    },
+    "partner_application_submitted": {
+      "title": "新的合作申请",
+      "body": "{reference} 提交了合作申请，等待您审核。"
     }
   },
   "notificationEmail": {
     "button": "在平台中打开",
     "linkHint": "如果按钮无法使用，请将此链接复制到浏览器：",
     "footer": "您收到此邮件是因为您在平台上拥有账户。所有通知都可在您的账户中查看。"
+  },
+  "join": {
+    "title": "成为合作伙伴",
+    "intro": "面向供应商、工厂、经销商和货运公司：接收来自沙特和海湾地区客户的中国汽车配件需求。",
+    "howTitle": "如何加入",
+    "steps": [
+      "使用公司邮箱注册账户并完成验证。",
+      "登记您的企业并选择业务类型。",
+      "完善企业资料，上传营业执照，然后提交。",
+      "我们审核后回复：通过、需要修改，或说明原因后拒绝。"
+    ],
+    "free": "注册免费。审核通过后，我们将与您签署中介合作协议，明确双方的权利和义务。",
+    "accountFirst": "第一步：注册账户（或登录），完成后会自动返回本页面。",
+    "alreadyPartner": "您的账户已关联企业，请在企业页面继续完成申请。",
+    "openApplication": "打开申请",
+    "countryHint": "两位国家代码，例如中国 CN、沙特 SA。",
+    "capabilities": "业务类型（可多选）",
+    "capabilityHints": {
+      "supplier": "供应配件并为客户需求报价。",
+      "manufacturer": "生产并销售配件。",
+      "seller": "销售自有库存配件。",
+      "carrier": "将订单从中国运往沙特和海湾地区。"
+    },
+    "review": "选择业务类型本身不授予任何权限，每项都需平台团队审核通过。",
+    "submit": "登记我的企业",
+    "errors": {
+      "invalid": "请检查名称和国家代码，并至少选择一项业务。",
+      "already": "您的账户已关联企业，请在企业页面继续完成申请。",
+      "confirm": "请先通过我们发送的邮件验证邮箱，然后返回本页面。",
+      "failed": "登记失败，请重试或联系我们。"
+    }
   }
 }

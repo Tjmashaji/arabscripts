@@ -6,7 +6,7 @@ import { localizedPath } from "@/lib/seo";
 
 export const revalidate = 3600;
 
-const staticPaths = ["/", "/products", "/about", "/how-it-works", "/faq", "/track", "/privacy", "/terms"];
+const staticPaths = ["/", "/products", "/about", "/how-it-works", "/faq", "/track", "/join", "/privacy", "/terms"];
 
 // خريطة الموقع بكل اللغات مع روابط hreflang: الصفحات العامة، صفحات العلامات، والمنتجات المنشورة فقط.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

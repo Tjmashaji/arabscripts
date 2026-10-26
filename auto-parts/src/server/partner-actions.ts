@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { localePath, requireSession } from "@/lib/auth";
-import { MAX_UPLOAD_BYTES, documentTypes, isCapability, safeFileName, sniffDocument } from "@/lib/partners";
+import { MAX_UPLOAD_BYTES, documentTypes, isCapability, safeFileName, selfCapabilities, sniffDocument } from "@/lib/partners";
 import { formLocale, text } from "./form";
 
 const tokenSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -26,6 +26,25 @@ export async function acceptInvitation(form: FormData) {
   const { error } = await supabase.rpc("ap_accept_invitation", { p_token: token.data, p_legal_name: legalName, p_country_code: country });
   if (error) redirect(`${invitePage}?error=1`);
   redirect(appPage(locale));
+}
+
+// التسجيل الذاتي كشريك (رابط /join): ينشئ المنشأة وطلب الاعتماد كما تفعل الدعوة، والاعتماد يبقى بيد الإدارة.
+export async function registerAsPartner(form: FormData) {
+  const locale = formLocale(form);
+  const page = localePath(locale, "/join");
+  await requireSession(locale, "/join");
+  const legalName = text(form, "legalName", 200);
+  const country = text(form, "country", 2).toUpperCase();
+  const caps = form.getAll("capabilities").filter((c): c is (typeof selfCapabilities)[number] =>
+    typeof c === "string" && (selfCapabilities as readonly string[]).includes(c));
+  if (legalName.length < 2 || !/^[A-Z]{2}$/.test(country) || caps.length === 0) redirect(`${page}?error=invalid`);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("ap_partner_self_register", {
+    p_legal_name: legalName, p_country_code: country, p_capabilities: [...new Set(caps)], p_locale: locale,
+  });
+  if (error) redirect(`${page}?error=${/already partner/.test(error.message) ? "already" : /not confirmed/.test(error.message) ? "confirm" : "failed"}`);
+  redirect(appPage(locale, "started=1"));
 }
 
 const optional = (max: number) => z.string().max(max).transform((v) => v.trim());

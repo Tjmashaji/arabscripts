@@ -57,7 +57,8 @@
       "p3": "We never show a final total while a mandatory fee is still unknown."
     },
     "partnerTitle": "Supplier, manufacturer or freight agent?",
-    "partnerBody": "Partners join by invitation for now, and every company is reviewed and approved before any activity on the platform."
+    "partnerBody": "Register your company yourself from the \"Join as a partner\" page. Every company is reviewed and approved before any activity on the platform.",
+    "partnerCta": "Join as a partner"
   },
   "auth": {
     "loginTitle": "Sign in",
@@ -262,7 +263,7 @@
     "acceptTitle": "Start your application",
     "accept": "Accept and start application",
     "noApproval": "Choosing a capability grants nothing by itself; each one is reviewed and approved by the team.",
-    "noOrg": "No company is linked to your account. Partners join by invitation from the platform team.",
+    "noOrg": "No company is linked to your account. Register your company from \"Join as a partner\", or accept an invitation from the platform team.",
     "applicationTitle": "Company approval application",
     "status": "Status",
     "edit": "Edit application",
@@ -298,7 +299,8 @@
     "notif_application_changes_requested": "Changes were requested on your application.",
     "notif_quote_request_invited": "You have a new quote request.",
     "notif_shipping_quote_requested": "You have a new shipping quote request.",
-    "notif_shipment_assigned": "A shipment was assigned to you."
+    "notif_shipment_assigned": "A shipment was assigned to you.",
+    "started": "Your company is registered. Complete the details, upload the documents, then submit for review."
   },
   "adminPartners": {
     "invitations": "Partner invitations",
@@ -348,7 +350,9 @@
     "checklistNote": "Check manually: legal name matches the document, documents are valid, the representative's role. There is no automatic government-registry check.",
     "emailSent": "The invitation was emailed to {email}.",
     "emailFailed": "The email couldn't be sent. Copy the link and send it yourself.",
-    "linkBackup": "Backup copy of the link (in case the email doesn't arrive or lands in spam):"
+    "linkBackup": "Backup copy of the link (in case the email doesn't arrive or lands in spam):",
+    "sourceInvite": "Invited",
+    "sourceSelf": "Self-registered"
   },
   "partTypes": {
     "genuine": "Genuine",
@@ -952,7 +956,8 @@
     "whatsapp": "WhatsApp",
     "cr": "Commercial registration",
     "whatsappCta": "Chat with us on WhatsApp",
-    "whatsappMessage": "Hello, I have a question about a spare part."
+    "whatsappMessage": "Hello, I have a question about a spare part.",
+    "join": "Join as a partner"
   },
   "brandPage": {
     "title": "{brand} spare parts",
@@ -1285,11 +1290,46 @@
     "payment_reported": {
       "title": "New transfer report",
       "body": "The customer reported a transfer for order {reference}. Check the account, then record the payment."
+    },
+    "partner_application_submitted": {
+      "title": "New partner application",
+      "body": "{reference} submitted an application for your review."
     }
   },
   "notificationEmail": {
     "button": "Open on the platform",
     "linkHint": "If the button doesn't work, copy this link into your browser:",
     "footer": "You received this because you have an account on the platform. All your notifications are in your account."
+  },
+  "join": {
+    "title": "Join as a partner",
+    "intro": "For suppliers, manufacturers, sellers and freight carriers: receive Chinese car parts requests from customers in Saudi Arabia and the Gulf.",
+    "howTitle": "How to join",
+    "steps": [
+      "Create an account with your company email and confirm it.",
+      "Register your company and choose your activity.",
+      "Complete your company details, upload your business license, and submit.",
+      "We review and reply: approved, changes requested, or rejected with a reason."
+    ],
+    "free": "Registration is free. Once approved, we sign a brokerage agreement that sets out both parties’ rights and obligations.",
+    "accountFirst": "First step: create an account (or sign in). You will come back to this page automatically.",
+    "alreadyPartner": "Your account is already linked to a company. Continue its application from your company page.",
+    "openApplication": "Open the application",
+    "countryHint": "Two-letter country code, e.g. CN for China, SA for Saudi Arabia.",
+    "capabilities": "Your activity (choose one or more)",
+    "capabilityHints": {
+      "supplier": "You supply parts and quote customer requests.",
+      "manufacturer": "You manufacture and sell parts.",
+      "seller": "You sell parts from your own stock.",
+      "carrier": "You ship orders from China to Saudi Arabia and the Gulf."
+    },
+    "review": "Choosing an activity grants nothing by itself; each one is reviewed and approved by the platform team.",
+    "submit": "Register my company",
+    "errors": {
+      "invalid": "Check the name and country code, and choose at least one activity.",
+      "already": "Your account is already linked to a company. Continue its application from your company page.",
+      "confirm": "Please confirm your email first from the message we sent, then come back to this page.",
+      "failed": "Registration failed. Try again or contact us."
+    }
   }
 }

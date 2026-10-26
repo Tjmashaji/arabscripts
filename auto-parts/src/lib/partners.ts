@@ -1,5 +1,7 @@
 // ثوابت الشركاء المشتركة بين الواجهة والخادم. القيم تطابق أنواع قاعدة البيانات (ap_capability وغيرها).
 export const capabilities = ["broker", "seller", "supplier", "manufacturer", "carrier"] as const;
+// الصفات المتاحة في التسجيل الذاتي (/join). الوسيط دور المنصة ويُمنح بالدعوة فقط.
+export const selfCapabilities = ["supplier", "manufacturer", "seller", "carrier"] as const;
 export type Capability = (typeof capabilities)[number];
 
 export const applicationStatuses = [

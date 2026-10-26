@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 type Row = {
-  id: string; status: string; submitted_at: string | null; created_at: string;
+  id: string; status: string; submitted_at: string | null; created_at: string; invitation_id: string | null;
   organization: { legal_name: string; country_code: string; preferred_locale: string; ap_organization_verifications: { capability: string; status: string }[] };
   ap_verification_documents: { id: string }[];
 };
@@ -36,7 +36,7 @@ export default async function ApplicationsPage({
 
   let query = supabase
     .from("ap_partner_applications")
-    .select("id, status, submitted_at, created_at, organization:ap_organizations!inner(legal_name, country_code, preferred_locale, ap_organization_verifications(capability, status)), ap_verification_documents(id)")
+    .select("id, status, submitted_at, created_at, invitation_id, organization:ap_organizations!inner(legal_name, country_code, preferred_locale, ap_organization_verifications(capability, status)), ap_verification_documents(id)")
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .limit(200);
   if (q.status && (applicationStatuses as readonly string[]).includes(q.status)) query = query.eq("status", q.status);
@@ -95,6 +95,7 @@ export default async function ApplicationsPage({
                     <Link href={`/admin/partner-applications/${r.id}`} className="font-bold text-accent">
                       {r.organization.legal_name}
                     </Link>
+                    <span className="ms-2 text-xs text-muted">{r.invitation_id ? t("sourceInvite") : t("sourceSelf")}</span>
                   </td>
                   <td className="ltr-value px-4 py-3">{r.organization.country_code}</td>
                   <td className="px-4 py-3">{r.organization.ap_organization_verifications.map((v) => tc(v.capability)).join("، ")}</td>
