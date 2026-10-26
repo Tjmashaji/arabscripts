@@ -10,6 +10,8 @@ import { reviewApplication, startReview } from "@/server/admin-actions";
 import { applicationFields, reviewableStatuses, type ApplicationStatus } from "@/lib/partners";
 import { localeFrom, localeNames, isLocale } from "@/i18n/locales";
 import { errorMessage } from "@/lib/errors";
+import { formatMoney } from "@/lib/catalog";
+import type { CarrierService } from "@/components/carrier-service-form";
 
 const decisionLabels: Record<string, "approve" | "reject" | "requestChanges" | "startReview"> = {
   approved: "approve", rejected: "reject", changes_requested: "requestChanges", under_review: "startReview",
@@ -24,7 +26,8 @@ type App = {
   id: string; status: string; contact_name: string | null; contact_title: string | null; contact_phone: string | null;
   contact_email: string | null; languages: string[]; declaration_accepted_at: string | null; submitted_at: string | null; decision_reason: string | null;
   organization: {
-    id: string; legal_name: string; trade_name: string | null; entity_type: string | null; country_code: string; registered_address: string | null;
+    id: string; account_kind: "company" | "individual"; registration_number: string | null; vat_number: string | null; city: string | null;
+    legal_name: string; trade_name: string | null; entity_type: string | null; country_code: string; registered_address: string | null;
     operating_country: string | null; website: string | null; activity_description: string | null; billing_currency: string | null; preferred_locale: string;
     ap_organization_verifications: { capability: string; status: string; decision_reason: string | null }[];
   };
@@ -56,7 +59,7 @@ export default async function ApplicationReviewPage({
   const { data } = await supabase
     .from("ap_partner_applications")
     .select(`id, status, contact_name, contact_title, contact_phone, contact_email, languages, declaration_accepted_at, submitted_at, decision_reason,
-      organization:ap_organizations(id, legal_name, trade_name, entity_type, country_code, registered_address, operating_country, website,
+      organization:ap_organizations(id, account_kind, registration_number, vat_number, city, legal_name, trade_name, entity_type, country_code, registered_address, operating_country, website,
         activity_description, billing_currency, preferred_locale, ap_organization_verifications(capability, status, decision_reason))`)
     .eq("id", id)
     .maybeSingle();
@@ -64,12 +67,20 @@ export default async function ApplicationReviewPage({
   const app = data as unknown as App;
   const org = app.organization;
 
-  const [{ data: docs }, { data: reviews }] = await Promise.all([
+  const [{ data: docs }, { data: reviews }, { data: missingDb }, { data: bank }, { data: services }] = await Promise.all([
     supabase.from("ap_verification_documents").select("id, document_type, file_name, size_bytes, issuing_country, document_expiry_date, created_at")
       .eq("application_id", id).order("created_at"),
     supabase.from("ap_application_reviews").select("id, decision, reason, approved_capabilities, rejected_capabilities, override_reason, reviewer_id, created_at")
       .eq("application_id", id).order("created_at", { ascending: false }),
+    supabase.rpc("ap_application_missing", { p_app: id }),
+    supabase.from("ap_organization_bank_accounts").select("bank_name, account_holder, iban, account_number, swift, currency, updated_at")
+      .eq("organization_id", org.id).maybeSingle(),
+    supabase.from("ap_carrier_services").select("*").eq("organization_id", org.id).order("created_at"),
   ]);
+  const individual = org.account_kind === "individual";
+  const tp = await getTranslations("partner");
+  const tm = await getTranslations("shippingModes");
+  const tcar = await getTranslations("carrier");
   const reviewerIds = [...new Set(((reviews ?? []) as Review[]).map((r) => r.reviewer_id).filter((x): x is string => !!x))];
   const { data: reviewers } = reviewerIds.length
     ? await supabase.from("ap_profiles").select("user_id, full_name").in("user_id", reviewerIds)
@@ -77,11 +88,8 @@ export default async function ApplicationReviewPage({
   const names = new Map((reviewers ?? []).map((r) => [r.user_id as string, r.full_name as string]));
 
   const requested = org.ap_organization_verifications.filter((v) => v.status === "requested");
-  const missing = [
-    !org.legal_name && "legal_name", !org.activity_description && "activity_description", !app.contact_name && "contact_name",
-    !app.contact_phone && "contact_phone", !app.contact_email && "contact_email", !app.declaration_accepted_at && "declaration",
-    org.ap_organization_verifications.length === 0 && "capabilities", (docs ?? []).length === 0 && "documents",
-  ].filter((x): x is string => !!x);
+  // نفس قاعدة الإرسال في قاعدة البيانات (حسب نوع الحساب والصفات).
+  const missing = (missingDb ?? []) as string[];
   const reviewable = reviewableStatuses.includes(app.status as ApplicationStatus);
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-SA" : locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Riyadh" });
   const row = (label: string, value: string | null | undefined, ltr = false) => (
@@ -107,7 +115,11 @@ export default async function ApplicationReviewPage({
         <div className="flex flex-col gap-5">
           <Card>
             <dl className="grid gap-4 sm:grid-cols-2">
-              {row(tf("legal_name"), org.legal_name)}
+              {row(tp("kindTitle"), tp(`kinds.${org.account_kind}`))}
+              {row(individual ? tf("full_name") : tf("legal_name"), org.legal_name)}
+              {!individual && row(tf("registration_number"), org.registration_number, true)}
+              {!individual && row(tf("vat_number"), org.vat_number, true)}
+              {row(tf("city"), org.city)}
               {row(tf("trade_name"), org.trade_name)}
               {row(tf("entity_type"), org.entity_type)}
               {row(tf("country_code"), org.country_code, true)}
@@ -150,6 +162,41 @@ export default async function ApplicationReviewPage({
                   </li>
                 ))}
               </ul>
+            )}
+          </Card>
+          {(services ?? []).length > 0 && (
+            <Card>
+              <h2 className="mb-3 font-bold">{tp("shippingSection")}</h2>
+              <ul className="flex flex-col divide-y divide-line text-sm">
+                {((services ?? []) as CarrierService[]).map((sv) => (
+                  <li key={sv.id} className="flex flex-col gap-0.5 py-2">
+                    <span className="font-bold">{sv.name} · {tm(sv.mode)}</span>
+                    <span className="text-muted">
+                      <span className="ltr-value">{sv.origin_countries.join(",")} → {sv.destination_countries.join(",")}</span>
+                      {sv.pickup_location && ` · ${sv.pickup_location}`}
+                      {sv.price_per_kg && sv.price_currency && <> · <span className="ltr-value">{formatMoney(sv.price_per_kg, sv.price_currency, locale)}</span>/{tcar("kg")}</>}
+                      {sv.min_charge && sv.price_currency && <> · {tcar("minCharge")}: <span className="ltr-value">{formatMoney(sv.min_charge, sv.price_currency, locale)}</span></>}
+                      {(sv.transit_days_min ?? sv.transit_days_max) !== null && ` · ${sv.transit_days_min ?? "?"}–${sv.transit_days_max ?? "?"} ${tcar("days")}`}
+                    </span>
+                    {sv.notes && <span className="text-muted">{sv.notes}</span>}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          <Card>
+            <h2 className="mb-3 font-bold">{tp("bankSection")}</h2>
+            {!bank ? (
+              <p className="text-sm text-muted">{tp("bankNone")}</p>
+            ) : (
+              <dl className="grid gap-4 sm:grid-cols-2">
+                {row(tp("bankName"), bank.bank_name)}
+                {row(tp("bankHolder"), bank.account_holder)}
+                {row("IBAN", bank.iban, true)}
+                {row(tp("bankAccountNumber"), bank.account_number, true)}
+                {row("SWIFT / BIC", bank.swift, true)}
+                {row(tcar("currency"), bank.currency, true)}
+              </dl>
             )}
           </Card>
           <Card>

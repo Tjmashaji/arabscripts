@@ -226,7 +226,10 @@
     "source_invoice": "Invoice or source document",
     "insurance": "Insurance policy",
     "transport_license": "Transport or freight license",
-    "other": "Other document"
+    "other": "Other document",
+    "identity_document": "Proof of identity (ID, residence permit or passport)",
+    "freelance_certificate": "Freelance certificate",
+    "vat_certificate": "VAT registration certificate"
   },
   "fields": {
     "legal_name": "Legal company name",
@@ -245,7 +248,17 @@
     "languages": "Languages used",
     "capabilities": "Requested capabilities",
     "documents": "Documents",
-    "declaration": "Declaration"
+    "declaration": "Declaration",
+    "full_name": "Full name",
+    "address": "Address",
+    "work_field": "Field of work",
+    "registration_number": "Commercial registration number",
+    "vat_number": "VAT number (if any)",
+    "city": "City",
+    "registration_document": "Commercial registration or business license document",
+    "identity_document": "Proof of identity",
+    "carrier_services": "At least one shipping service with a price per kg",
+    "bank_account": "Bank account"
   },
   "partner": {
     "portal": "Partner portal",
@@ -300,7 +313,34 @@
     "notif_quote_request_invited": "You have a new quote request.",
     "notif_shipping_quote_requested": "You have a new shipping quote request.",
     "notif_shipment_assigned": "A shipment was assigned to you.",
-    "started": "Your company is registered. Complete the details, upload the documents, then submit for review."
+    "started": "Your company is registered. Complete the details, upload the documents, then submit for review.",
+    "kindTitle": "Account type",
+    "kinds": {
+      "company": "Company",
+      "individual": "Individual"
+    },
+    "kindHints": {
+      "company": "A company, establishment or factory with a commercial registration.",
+      "individual": "A person working under their own name (e.g. freelance)."
+    },
+    "kindSwitch": "Changed the type? Save the application and the required fields and documents will update.",
+    "personSection": "Your personal details",
+    "todoTitle": "Still needed to complete your application",
+    "docsNeededIndividual": "Required: proof of identity (ID, residence permit or passport), and a freelance certificate if you are in Saudi Arabia.",
+    "docsNeededCompany": "Required: commercial registration or business license, VAT certificate if any, and an authorization letter if the applicant is not the owner.",
+    "shippingSection": "Shipping services",
+    "shippingHelp": "Add at least one shipping service: type, from and to, pickup location, price per kg and transit time. Our team reviews it before approval.",
+    "bankSection": "Bank account (optional)",
+    "bankHelp": "For receiving your payments later. Only the approval and finance teams can see it, and you can change it any time.",
+    "bankInvalid": "Check the account details: bank name, account holder, and a valid IBAN or account number.",
+    "bankName": "Bank name",
+    "bankHolder": "Account holder",
+    "bankAccountNumber": "Account number",
+    "bankAccountHint": "For accounts outside Saudi Arabia without an IBAN.",
+    "bankSave": "Save bank account",
+    "bankClearHint": "To remove the account, clear the bank name and save.",
+    "bankSaved": "Bank account saved.",
+    "bankNone": "No bank account added."
   },
   "adminPartners": {
     "invitations": "Partner invitations",
@@ -873,7 +913,17 @@
     "updateQuote": "Update quote",
     "submitQuote": "Submit quote",
     "closed": "This quote can't be changed.",
-    "podNote": "Upload proof of delivery (photo or PDF) before setting Delivered. Carriers can't change part prices or platform fees."
+    "podNote": "Upload proof of delivery (photo or PDF) before setting Delivered. Carriers can't change part prices or platform fees.",
+    "serviceNameHint": "e.g. Express air to Riyadh",
+    "pickupLocation": "Pickup location or warehouse",
+    "pickupHint": "e.g. Guangzhou, Baiyun warehouse",
+    "countriesHint": "Two-letter country codes separated by commas, e.g. CN, HK",
+    "pricePerKg": "Price per kg",
+    "currency": "Currency",
+    "minCharge": "Minimum charge per shipment",
+    "notesHint": "e.g. customs not included, door-to-door delivery",
+    "kg": "kg",
+    "days": "days"
   },
   "supplierOrders": {
     "title": "Assigned orders",
@@ -1306,9 +1356,9 @@
     "intro": "For suppliers, manufacturers, sellers and freight carriers: receive Chinese car parts requests from customers in Saudi Arabia and the Gulf.",
     "howTitle": "How to join",
     "steps": [
-      "Create an account with your company email and confirm it.",
-      "Register your company and choose your activity.",
-      "Complete your company details, upload your business license, and submit.",
+      "Create an account with your email and confirm it.",
+      "Choose your account type (individual or company) and your activity.",
+      "Complete your details, upload the required documents (ID for individuals, business license for companies), and submit.",
       "We review and reply: approved, changes requested, or rejected with a reason."
     ],
     "free": "Registration is free. Once approved, we sign a brokerage agreement that sets out both parties’ rights and obligations.",
@@ -1330,6 +1380,18 @@
       "already": "Your account is already linked to a company. Continue its application from your company page.",
       "confirm": "Please confirm your email first from the message we sent, then come back to this page.",
       "failed": "Registration failed. Try again or contact us."
-    }
+    },
+    "kindTitle": "Account type",
+    "kinds": {
+      "company": "Company",
+      "individual": "Individual"
+    },
+    "kindHints": {
+      "company": "A company, establishment or factory with a commercial registration.",
+      "individual": "A person working under their own name (e.g. freelance)."
+    },
+    "nameLabel": "Name",
+    "nameHint": "Company: the legal name as registered. Individual: your full name.",
+    "countryPlaceholder": "Choose a country"
   }
 }
