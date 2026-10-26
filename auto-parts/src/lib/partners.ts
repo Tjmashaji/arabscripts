@@ -10,20 +10,37 @@ export const applicationStatuses = [
 export type ApplicationStatus = (typeof applicationStatuses)[number];
 
 export const documentTypes = [
-  "commercial_register", "business_license", "authorization_letter", "brand_authorization", "product_catalog",
-  "certificate", "source_invoice", "insurance", "transport_license", "other",
+  "commercial_register", "business_license", "identity_document", "freelance_certificate", "vat_certificate", "authorization_letter",
+  "brand_authorization", "product_catalog", "certificate", "source_invoice", "insurance", "transport_license", "other",
 ] as const;
 
+// نوع حساب الشريك: فرد (هوية ووثيقة عمل حر) أو منشأة (سجل تجاري ومسؤول مفوّض).
+export const accountKinds = ["company", "individual"] as const;
+export type AccountKind = (typeof accountKinds)[number];
+export const isAccountKind = (v: unknown): v is AccountKind => typeof v === "string" && (accountKinds as readonly string[]).includes(v);
+
 export const applicationFields = [
-  "legal_name", "trade_name", "entity_type", "country_code", "registered_address", "operating_country", "website",
-  "activity_description", "billing_currency", "contact_name", "contact_title", "contact_phone", "contact_email",
-  "languages", "capabilities", "documents", "declaration",
+  "legal_name", "trade_name", "registration_number", "vat_number", "entity_type", "country_code", "city", "registered_address",
+  "operating_country", "website", "activity_description", "billing_currency", "contact_name", "contact_title", "contact_phone",
+  "contact_email", "languages", "capabilities", "documents", "registration_document", "identity_document", "carrier_services",
+  "bank_account", "declaration",
 ] as const;
 
 export const editableStatuses: readonly ApplicationStatus[] = ["draft_application", "changes_requested"];
 export const reviewableStatuses: readonly ApplicationStatus[] = ["submitted_for_review", "under_review", "resubmitted"];
 
-export const countries = ["SA", "CN", "AE", "KW", "QA", "BH", "OM", "EG", "JO", "HK", "TW", "KR", "JP", "TR", "IN", "DE", "US"] as const;
+export const countries = [
+  "SA", "CN", "AE", "KW", "QA", "BH", "OM", "EG", "JO", "IQ", "YE", "LB", "SD", "MA", "HK", "TW", "KR", "JP", "MY", "TH", "VN", "ID",
+  "SG", "PK", "IN", "TR", "DE", "IT", "FR", "GB", "US",
+] as const;
+
+// اسم الدولة بلغة الصفحة (قائمة أسماء بدل رموز من حرفين)، مرتبة أبجديًا مع السعودية والصين أولًا.
+export function countryOptions(locale: string): { code: string; name: string }[] {
+  const names = new Intl.DisplayNames([locale === "zh" ? "zh-Hans" : locale], { type: "region" });
+  const label = (c: string) => names.of(c) ?? c;
+  const [first, rest] = [["SA", "CN"], countries.filter((c) => c !== "SA" && c !== "CN")];
+  return [...first, ...[...rest].sort((a, b) => label(a).localeCompare(label(b), locale))].map((code) => ({ code, name: label(code) }));
+}
 
 export function isCapability(v: unknown): v is Capability {
   return typeof v === "string" && (capabilities as readonly string[]).includes(v);

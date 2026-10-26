@@ -27,22 +27,35 @@ const withQuery = (path: string, q: string, hash = "") => `${path}?${q}${hash}`;
 // ───────── الناقل ─────────
 export async function saveCarrierService(form: FormData) {
   const locale = formLocale(form);
-  await requireSession(locale, "/carrier");
-  const back = localePath(locale, "/carrier");
+  // من طلب الاعتماد (قبل الاعتماد) أو من لوحة الناقل.
+  const fromApplication = form.get("back") === "application";
+  await requireSession(locale, fromApplication ? "/partner/application" : "/carrier");
+  const back = localePath(locale, fromApplication ? "/partner/application" : "/carrier");
+  const hash = fromApplication ? "#shipping" : "#services";
   const org = uuid.safeParse(text(form, "organizationId", 64));
   const mode = z.enum(shippingModes).safeParse(form.get("mode"));
   const origins = countryList(text(form, "origins", 200));
   const destinations = countryList(text(form, "destinations", 200));
   const name = text(form, "name", 120);
-  if (!org.success || !mode.success || !origins || !destinations || name.length < 2) redirect(withQuery(back, "error=invalid", "#services"));
+  const rawPrice = text(form, "pricePerKg", 12);
+  const price = rawPrice ? money(rawPrice) : null;
+  const rawMin = text(form, "minCharge", 12);
+  const minCharge = rawMin ? money(rawMin) : null;
+  const currency = z.enum(currencies).safeParse(form.get("priceCurrency"));
+  if (!org.success || !mode.success || !origins || !destinations || name.length < 2 || (rawPrice && !price) || (rawMin && !minCharge)
+      || (fromApplication && !price)) {
+    redirect(withQuery(back, "error=invalid", hash));
+  }
   const supabase = await createClient();
   const { error } = await supabase.rpc("ap_save_carrier_service", {
     p_id: optionalUuid(text(form, "serviceId", 64)), p_org: org.data, p_name: name, p_mode: mode.data,
     p_origins: origins, p_destinations: destinations,
     p_days_min: intOrNull(text(form, "daysMin", 3)), p_days_max: intOrNull(text(form, "daysMax", 3)),
     p_notes: text(form, "notes", 1000) || null, p_enabled: form.get("enabled") === "on",
+    p_price_per_kg: price, p_price_currency: price && currency.success ? currency.data : null, p_min_charge: minCharge,
+    p_pickup_location: text(form, "pickupLocation", 200) || null,
   });
-  redirect(withQuery(back, error ? fail(error.message) : "saved=1", "#services"));
+  redirect(withQuery(back, error ? fail(error.message) : "saved=1", hash));
 }
 
 export async function submitShippingQuote(form: FormData) {

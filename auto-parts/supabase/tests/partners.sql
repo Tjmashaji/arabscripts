@@ -51,10 +51,13 @@ begin
   -- ───────── تعبئة الطلب والمستندات ─────────
   perform public.ap_save_application(app, jsonb_build_object(
     'legal_name', 'Shenzhen Parts Co.', 'country_code', 'CN', 'activity_description', 'توريد قطع شيري وجيلي',
+    'registered_address', 'Longgang, Shenzhen', 'registration_number', '91440300MA5FXXXX',
     'contact_name', 'Li Wei', 'contact_phone', '+86 138 0000 0000', 'contact_email', 'LI@EXAMPLE.COM',
     'languages', jsonb_build_array('zh', 'en', 'xx'), 'declaration', true), array['supplier', 'carrier']::public.ap_capability[]);
   select contact_email || ':' || array_to_string(languages, ',') into x from public.ap_partner_applications where id = app;
   out := array_append(out, (case when x = 'li@example.com:zh,en' then 'PASS' else 'FAIL' end) || ' C1 حفظ الطلب وتجاهل اللغات غير المعروفة (' || x || ')');
+  -- طالب صفة الناقل يضيف خدمة الشحن قبل الإرسال (شرط لاكتمال الطلب)
+  perform public.ap_save_carrier_service(null, org, 'جوي سريع', 'air', array['CN'], array['SA'], 5, 9, null, true, 32, 'CNY', 150, 'Shenzhen');
   ok := false; begin perform public.ap_submit_application(app); exception when others then ok := sqlerrm like '%documents%'; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' C2 لا يُرسل الطلب بلا مستندات');
 

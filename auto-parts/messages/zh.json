@@ -226,7 +226,10 @@
     "source_invoice": "发票或来源证明",
     "insurance": "保险单",
     "transport_license": "运输或货运许可证",
-    "other": "其他文件"
+    "other": "其他文件",
+    "identity_document": "身份证明（身份证、居留证或护照）",
+    "freelance_certificate": "自由职业证明",
+    "vat_certificate": "税务登记证明"
   },
   "fields": {
     "legal_name": "企业法定名称",
@@ -245,7 +248,17 @@
     "languages": "使用语言",
     "capabilities": "申请的资质",
     "documents": "文件",
-    "declaration": "声明"
+    "declaration": "声明",
+    "full_name": "姓名",
+    "address": "地址",
+    "work_field": "业务领域",
+    "registration_number": "营业执照号码",
+    "vat_number": "税号（如有）",
+    "city": "城市",
+    "registration_document": "营业执照或注册证明文件",
+    "identity_document": "身份证明",
+    "carrier_services": "至少一项含每公斤价格的运输服务",
+    "bank_account": "银行账户"
   },
   "partner": {
     "portal": "合作伙伴门户",
@@ -300,7 +313,34 @@
     "notif_quote_request_invited": "您收到一条新的询价请求。",
     "notif_shipping_quote_requested": "您收到一条新的运费询价。",
     "notif_shipment_assigned": "有一票货运已分配给您。",
-    "started": "企业已登记。请完善资料、上传文件，然后提交审核。"
+    "started": "企业已登记。请完善资料、上传文件，然后提交审核。",
+    "kindTitle": "账户类型",
+    "kinds": {
+      "company": "企业",
+      "individual": "个人"
+    },
+    "kindHints": {
+      "company": "持有营业执照的公司、商户或工厂。",
+      "individual": "以个人名义经营（如自由职业）。"
+    },
+    "kindSwitch": "更改了类型？保存申请后，所需字段和文件会相应更新。",
+    "personSection": "个人信息",
+    "todoTitle": "完成申请还需要",
+    "docsNeededIndividual": "需提供：身份证明（身份证、居留证或护照）；如在沙特，还需自由职业证明。",
+    "docsNeededCompany": "需提供：营业执照或注册证明、税务证明（如有），如申请人非所有人还需授权书。",
+    "shippingSection": "运输服务",
+    "shippingHelp": "请至少添加一项运输服务：方式、起止地、提货地点、每公斤价格和时效。我们会在审核前查看。",
+    "bankSection": "银行账户（可选）",
+    "bankHelp": "用于日后收款。仅审核和财务团队可见，可随时修改。",
+    "bankInvalid": "请检查账户信息：银行名称、账户名，以及有效的 IBAN 或账号。",
+    "bankName": "银行名称",
+    "bankHolder": "账户名",
+    "bankAccountNumber": "账号",
+    "bankAccountHint": "适用于没有 IBAN 的沙特境外账户。",
+    "bankSave": "保存银行账户",
+    "bankClearHint": "如需删除账户，清空银行名称并保存。",
+    "bankSaved": "银行账户已保存。",
+    "bankNone": "未添加银行账户。"
   },
   "adminPartners": {
     "invitations": "合作伙伴邀请",
@@ -873,7 +913,17 @@
     "updateQuote": "更新报价",
     "submitQuote": "提交报价",
     "closed": "此报价无法修改。",
-    "podNote": "在设置“已送达”前请上传签收证明（照片或 PDF）。承运商不能修改配件价格或平台费用。"
+    "podNote": "在设置“已送达”前请上传签收证明（照片或 PDF）。承运商不能修改配件价格或平台费用。",
+    "serviceNameHint": "例如：空运快线到利雅得",
+    "pickupLocation": "提货地点或仓库",
+    "pickupHint": "例如：广州白云仓库",
+    "countriesHint": "两位国家代码，用逗号分隔，例如 CN, HK",
+    "pricePerKg": "每公斤价格",
+    "currency": "币种",
+    "minCharge": "每票最低收费",
+    "notesHint": "例如：不含关税，门到门派送",
+    "kg": "公斤",
+    "days": "天"
   },
   "supplierOrders": {
     "title": "分配的订单",
@@ -1306,9 +1356,9 @@
     "intro": "面向供应商、工厂、经销商和货运公司：接收来自沙特和海湾地区客户的中国汽车配件需求。",
     "howTitle": "如何加入",
     "steps": [
-      "使用公司邮箱注册账户并完成验证。",
-      "登记您的企业并选择业务类型。",
-      "完善企业资料，上传营业执照，然后提交。",
+      "使用您的邮箱注册账户并完成验证。",
+      "选择账户类型（个人或企业）及业务类型。",
+      "完善资料，上传所需文件（个人提供身份证件，企业提供营业执照），然后提交。",
       "我们审核后回复：通过、需要修改，或说明原因后拒绝。"
     ],
     "free": "注册免费。审核通过后，我们将与您签署中介合作协议，明确双方的权利和义务。",
@@ -1330,6 +1380,18 @@
       "already": "您的账户已关联企业，请在企业页面继续完成申请。",
       "confirm": "请先通过我们发送的邮件验证邮箱，然后返回本页面。",
       "failed": "登记失败，请重试或联系我们。"
-    }
+    },
+    "kindTitle": "账户类型",
+    "kinds": {
+      "company": "企业",
+      "individual": "个人"
+    },
+    "kindHints": {
+      "company": "持有营业执照的公司、商户或工厂。",
+      "individual": "以个人名义经营（如自由职业）。"
+    },
+    "nameLabel": "名称",
+    "nameHint": "企业：注册的法定名称。个人：您的姓名。",
+    "countryPlaceholder": "选择国家"
   }
 }

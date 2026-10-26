@@ -2,18 +2,15 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { SiteShell } from "@/components/site-shell";
-import { SubmitButton } from "@/components/submit-button";
-import { Alert, Badge, Card, Input, PageTitle, Select, statusTone } from "@/components/ui";
+import { Alert, Badge, Card, PageTitle, statusTone } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { getCarrierOrganizations } from "@/lib/partner-data";
 import { formatMoney } from "@/lib/catalog";
-import { shippingModes } from "@/lib/shipping";
-import { saveCarrierService } from "@/server/shipping-actions";
+import { CarrierServiceForm, type CarrierService } from "@/components/carrier-service-form";
 import { errorMessage } from "@/lib/errors";
 import { localeFrom } from "@/i18n/locales";
 
-type Service = { id: string; organization_id: string; name: string; mode: string; origin_countries: string[]; destination_countries: string[];
-  transit_days_min: number | null; transit_days_max: number | null; notes: string | null; enabled: boolean };
+type Service = CarrierService;
 type QuoteRow = { id: string; request_reference: string; part_description: string; mode: string; origin_country: string; destination_city: string;
   price: string | null; currency: string | null; status: string; created_at: string; request_open: boolean };
 type ShipmentRow = { id: string; reference: string; status: string; tracking_number: string | null; destination_city: string; created_at: string };
@@ -44,30 +41,7 @@ export default async function CarrierHome({ params, searchParams }: { params: Pr
       ])
     : [{ data: [] }, { data: [] }, { data: [] }];
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-SA" : locale, { dateStyle: "medium", timeZone: "Asia/Riyadh" });
-  const serviceForm = (s?: Service) => (
-    <form action={saveCarrierService} className="grid gap-2 sm:grid-cols-2">
-      <input type="hidden" name="locale" value={locale} />
-      {s && <input type="hidden" name="serviceId" value={s.id} />}
-      {orgs.length === 1 || s ? (
-        <input type="hidden" name="organizationId" value={s?.organization_id ?? orgs[0].id} />
-      ) : (
-        <Select name="organizationId" aria-label={t("organization")} className="sm:col-span-2">
-          {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-        </Select>
-      )}
-      <Input name="name" required minLength={2} maxLength={120} placeholder={t("serviceName")} aria-label={t("serviceName")} defaultValue={s?.name ?? ""} />
-      <Select name="mode" aria-label={tsh("mode")} defaultValue={s?.mode ?? "air"}>{shippingModes.map((m) => <option key={m} value={m}>{tm(m)}</option>)}</Select>
-      <Input name="origins" required dir="ltr" placeholder={t("origins")} aria-label={t("origins")} defaultValue={s?.origin_countries.join(", ") ?? "CN"} />
-      <Input name="destinations" required dir="ltr" placeholder={t("destinations")} aria-label={t("destinations")} defaultValue={s?.destination_countries.join(", ") ?? "SA"} />
-      <Input name="daysMin" type="number" min={0} max={365} placeholder={t("daysMin")} aria-label={t("daysMin")} defaultValue={s?.transit_days_min ?? ""} />
-      <Input name="daysMax" type="number" min={0} max={365} placeholder={t("daysMax")} aria-label={t("daysMax")} defaultValue={s?.transit_days_max ?? ""} />
-      <Input name="notes" maxLength={1000} placeholder={tsh("note")} aria-label={tsh("note")} defaultValue={s?.notes ?? ""} className="sm:col-span-2" />
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="enabled" defaultChecked={s?.enabled ?? true} className="size-4 accent-accent" /> {t("enabled")}
-      </label>
-      <div><SubmitButton variant="secondary">{tsh("save")}</SubmitButton></div>
-    </form>
-  );
+  const serviceForm = (s?: Service) => <CarrierServiceForm locale={locale} orgs={orgs} service={s} back="carrier" />;
 
   return (
     <SiteShell locale={locale} path="/carrier">
@@ -127,6 +101,7 @@ export default async function CarrierHome({ params, searchParams }: { params: Pr
                 <details key={s.id} className="rounded-lg border border-line p-3">
                   <summary className="cursor-pointer text-sm">
                     <span className="font-bold">{s.name}</span> · {tm(s.mode)} · <span className="ltr-value">{s.origin_countries.join(",")} → {s.destination_countries.join(",")}</span>
+                    {s.price_per_kg && s.price_currency && <> · <span className="ltr-value">{formatMoney(s.price_per_kg, s.price_currency, locale)}</span>/{t("kg")}</>}
                     {!s.enabled && <> · <Badge tone="neutral">{t("disabled")}</Badge></>}
                   </summary>
                   <div className="mt-3">{serviceForm(s)}</div>

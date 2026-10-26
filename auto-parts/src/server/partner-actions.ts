@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { localePath, requireSession } from "@/lib/auth";
-import { MAX_UPLOAD_BYTES, documentTypes, isCapability, safeFileName, selfCapabilities, sniffDocument } from "@/lib/partners";
+import { MAX_UPLOAD_BYTES, documentTypes, isAccountKind, isCapability, safeFileName, selfCapabilities, sniffDocument } from "@/lib/partners";
 import { formLocale, text } from "./form";
 
 const tokenSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -37,11 +37,12 @@ export async function registerAsPartner(form: FormData) {
   const country = text(form, "country", 2).toUpperCase();
   const caps = form.getAll("capabilities").filter((c): c is (typeof selfCapabilities)[number] =>
     typeof c === "string" && (selfCapabilities as readonly string[]).includes(c));
-  if (legalName.length < 2 || !/^[A-Z]{2}$/.test(country) || caps.length === 0) redirect(`${page}?error=invalid`);
+  const kind = form.get("accountKind");
+  if (legalName.length < 2 || !/^[A-Z]{2}$/.test(country) || caps.length === 0 || !isAccountKind(kind)) redirect(`${page}?error=invalid`);
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("ap_partner_self_register", {
-    p_legal_name: legalName, p_country_code: country, p_capabilities: [...new Set(caps)], p_locale: locale,
+    p_legal_name: legalName, p_country_code: country, p_capabilities: [...new Set(caps)], p_locale: locale, p_account_kind: kind,
   });
   if (error) redirect(`${page}?error=${/already partner/.test(error.message) ? "already" : /not confirmed/.test(error.message) ? "confirm" : "failed"}`);
   redirect(appPage(locale, "started=1"));
@@ -49,7 +50,11 @@ export async function registerAsPartner(form: FormData) {
 
 const optional = (max: number) => z.string().max(max).transform((v) => v.trim());
 const applicationSchema = z.object({
+  account_kind: z.enum(["company", "individual"]),
   legal_name: z.string().trim().min(2).max(200),
+  registration_number: optional(60),
+  vat_number: optional(30),
+  city: optional(80),
   trade_name: optional(200),
   entity_type: optional(80),
   country_code: z.string().regex(/^[A-Za-z]{2}$/),
@@ -104,6 +109,33 @@ export async function submitApplication(form: FormData) {
     redirect(appPage(locale, missing ? `missing=${encodeURIComponent(missing)}` : "error=submit"));
   }
   redirect(appPage(locale, "submitted=1"));
+}
+
+// الحساب البنكي اختياري ويُعدَّل في أي وقت (حتى بعد الاعتماد). اسم بنك فارغ = حذف.
+const bankSchema = z.object({
+  bankName: optional(120),
+  holder: optional(200),
+  iban: z.string().transform((v) => v.replace(/\s+/g, "").toUpperCase()).pipe(z.union([z.literal(""), z.string().regex(/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/)])),
+  accountNumber: z.string().trim().toUpperCase().pipe(z.union([z.literal(""), z.string().regex(/^[0-9A-Z -]{4,40}$/)])),
+  swift: z.string().transform((v) => v.replace(/\s+/g, "").toUpperCase()).pipe(z.union([z.literal(""), z.string().regex(/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/)])),
+  currency: z.union([z.literal(""), z.string().regex(/^[A-Z]{3}$/)]),
+});
+
+export async function saveBankAccount(form: FormData) {
+  const locale = formLocale(form);
+  const { supabase, app } = await editableApplication(locale);
+  const parsed = bankSchema.safeParse({
+    bankName: text(form, "bankName", 120), holder: text(form, "holder", 200), iban: text(form, "iban", 60),
+    accountNumber: text(form, "accountNumber", 40), swift: text(form, "swift", 20), currency: text(form, "currency", 3),
+  });
+  const d = parsed.data;
+  const clearing = !!d && d.bankName === "";
+  if (!d || (!clearing && (d.holder.length < 2 || (!d.iban && !d.accountNumber)))) redirect(appPage(locale, "error=bank#bank"));
+  const { error } = await supabase.rpc("ap_save_bank_account", {
+    p_org: app.organization_id, p_bank_name: d.bankName, p_holder: d.holder, p_iban: d.iban || null,
+    p_account_number: d.accountNumber || null, p_swift: d.swift || null, p_currency: d.currency || null,
+  });
+  redirect(appPage(locale, error ? "error=bank#bank" : "bankSaved=1#bank"));
 }
 
 // الرفع يمر بالخادم: يُفحص نوع الملف من محتواه وحجمه، ثم يُرفع بجلسة المستخدم (سياسات التخزين تتحقق من المنشأة وحالة الطلب).

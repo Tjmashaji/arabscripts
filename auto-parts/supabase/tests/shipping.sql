@@ -39,9 +39,13 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', ca, 'role', 'authenticated')::text, true);
   svc := public.ap_save_carrier_service(null, org_k, 'جوي سريع', 'air', array['CN'], array['SA'], 5, 9, null, true);
   out := array_append(out, (case when svc is not null then 'PASS' else 'FAIL' end) || ' A1 الناقل المعتمد يضيف خدمة');
+  -- طالب صفة الناقل (قبل الاعتماد) يضيف خدمته ليراجعها الفريق، لكن لا يُطلب منه عرض شحن قبل الاعتماد (B2).
   perform set_config('request.jwt.claims', json_build_object('sub', cc, 'role', 'authenticated')::text, true);
-  ok := false; begin perform public.ap_save_carrier_service(null, org_c, 'بحري', 'sea', array['CN'], array['SA'], 20, 40, null, true); exception when others then ok := true; end;
-  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' A2 ناقل غير معتمد لا يضيف خدمات');
+  ok := true; begin perform public.ap_save_carrier_service(null, org_c, 'بحري', 'sea', array['CN'], array['SA'], 20, 40, null, true, 8, 'CNY', 200, 'Ningbo'); exception when others then ok := false; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' A2 طالب صفة الناقل يضيف خدمته قبل الاعتماد للمراجعة');
+  perform set_config('request.jwt.claims', json_build_object('sub', cb, 'role', 'authenticated')::text, true);
+  ok := false; begin perform public.ap_save_carrier_service(null, org_c, 'دخيل', 'sea', array['CN'], array['SA'], 20, 40, null, true); exception when others then ok := true; end;
+  out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' A2b لا يضيف أحد خدمة لمنشأة ليست له');
   perform set_config('request.jwt.claims', json_build_object('sub', cb, 'role', 'authenticated')::text, true);
   ok := false; begin perform public.ap_save_carrier_service(svc, org_l, 'تعديل', 'air', array['CN'], array['SA'], 1, 2, null, true); exception when others then ok := true; end;
   out := array_append(out, (case when ok then 'PASS' else 'FAIL' end) || ' A3 ناقل لا يعدّل خدمة ناقل آخر');

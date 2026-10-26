@@ -5,7 +5,8 @@ import { SiteShell } from "@/components/site-shell";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Card, Field, Input, PageTitle } from "@/components/ui";
 import { getSession } from "@/lib/auth";
-import { countries, selfCapabilities } from "@/lib/partners";
+import { accountKinds, selfCapabilities } from "@/lib/partners";
+import { CountrySelect } from "@/components/country-select";
 import { alternates } from "@/lib/seo";
 import { registerAsPartner } from "@/server/partner-actions";
 import { localeFrom } from "@/i18n/locales";
@@ -72,16 +73,20 @@ export default async function JoinPage({ params, searchParams }: { params: Promi
           ) : (
             <form action={registerAsPartner} className="flex flex-col gap-4">
               <input type="hidden" name="locale" value={locale} />
-              <Field label={tf("legal_name")} htmlFor="legalName">
+              <fieldset className="grid gap-2 sm:grid-cols-2">
+                <legend className="mb-1 text-sm font-bold">{t("kindTitle")}</legend>
+                {accountKinds.map((k) => (
+                  <label key={k} className="flex items-start gap-3 rounded-lg border border-line p-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
+                    <input type="radio" name="accountKind" value={k} required defaultChecked={k === "company"} className="mt-1 accent-accent" />
+                    <span><span className="block font-bold">{t(`kinds.${k}`)}</span><span className="text-muted">{t(`kindHints.${k}`)}</span></span>
+                  </label>
+                ))}
+              </fieldset>
+              <Field label={t("nameLabel")} hint={t("nameHint")} htmlFor="legalName">
                 <Input id="legalName" name="legalName" required minLength={2} maxLength={200} />
               </Field>
-              <Field label={tf("country_code")} hint={t("countryHint")} htmlFor="country">
-                <Input id="country" name="country" required pattern="[A-Za-z]{2}" maxLength={2} list="countries" dir="ltr" className="uppercase" />
-                <datalist id="countries">
-                  {countries.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
+              <Field label={tf("country_code")} htmlFor="country">
+                <CountrySelect name="country" locale={locale} required placeholder={t("countryPlaceholder")} />
               </Field>
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-bold">{t("capabilities")}</legend>
