@@ -12,7 +12,7 @@ export async function SiteFooter() {
   const s = await getPublicSettings();
   const groups = [
     { title: t("platform"), links: [["/about", t("about")], ["/how-it-works", t("howItWorks")], ["/faq", t("faq")]] },
-    { title: t("services"), links: [["/products", t("products")], ["/request-part", t("requestPart")], ["/track", t("track")]] },
+    { title: t("services"), links: [["/products", t("products")], ["/request-part", t("requestPart")], ["/track", t("track")], ["/join", t("join")]] },
     { title: t("legal"), links: [["/privacy", t("privacy")], ["/terms", t("terms")]] },
   ] as const;
 

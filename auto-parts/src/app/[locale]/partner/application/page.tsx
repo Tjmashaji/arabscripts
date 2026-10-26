@@ -27,7 +27,7 @@ export default async function ApplicationPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ saved?: string; error?: string; missing?: string; submitted?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; missing?: string; submitted?: string; started?: string }>;
 }) {
   const locale = await localeFrom(params);
   setRequestLocale(locale);
@@ -77,6 +77,7 @@ export default async function ApplicationPage({
           <PageTitle>{t("applicationTitle")}</PageTitle>
           <Badge tone={statusTone(app.status)}>{tas(app.status)}</Badge>
         </div>
+        {q.started && <Alert tone="success">{t("started")}</Alert>}
         {q.saved && <Alert tone="success">{t("saved")}</Alert>}
         {q.submitted && <Alert tone="success">{t("submitted")}</Alert>}
         {q.error === "upload" && <Alert tone="danger">{t("uploadFailed")}</Alert>}

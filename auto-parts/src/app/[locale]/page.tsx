@@ -89,6 +89,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <Card>
             <h2 className="text-lg font-bold">{t("partnerTitle")}</h2>
             <p className="mt-3 text-sm text-muted">{t("partnerBody")}</p>
+            <Link href="/join" className="mt-4 inline-flex rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white">{t("partnerCta")}</Link>
           </Card>
         </div>
       </div>

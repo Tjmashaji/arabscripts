@@ -25,6 +25,11 @@ describe("pushText", () => {
     expect(m.body).toBe("لديك إشعار جديد.");
     expect(m.path).toBe("/account");
   });
+  it("sends a new partner application to its admin review page", () => {
+    const m = pushText(ar as unknown as PushMessages, "partner_application_submitted", { application_id: id, reference: "Henghui Auto Parts" }, "ar");
+    expect(m.body).toContain("Henghui Auto Parts");
+    expect(m.path).toBe(`/admin/partner-applications/${id}`);
+  });
   it("has every push text in all three languages", () => {
     const keys = (x: unknown) => Object.keys((x as PushMessages).push).sort();
     expect(keys(en)).toEqual(keys(ar));

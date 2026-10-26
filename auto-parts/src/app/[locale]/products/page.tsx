@@ -45,35 +45,38 @@ export default async function ProductsPage({ params, searchParams }: { params: P
     <SiteShell locale={locale} path="/products">
       <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 py-8">
         <PageTitle>{t("title")}</PageTitle>
-        <PartSearchForm locale={locale} action={locale === "ar" ? "/products" : `/${locale}/products`} values={q} />
-        <form method="get" className="grid gap-2 rounded-xl border border-line bg-card p-3 text-sm sm:grid-cols-2 lg:grid-cols-6">
-          {(["q", "brand", "model", "year"] as const).map((k) => q[k] && <input key={k} type="hidden" name={k} value={q[k]} />)}
-          <select name="category" defaultValue={q.category ?? ""} aria-label={t("category")} className="min-h-11 rounded-lg border border-line bg-card px-2">
-            <option value="">{t("category")}: {t("any")}</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {localName(c, locale)}
-              </option>
-            ))}
-          </select>
-          <select name="type" defaultValue={q.type ?? ""} aria-label={t("partType")} className="min-h-11 rounded-lg border border-line bg-card px-2">
-            <option value="">{t("partType")}: {t("any")}</option>
-            {partTypes.map((p) => (
-              <option key={p} value={p}>
-                {tp(p)}
-              </option>
-            ))}
-          </select>
-          <input name="min" defaultValue={q.min} placeholder={t("priceMin")} aria-label={t("priceMin")} inputMode="decimal" dir="ltr" className="min-h-11 rounded-lg border border-line px-2" />
-          <input name="max" defaultValue={q.max} placeholder={t("priceMax")} aria-label={t("priceMax")} inputMode="decimal" dir="ltr" className="min-h-11 rounded-lg border border-line px-2" />
-          <label className="flex min-h-11 items-center gap-2">
-            <input type="checkbox" name="available" value="1" defaultChecked={q.available === "1"} />
-            {t("availableOnly")}
-          </label>
-          <button type="submit" className="min-h-11 rounded-lg border border-line font-bold">
-            {t("search")}
-          </button>
-        </form>
+        <PartSearchForm
+          locale={locale}
+          action={locale === "ar" ? "/products" : `/${locale}/products`}
+          values={q}
+          filtersOpen={Boolean(q.category || q.type || q.min || q.max || q.available)}
+          filters={
+            <>
+              <select name="category" defaultValue={q.category ?? ""} aria-label={t("category")} className="min-h-11 rounded-lg border border-line bg-card px-2">
+                <option value="">{t("category")}: {t("any")}</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {localName(c, locale)}
+                  </option>
+                ))}
+              </select>
+              <select name="type" defaultValue={q.type ?? ""} aria-label={t("partType")} className="min-h-11 rounded-lg border border-line bg-card px-2">
+                <option value="">{t("partType")}: {t("any")}</option>
+                {partTypes.map((p) => (
+                  <option key={p} value={p}>
+                    {tp(p)}
+                  </option>
+                ))}
+              </select>
+              <input name="min" defaultValue={q.min} placeholder={t("priceMin")} aria-label={t("priceMin")} inputMode="decimal" dir="ltr" className="min-h-11 rounded-lg border border-line px-2" />
+              <input name="max" defaultValue={q.max} placeholder={t("priceMax")} aria-label={t("priceMax")} inputMode="decimal" dir="ltr" className="min-h-11 rounded-lg border border-line px-2" />
+              <label className="flex min-h-11 items-center gap-2">
+                <input type="checkbox" name="available" value="1" defaultChecked={q.available === "1"} />
+                {t("availableOnly")}
+              </label>
+            </>
+          }
+        />
 
         <p className="text-sm text-muted">{t("results", { count: total })}</p>
         {rows.length === 0 ? (

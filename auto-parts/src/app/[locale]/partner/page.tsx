@@ -58,7 +58,12 @@ export default async function PartnerHome({ params }: { params: Promise<{ locale
             </Link>
           </div>
         </div>
-        {(apps ?? []).length === 0 && session.organizations.length === 0 && <Alert tone="info">{t("noOrg")}</Alert>}
+        {(apps ?? []).length === 0 && session.organizations.length === 0 && (
+          <Alert tone="info">
+            {t("noOrg")}{" "}
+            <Link href="/join" className="font-bold underline">{(await getTranslations("join"))("title")}</Link>
+          </Alert>
+        )}
 
         {(apps ?? []).map((app) => {
           const org = app.organization as unknown as {
