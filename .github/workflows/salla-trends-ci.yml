@@ -1,0 +1,52 @@
+# فحوصات رادار الترند مع كل دفع أو طلب دمج يمس مجلد salla-trends:
+# الأنواع، ESLint، اختبارات الوحدات والتكامل على Postgres حقيقي (العزل، الخصوصية، الويب هوك)، ثم بناء الإنتاج.
+name: salla-trends-ci
+
+on:
+  push:
+    paths: ["salla-trends/**", ".github/workflows/salla-trends-ci.yml"]
+  pull_request:
+    paths: ["salla-trends/**", ".github/workflows/salla-trends-ci.yml"]
+
+defaults:
+  run:
+    working-directory: salla-trends
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: salla-trends/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test database
+        run: ./tests/global-db.sh
+      - name: Unit + integration tests
+        run: npm test
+      - name: Build
+        env:
+          DATABASE_URL: postgres://trends_app:trends_app_dev@127.0.0.1:5432/salla_trends_test
+          WORKER_DATABASE_URL: postgres://trends_worker:trends_worker_dev@127.0.0.1:5432/salla_trends_test
+          TOKEN_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+        run: npm run build
