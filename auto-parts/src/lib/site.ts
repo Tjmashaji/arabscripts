@@ -2,6 +2,9 @@
 export const numericSettings = {
   service_fee_percent: { min: 0, max: 50, integer: false },
   availability_max_age_hours: { min: 1, max: 720, integer: true },
+  // مساعد التعبئة الذكي: حصة كل مستخدم وسقف المنصة خلال 24 ساعة (0 = إيقاف المساعد).
+  ai_daily_user_limit: { min: 0, max: 500, integer: true },
+  ai_daily_total_limit: { min: 0, max: 20000, integer: true },
 } as const;
 
 // بيانات الجهة المشغّلة: تظهر في التذييل وصفحة «من نحن» فقط إذا أُدخلت (لا بيانات افتراضية أو وهمية).

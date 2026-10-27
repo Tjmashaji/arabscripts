@@ -989,7 +989,11 @@
     "bank_account_name": "Account holder name",
     "bank_account_name_help": "As the customer sees it when transferring.",
     "bank_iban": "IBAN",
-    "bank_iban_help": "SA followed by 22 digits. Spaces are removed automatically."
+    "bank_iban_help": "SA followed by 22 digits. Spaces are removed automatically.",
+    "ai_daily_user_limit": "AI assistant: daily limit per user",
+    "ai_daily_user_limit_help": "Uses per user in 24 hours. 0 turns the assistant off. 0 to 500.",
+    "ai_daily_total_limit": "AI assistant: daily platform limit",
+    "ai_daily_total_limit_help": "Cost cap: total uses by all users in 24 hours. 0 turns the assistant off. 0 to 20000."
   },
   "footer": {
     "platform": "Platform",
@@ -1167,7 +1171,7 @@
     },
     "privacy": {
       "title": "Privacy policy",
-      "updated": "October 20, 2026",
+      "updated": "October 27, 2026",
       "description": "What data we collect, why, who can see it, how we protect it, and your rights.",
       "intro": "We collect the minimum data needed to fulfil your order and limit access to those who need it to do so.",
       "sections": [
@@ -1192,6 +1196,7 @@
             "Suppliers: only the part description, vehicle details and city — never your name or mobile — and the VIN only when needed.",
             "Carriers: only the delivery details needed for shipments assigned to them, without part prices.",
             "Platform team: according to role and permission; every access to private documents is logged.",
+            "Smart filling assistant (optional): what you paste or upload there is sent to our AI provider (Anthropic) only to extract the data, and we don't store it.",
             "We don't sell your data or share it for advertising."
           ]
         },
@@ -1393,5 +1398,31 @@
     "nameLabel": "Name",
     "nameHint": "Company: the legal name as registered. Individual: your full name.",
     "countryPlaceholder": "Choose a country"
+  },
+  "aiFill": {
+    "title": "Fill this form with AI",
+    "help": {
+      "partner_application": "Paste your company details (from a company profile, a message or your website), or upload your business license, and we fill in the fields for you.",
+      "bank": "Paste the account details or upload the bank letter or IBAN certificate, and we fill in the fields for you.",
+      "carrier_service": "Paste your shipping rate offer (e.g. a WhatsApp message or price table) or upload a photo of it, and we fill in the service for you.",
+      "product": "Paste the part description or upload a photo of its label or catalog page, and we fill in the name, description, brand and category."
+    },
+    "textLabel": "Text",
+    "placeholder": "Paste the text here (any language)…",
+    "fileLabel": "Or upload an image or PDF (optional, up to 4 MB)",
+    "run": "Fill the fields",
+    "working": "Reading…",
+    "privacy": "What you add here is sent to our AI provider (Anthropic) only to extract the data. We don't store it.",
+    "filled": "We filled {count} fields (highlighted). Review and correct them, then press Save.",
+    "nothing": "We found no new data for this form in what you sent.",
+    "errors": {
+      "file": "Unsupported file or larger than 4 MB. Allowed: PNG, JPG or PDF.",
+      "empty": "Paste some text or upload a file first.",
+      "refused": "The assistant couldn't read this content. Please fill in the fields manually.",
+      "failed": "The assistant is unavailable right now. Try again shortly or fill in manually.",
+      "auth": "Sign in to use the assistant.",
+      "off": "The assistant is not enabled right now.",
+      "quota": "You've reached the daily limit for the assistant. Try again in 24 hours."
+    }
   }
 }
