@@ -9,6 +9,8 @@ import { localName } from "@/lib/catalog";
 import { createProduct } from "@/server/catalog-actions";
 import { localeFrom, localeNames, locales } from "@/i18n/locales";
 import { errorMessage } from "@/lib/errors";
+import { AiFill } from "@/components/ai-fill";
+import { aiConfigured } from "@/lib/ai-fill";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = await localeFrom(params);
@@ -36,6 +38,7 @@ export default async function NewProduct({ params, searchParams }: { params: Pro
             {error && <div className="mb-4"><Alert tone="danger">{await errorMessage(error)}</Alert></div>}
             <form action={createProduct} className="grid gap-4 sm:grid-cols-2">
               <input type="hidden" name="locale" value={locale} />
+              {aiConfigured() && <AiFill profile="product" locale={locale} />}
               {orgs.length === 1 ? (
                 <input type="hidden" name="organizationId" value={orgs[0].id} />
               ) : (

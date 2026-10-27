@@ -4,6 +4,8 @@ import { Field, Input, Select } from "./ui";
 import { currencies } from "@/lib/catalog";
 import { shippingModes } from "@/lib/shipping";
 import { saveCarrierService } from "@/server/shipping-actions";
+import { aiConfigured } from "@/lib/ai-fill";
+import { AiFill } from "./ai-fill";
 
 export type CarrierService = {
   id: string; organization_id: string; name: string; mode: string; origin_countries: string[]; destination_countries: string[];
@@ -26,6 +28,7 @@ export async function CarrierServiceForm({ locale, orgs, service, back }: {
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="back" value={back} />
       {s && <input type="hidden" name="serviceId" value={s.id} />}
+      {!s && aiConfigured() && <AiFill profile="carrier_service" locale={locale} />}
       {orgs.length === 1 || s ? (
         <input type="hidden" name="organizationId" value={s?.organization_id ?? orgs[0].id} />
       ) : (

@@ -12,6 +12,8 @@ import { CarrierServiceForm, type CarrierService } from "@/components/carrier-se
 import { currencies, formatMoney } from "@/lib/catalog";
 import { accountKinds, capabilities, countries, documentTypes, editableStatuses, type ApplicationStatus } from "@/lib/partners";
 import { localeFrom, localeNames, locales } from "@/i18n/locales";
+import { AiFill } from "@/components/ai-fill";
+import { aiConfigured } from "@/lib/ai-fill";
 
 type Org = {
   id: string; account_kind: "company" | "individual"; registration_number: string | null; vat_number: string | null; city: string | null;
@@ -67,6 +69,7 @@ export default async function ApplicationPage({
   const editable = editableStatuses.includes(app.status as ApplicationStatus);
   const requested = new Set(org.ap_organization_verifications.map((v) => v.capability));
   const individual = org.account_kind === "individual";
+  const ai = aiConfigured();
   const carrierCap = org.ap_organization_verifications.find((v) => v.capability === "carrier" && (v.status === "requested" || v.status === "approved"));
   const todo = editable ? ((missingNow ?? []) as string[]) : [];
   const tm = await getTranslations("shippingModes");
@@ -117,6 +120,7 @@ export default async function ApplicationPage({
 
         <form action={saveApplication} className="flex flex-col gap-5">
           <input type="hidden" name="locale" value={locale} />
+          {editable && ai && <AiFill profile="partner_application" locale={locale} />}
           <Card className="flex flex-col gap-3">
             <h2 className="font-bold">{t("kindTitle")}</h2>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -296,6 +300,7 @@ export default async function ApplicationPage({
           <p className="text-sm text-muted">{t("bankHelp")}</p>
           {q.error === "bank" && <Alert tone="danger">{t("bankInvalid")}</Alert>}
           <form action={saveBankAccount} className="grid gap-4 sm:grid-cols-2">
+            {ai && <AiFill profile="bank" locale={locale} />}
             <input type="hidden" name="locale" value={locale} />
             <Field label={t("bankName")} htmlFor="bankName"><Input id="bankName" name="bankName" maxLength={120} defaultValue={bank?.bank_name ?? ""} /></Field>
             <Field label={t("bankHolder")} htmlFor="holder"><Input id="holder" name="holder" maxLength={200} defaultValue={bank?.account_holder ?? org.legal_name} /></Field>
